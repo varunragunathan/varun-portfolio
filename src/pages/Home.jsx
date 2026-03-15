@@ -35,7 +35,7 @@ function Hero() {
         {/* Avatar */}
         <div style={{ width: 96, height: 96, borderRadius: '50%', margin: '0 auto 18px', background: `linear-gradient(135deg, ${t.accent}, ${t.accentDim})`, padding: 2 }}>
           <img
-            src="/varun.PNG"
+            src="/varun.png"
             alt="Varun Ragunathan"
             width={92}
             height={92}
