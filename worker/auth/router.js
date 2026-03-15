@@ -8,6 +8,7 @@ import {
   listPasskeys, revokePasskey, renamePasskey,
   listSecurityEvents,
   recoveryCodesStatus, regenerateRecoveryCodes,
+  deleteAccount,
 } from './account.js';
 
 function json(data, status = 200) {
@@ -75,6 +76,9 @@ export async function handleAuth(request, env, url) {
   if (method === 'POST' && path === '/num-match/respond')           return respondToApproval(request, env);
   // GET (legacy email link) — kept for any in-flight links
   if (method === 'GET'  && path === '/num-match/approve')           return approveNumMatch(request, env);
+
+  // ── Account deletion ────────────────────────────────────────────
+  if (method === 'DELETE' && path === '/account')                   return deleteAccount(request, env);
 
   // ── Account recovery ────────────────────────────────────────────
   if (method === 'POST' && path === '/recovery/start')              return recoveryStart(request, env);

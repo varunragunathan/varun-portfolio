@@ -157,6 +157,15 @@ export async function deleteAllSessionsByUserId(db, userId) {
   await db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId).run();
 }
 
+export async function deleteUser(db, userId) {
+  // Delete child records first (no CASCADE in schema)
+  await db.prepare('DELETE FROM recovery_codes WHERE user_id = ?').bind(userId).run();
+  await db.prepare('DELETE FROM security_events WHERE user_id = ?').bind(userId).run();
+  await db.prepare('DELETE FROM passkey_creds WHERE user_id = ?').bind(userId).run();
+  await db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId).run();
+  await db.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
+}
+
 export async function deleteAllSessionsByUserIdExcept(db, userId, exceptSessionId) {
   await db
     .prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?')

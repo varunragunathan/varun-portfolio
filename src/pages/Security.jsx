@@ -372,9 +372,122 @@ function SecurityEvents() {
 }
 
 // ── Security page ─────────────────────────────────────────────────
+// ── Delete account ────────────────────────────────────────────────
+function DeleteAccount({ userEmail, onDeleted }) {
+  const { t } = useTheme();
+  const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function handleDelete() {
+    setBusy(true); setError(null);
+    const res = await fetch('/api/auth/account', { method: 'DELETE', credentials: 'include' });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || 'Something went wrong');
+      setBusy(false);
+      return;
+    }
+    onDeleted();
+  }
+
+  return (
+    <>
+      <div style={{
+        marginTop: 48, padding: '24px', borderRadius: 14,
+        border: '1px solid rgba(239,68,68,0.25)',
+        background: 'rgba(239,68,68,0.04)',
+      }}>
+        <h2 style={{ fontFamily: F, fontWeight: 400, fontSize: 16, color: '#f87171', margin: '0 0 6px' }}>
+          Delete account
+        </h2>
+        <p style={{ fontFamily: F, fontSize: 13, color: t.text3, margin: '0 0 16px', lineHeight: 1.6 }}>
+          Permanently deletes your account, all passkeys, sessions, and recovery codes. This cannot be undone.
+        </p>
+        <button
+          onClick={() => setOpen(true)}
+          style={{
+            padding: '9px 18px', borderRadius: 9,
+            fontFamily: F, fontSize: 14, cursor: 'pointer',
+            background: 'rgba(239,68,68,0.08)', color: '#f87171',
+            border: '1px solid rgba(239,68,68,0.25)',
+          }}
+        >
+          Delete account
+        </button>
+      </div>
+
+      {open && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 2000,
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+        }}>
+          <div style={{
+            background: t.cardBg, border: '1px solid rgba(239,68,68,0.3)',
+            borderRadius: 20, padding: '32px 28px', maxWidth: 400, width: '100%',
+          }}>
+            <h2 style={{ fontFamily: F, fontWeight: 400, fontSize: 20, color: '#f87171', margin: '0 0 10px' }}>
+              Delete account
+            </h2>
+            <p style={{ fontFamily: F, fontSize: 14, color: t.text2, lineHeight: 1.6, marginBottom: 24 }}>
+              This will permanently delete your account and all associated data. Type your email to confirm.
+            </p>
+            <input
+              value={confirm}
+              onChange={e => setConfirm(e.target.value)}
+              placeholder={userEmail}
+              autoFocus
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                padding: '11px 14px', borderRadius: 10, marginBottom: 16,
+                fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: t.text1,
+                background: '#1a1a1a', border: '1px solid rgba(239,68,68,0.3)',
+                outline: 'none',
+              }}
+            />
+            {error && (
+              <p style={{ fontFamily: F, fontSize: 13, color: '#f87171', marginBottom: 12 }}>{error}</p>
+            )}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => { setOpen(false); setConfirm(''); setError(null); }}
+                disabled={busy}
+                style={{
+                  flex: 1, padding: '11px', borderRadius: 10,
+                  fontFamily: F, fontSize: 14, cursor: 'pointer',
+                  background: 'transparent', color: t.text2, border: `1px solid ${t.border}`,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={busy || confirm !== userEmail}
+                style={{
+                  flex: 1, padding: '11px', borderRadius: 10,
+                  fontFamily: F, fontSize: 14, fontWeight: 500,
+                  cursor: busy || confirm !== userEmail ? 'not-allowed' : 'pointer',
+                  background: 'rgba(239,68,68,0.15)', color: '#f87171',
+                  border: '1px solid rgba(239,68,68,0.3)',
+                  opacity: busy || confirm !== userEmail ? 0.5 : 1,
+                  transition: 'opacity 0.2s',
+                }}
+              >
+                {busy ? 'Deleting…' : 'Delete permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function Security() {
   const { t } = useTheme();
-  const { user, loading, enabled } = useAuth();
+  const { user, loading, enabled, setUser } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -413,6 +526,11 @@ export default function Security() {
       <Section title="Recent activity" subtitle="Last 20 security events on your account">
         <SecurityEvents />
       </Section>
+
+      <DeleteAccount
+        userEmail={user.email}
+        onDeleted={() => { setUser(null); navigate('/'); }}
+      />
     </main>
   );
 }

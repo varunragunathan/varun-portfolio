@@ -14,6 +14,7 @@ import {
   getRecoveryCodeStatus,
   generateAndStoreRecoveryCodes,
   logSecurityEvent,
+  deleteUser,
 } from '../db.js';
 import { sha256Hex as sha256 } from '../utils.js';
 
@@ -193,4 +194,18 @@ export async function regenerateRecoveryCodes(request, env) {
   });
 
   return json({ ok: true, recoveryCodes });
+}
+
+// DELETE /api/auth/account
+export async function deleteAccount(request, env) {
+  const { session, error } = await requireSession(request, env);
+  if (error) return error;
+
+  const db = env.varun_portfolio_auth;
+
+  // Delete everything — KV session first, then all D1 records
+  await env.AUTH_KV.delete(`session:${session.token}`);
+  await deleteUser(db, session.userId);
+
+  return json({ ok: true }, 200, { 'Set-Cookie': sessionCookie('', 0) });
 }
