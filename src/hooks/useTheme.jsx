@@ -32,20 +32,42 @@ export const themes = {
   },
 };
 
+function getSystemTheme() {
+  if (typeof window === 'undefined') return 'dark';
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
+// preference: 'auto' | 'light' | 'dark'
+// resolved:   'light' | 'dark'
 export function ThemeProvider({ children }) {
-  const [mode, setMode] = useState(() => {
-    if (typeof window === 'undefined') return 'dark';
-    const saved = localStorage.getItem('theme');
-    if (saved) return saved;
-    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  const [preference, setPreference] = useState(() => {
+    if (typeof window === 'undefined') return 'auto';
+    return localStorage.getItem('theme-pref') || 'auto';
   });
 
-  useEffect(() => { localStorage.setItem('theme', mode); }, [mode]);
+  const [systemTheme, setSystemTheme] = useState(getSystemTheme);
 
-  const toggle = () => setMode(m => m === 'dark' ? 'light' : 'dark');
+  // Track OS preference changes (only matters when preference === 'auto')
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: light)');
+    const handler = e => setSystemTheme(e.matches ? 'light' : 'dark');
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('theme-pref', preference);
+  }, [preference]);
+
+  const resolved = preference === 'auto' ? systemTheme : preference;
 
   return (
-    <ThemeCtx.Provider value={{ t: themes[mode], mode, toggle }}>
+    <ThemeCtx.Provider value={{
+      t: themes[resolved],
+      mode: resolved,
+      preference,
+      setPreference,
+    }}>
       {children}
     </ThemeCtx.Provider>
   );

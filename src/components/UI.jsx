@@ -66,27 +66,78 @@ export function Btn({ href, primary, children, external }) {
   );
 }
 
-/** Theme toggle button. Pass inline=true when used inside Nav. */
-export function ThemeToggle({ inline = false }) {
-  const { t, mode, toggle } = useTheme();
+// Icons for each theme mode
+function SunIcon({ stroke }) {
   return (
-    <button
-      onClick={toggle}
-      aria-label={`Switch to ${mode === 'dark' ? 'light' : 'dark'} mode`}
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="5" />
+      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+    </svg>
+  );
+}
+function MoonIcon({ stroke }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  );
+}
+function AutoIcon({ stroke }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
+      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <path d="M8 21h8M12 17v4" />
+    </svg>
+  );
+}
+
+const MODES = ['auto', 'light', 'dark'];
+const MODE_ICONS = { auto: AutoIcon, light: SunIcon, dark: MoonIcon };
+const MODE_LABELS = { auto: 'Auto', light: 'Light', dark: 'Dark' };
+
+/** 3-segment theme control. Pass inline=true when used inside Nav. */
+export function ThemeToggle({ inline = false }) {
+  const { t, preference, setPreference } = useTheme();
+
+  const segments = (
+    <div
+      role="group"
+      aria-label="Theme preference"
       style={{
-        ...(inline ? { position: 'static' } : { position: 'fixed', top: 18, right: 18, zIndex: 100 }),
-        width: 38, height: 38, borderRadius: 10,
+        display: 'flex', alignItems: 'center',
         background: t.surface, border: `1px solid ${t.border}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'pointer', transition: 'all 0.3s',
+        borderRadius: 10, padding: 3, gap: 2,
       }}
     >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.text2} strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-        {mode === 'dark'
-          ? <><circle cx="12" cy="12" r="5" /><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" /></>
-          : <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />}
-      </svg>
-    </button>
+      {MODES.map(m => {
+        const Icon = MODE_ICONS[m];
+        const active = preference === m;
+        return (
+          <button
+            key={m}
+            onClick={() => setPreference(m)}
+            aria-label={MODE_LABELS[m]}
+            aria-pressed={active}
+            style={{
+              width: 30, height: 30, borderRadius: 7, border: 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', transition: 'all 0.2s',
+              background: active ? t.accentDim : 'transparent',
+            }}
+          >
+            <Icon stroke={active ? t.accent : t.text3} />
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  if (inline) return segments;
+
+  return (
+    <div style={{ position: 'fixed', top: 14, right: 14, zIndex: 100 }}>
+      {segments}
+    </div>
   );
 }
 
