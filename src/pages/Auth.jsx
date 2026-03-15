@@ -296,7 +296,7 @@ function NumberMatchScreen({ code, tempToken, onApproved, onDenied }) {
       </div>
 
       <p style={{ fontFamily: F, fontSize: 14, color: t.text2, lineHeight: 1.6, marginBottom: 28 }}>
-        We've sent an approval email to your address. Make sure the number in the email matches what you see below.
+        Your other signed-in devices will show an approval prompt. Make sure the number matches what you see there.
       </p>
 
       <div style={{
@@ -311,7 +311,7 @@ function NumberMatchScreen({ code, tempToken, onApproved, onDenied }) {
         <p style={{ fontFamily: F, fontSize: 13, color: t.text3, lineHeight: 1.5 }}>
           Waiting for approval from a trusted device…
           <br />
-          <span style={{ fontSize: 11 }}>Check your email and click Approve if this number matches.</span>
+          <span style={{ fontSize: 11 }}>Open varunr.dev on a trusted device to approve.</span>
         </p>
       )}
       {status === 'denied' && (
