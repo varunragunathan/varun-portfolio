@@ -33,8 +33,14 @@ function Hero() {
         transition: 'opacity 0.85s cubic-bezier(0.22,1,0.36,1), transform 0.85s cubic-bezier(0.22,1,0.36,1)',
       }}>
         {/* Avatar */}
-        <div aria-hidden="true" style={{ width: 84, height: 84, borderRadius: '50%', margin: '0 auto 18px', background: `linear-gradient(135deg, ${t.accent}, ${t.accentDim})`, padding: 2 }}>
-          <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: t.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: F, fontSize: 24, fontWeight: 300, color: t.accent }}>VR</div>
+        <div style={{ width: 96, height: 96, borderRadius: '50%', margin: '0 auto 18px', background: `linear-gradient(135deg, ${t.accent}, ${t.accentDim})`, padding: 2 }}>
+          <img
+            src="/varun.PNG"
+            alt="Varun Ragunathan"
+            width={92}
+            height={92}
+            style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+          />
         </div>
 
         <div style={{ fontFamily: M, fontSize: 12, fontWeight: 400, letterSpacing: '0.22em', textTransform: 'uppercase', color: t.accentMuted, marginBottom: 16 }}>

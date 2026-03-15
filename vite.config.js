@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon.svg', 'robots.txt', 'icon-192.png', 'icon-512.png'],
       manifest: {
         name: 'Varun Ragunathan — Staff Engineer',
         short_name: 'Varun R.',
