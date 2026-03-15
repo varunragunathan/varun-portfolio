@@ -20,8 +20,8 @@ export const PROJECTS = [
   {
     role: 'Frontend Architecture Lead',
     title: 'Passkey Authentication Platform',
-    description: "Designed eBay's passkey eligibility detection module and led UI architecture from POC to production. Reduced integration time from 3 months to 1 week. 98% authentication success vs ~70% for passwords.",
-    metrics: ['$20M+ annual revenue', '98% auth success', '135M+ users'],
+    description: "Designed eBay's passkey eligibility detection module and led UI architecture from POC to production. Reduced integration time from 3 months to 1 week. 93% authentication success vs ~70% for passwords.",
+    metrics: ['$20M+ annual revenue', '93% auth success', '135M+ users'],
     tags: ['WebAuthn', 'Passkeys', 'Node.js', 'Marko', 'Risk-based Auth'],
     featured: true,
   },
