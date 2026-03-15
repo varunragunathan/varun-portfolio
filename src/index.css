@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  ::selection {
+    background: rgba(100, 255, 218, 0.25);
+    color: #fff;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100, 255, 218, 0.15) transparent;
+  }
+  *::-webkit-scrollbar { width: 5px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: rgba(100, 255, 218, 0.12); border-radius: 3px; }
+}
