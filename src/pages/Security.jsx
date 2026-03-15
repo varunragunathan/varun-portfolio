@@ -21,13 +21,14 @@ function Section({ title, subtitle, children }) {
   );
 }
 
-function Row({ children, last }) {
+function Row({ children, last, highlight }) {
   const { t } = useTheme();
   return (
     <div style={{
       padding: '16px 20px',
       borderBottom: last ? 'none' : `1px solid ${t.border}`,
       display: 'flex', alignItems: 'center', gap: 12,
+      background: highlight ? 'rgba(99,102,241,0.06)' : 'transparent',
     }}>
       {children}
     </div>
@@ -79,6 +80,24 @@ function GhostBtn({ children, onClick }) {
       }}
     >
       {children}
+    </button>
+  );
+}
+
+function RevealIP({ ip }) {
+  const [revealed, setRevealed] = useState(false);
+  if (!ip || ip === 'unknown') return <span>unknown IP</span>;
+  if (revealed) return <span>{ip}</span>;
+  return (
+    <button
+      onClick={() => setRevealed(true)}
+      style={{
+        background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+        fontFamily: M, fontSize: 11, color: '#6366f1', textDecoration: 'underline',
+        textDecorationStyle: 'dotted',
+      }}
+    >
+      Reveal IP
     </button>
   );
 }
@@ -137,15 +156,15 @@ function Sessions() {
   return (
     <>
       {sessions.map((s, i) => (
-        <Row key={s.id} last={i === sessions.length - 1}>
+        <Row key={s.id} last={i === sessions.length - 1} highlight={s.isCurrent}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
               <span style={{ fontFamily: F, fontSize: 14, color: t.text1 }}>{s.deviceName || 'Unknown device'}</span>
               {s.isCurrent && <Badge color="#6366f1">Current</Badge>}
               {s.trusted && <Badge color="#22c55e">Trusted</Badge>}
             </div>
-            <span style={{ fontFamily: M, fontSize: 11, color: t.text3 }}>
-              Active {formatRelative(s.lastActiveAt)} · {s.ip || 'unknown IP'}
+            <span style={{ fontFamily: M, fontSize: 11, color: t.text3, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              Active {formatRelative(s.lastActiveAt)} · <RevealIP ip={s.ip} />
             </span>
           </div>
           {!s.isCurrent && (
@@ -341,9 +360,9 @@ function SecurityEvents() {
                 {EVENT_LABELS[ev.type] || ev.type}
               </span>
             </div>
-            <span style={{ fontFamily: M, fontSize: 11, color: t.text3 }}>
+            <span style={{ fontFamily: M, fontSize: 11, color: t.text3, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               {formatDate(ev.created_at)}
-              {ev.ip && ev.ip !== 'unknown' ? ` · ${ev.ip}` : ''}
+              {ev.ip && ev.ip !== 'unknown' && <><span>·</span><RevealIP ip={ev.ip} /></>}
             </span>
           </div>
         </Row>
