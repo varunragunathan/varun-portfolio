@@ -2,6 +2,7 @@
 // All routes require an active session.
 
 import { getSession, sessionCookie } from './session.js';
+import { consumeStepUpToken } from './stepUp.js';
 import {
   getSessionsByUserId,
   deleteSessionById,
@@ -196,10 +197,14 @@ export async function regenerateRecoveryCodes(request, env) {
   return json({ ok: true, recoveryCodes });
 }
 
-// DELETE /api/auth/account
+// DELETE /api/auth/account  { stepUpToken }
 export async function deleteAccount(request, env) {
   const { session, error } = await requireSession(request, env);
   if (error) return error;
+
+  const body = await request.json().catch(() => ({}));
+  const valid = await consumeStepUpToken(env.AUTH_KV, body.stepUpToken, session.userId);
+  if (!valid) return json({ error: 'Step-up authentication required or expired. Please verify your passkey again.' }, 403);
 
   const db = env.varun_portfolio_auth;
 

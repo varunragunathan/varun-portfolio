@@ -2,6 +2,7 @@ import { sendOTP, verifyOTP } from './otp.js';
 import { getRegisterOptions, verifyRegistration, getAuthOptions, verifyAuth } from './passkey.js';
 import { getMe, logout, finaliseSession } from './session.js';
 import { approveNumMatch, pollNumMatch, getPendingApproval, respondToApproval } from './numMatch.js';
+import { stepUpOptions, stepUpVerify } from './stepUp.js';
 import { recoveryStart, recoveryVerify } from './recovery.js';
 import {
   listSessions, revokeSession, revokeOtherSessions, renameSession,
@@ -76,6 +77,10 @@ export async function handleAuth(request, env, url) {
   if (method === 'POST' && path === '/num-match/respond')           return respondToApproval(request, env);
   // GET (legacy email link) — kept for any in-flight links
   if (method === 'GET'  && path === '/num-match/approve')           return approveNumMatch(request, env);
+
+  // ── Step-up authentication ──────────────────────────────────────
+  if (method === 'POST' && path === '/step-up/options')             return stepUpOptions(request, env);
+  if (method === 'POST' && path === '/step-up/verify')              return stepUpVerify(request, env);
 
   // ── Account deletion ────────────────────────────────────────────
   if (method === 'DELETE' && path === '/account')                   return deleteAccount(request, env);

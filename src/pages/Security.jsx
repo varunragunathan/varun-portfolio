@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { startAuthentication } from '@simplewebauthn/browser';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth.jsx';
@@ -375,21 +376,68 @@ function SecurityEvents() {
 // ── Delete account ────────────────────────────────────────────────
 function DeleteAccount({ userEmail, onDeleted }) {
   const { t } = useTheme();
-  const [open, setOpen] = useState(false);
+  // 'idle' | 'verifying' | 'confirm' | 'deleting'
+  const [stage, setStage] = useState('idle');
+  const [stepUpToken, setStepUpToken] = useState(null);
   const [confirm, setConfirm] = useState('');
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
+  async function startDelete() {
+    setError(null);
+    setStage('verifying');
+    try {
+      // Step 1 — get passkey challenge for step-up
+      const optRes = await fetch('/api/auth/step-up/options', {
+        method: 'POST', credentials: 'include',
+      });
+      const { options, error: optErr } = await optRes.json();
+      if (!optRes.ok) { setError(optErr || 'Failed to start verification'); setStage('idle'); return; }
+
+      // Step 2 — prompt passkey
+      const authResponse = await startAuthentication({ optionsJSON: options });
+
+      // Step 3 — verify and get stepUpToken
+      const verRes = await fetch('/api/auth/step-up/verify', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authResponse }),
+      });
+      const verData = await verRes.json();
+      if (!verRes.ok) { setError(verData.error || 'Verification failed'); setStage('idle'); return; }
+
+      setStepUpToken(verData.stepUpToken);
+      setStage('confirm');
+    } catch (err) {
+      if (err.name === 'NotAllowedError') {
+        setError('Passkey prompt was dismissed.');
+      } else {
+        setError(err.message || 'Verification failed.');
+      }
+      setStage('idle');
+    }
+  }
+
   async function handleDelete() {
-    setBusy(true); setError(null);
-    const res = await fetch('/api/auth/account', { method: 'DELETE', credentials: 'include' });
+    setStage('deleting');
+    const res = await fetch('/api/auth/account', {
+      method: 'DELETE', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stepUpToken }),
+    });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       setError(data.error || 'Something went wrong');
-      setBusy(false);
+      setStage('idle');
       return;
     }
     onDeleted();
+  }
+
+  function cancel() {
+    setStage('idle');
+    setConfirm('');
+    setError(null);
+    setStepUpToken(null);
   }
 
   return (
@@ -406,19 +454,23 @@ function DeleteAccount({ userEmail, onDeleted }) {
           Permanently deletes your account, all passkeys, sessions, and recovery codes. This cannot be undone.
         </p>
         <button
-          onClick={() => setOpen(true)}
+          onClick={startDelete}
+          disabled={stage === 'verifying'}
           style={{
             padding: '9px 18px', borderRadius: 9,
-            fontFamily: F, fontSize: 14, cursor: 'pointer',
+            fontFamily: F, fontSize: 14,
+            cursor: stage === 'verifying' ? 'not-allowed' : 'pointer',
             background: 'rgba(239,68,68,0.08)', color: '#f87171',
             border: '1px solid rgba(239,68,68,0.25)',
+            opacity: stage === 'verifying' ? 0.6 : 1,
           }}
         >
-          Delete account
+          {stage === 'verifying' ? 'Verifying…' : 'Delete account'}
         </button>
+        {error && <p style={{ fontFamily: F, fontSize: 13, color: '#f87171', marginTop: 10 }}>{error}</p>}
       </div>
 
-      {open && (
+      {stage === 'confirm' && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 2000,
           background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
@@ -428,6 +480,9 @@ function DeleteAccount({ userEmail, onDeleted }) {
             background: t.cardBg, border: '1px solid rgba(239,68,68,0.3)',
             borderRadius: 20, padding: '32px 28px', maxWidth: 400, width: '100%',
           }}>
+            <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#22c55e', marginBottom: 14 }}>
+              ✓ Identity verified
+            </div>
             <h2 style={{ fontFamily: F, fontWeight: 400, fontSize: 20, color: '#f87171', margin: '0 0 10px' }}>
               Delete account
             </h2>
@@ -442,18 +497,14 @@ function DeleteAccount({ userEmail, onDeleted }) {
               style={{
                 width: '100%', boxSizing: 'border-box',
                 padding: '11px 14px', borderRadius: 10, marginBottom: 16,
-                fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: t.text1,
+                fontFamily: M, fontSize: 13, color: t.text1,
                 background: '#1a1a1a', border: '1px solid rgba(239,68,68,0.3)',
                 outline: 'none',
               }}
             />
-            {error && (
-              <p style={{ fontFamily: F, fontSize: 13, color: '#f87171', marginBottom: 12 }}>{error}</p>
-            )}
             <div style={{ display: 'flex', gap: 10 }}>
               <button
-                onClick={() => { setOpen(false); setConfirm(''); setError(null); }}
-                disabled={busy}
+                onClick={cancel}
                 style={{
                   flex: 1, padding: '11px', borderRadius: 10,
                   fontFamily: F, fontSize: 14, cursor: 'pointer',
@@ -464,18 +515,18 @@ function DeleteAccount({ userEmail, onDeleted }) {
               </button>
               <button
                 onClick={handleDelete}
-                disabled={busy || confirm !== userEmail}
+                disabled={confirm !== userEmail}
                 style={{
                   flex: 1, padding: '11px', borderRadius: 10,
                   fontFamily: F, fontSize: 14, fontWeight: 500,
-                  cursor: busy || confirm !== userEmail ? 'not-allowed' : 'pointer',
+                  cursor: confirm !== userEmail ? 'not-allowed' : 'pointer',
                   background: 'rgba(239,68,68,0.15)', color: '#f87171',
                   border: '1px solid rgba(239,68,68,0.3)',
-                  opacity: busy || confirm !== userEmail ? 0.5 : 1,
+                  opacity: confirm !== userEmail ? 0.5 : 1,
                   transition: 'opacity 0.2s',
                 }}
               >
-                {busy ? 'Deleting…' : 'Delete permanently'}
+                Delete permanently
               </button>
             </div>
           </div>
