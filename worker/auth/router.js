@@ -1,7 +1,7 @@
 import { sendOTP, verifyOTP } from './otp.js';
 import { getRegisterOptions, verifyRegistration, getAuthOptions, verifyAuth } from './passkey.js';
 import { getMe, logout, finaliseSession } from './session.js';
-import { approveNumMatch, pollNumMatch } from './numMatch.js';
+import { approveNumMatch, pollNumMatch, getPendingApproval, respondToApproval } from './numMatch.js';
 import { recoveryStart, recoveryVerify } from './recovery.js';
 import {
   listSessions, revokeSession, revokeOtherSessions, renameSession,
@@ -67,10 +67,14 @@ export async function handleAuth(request, env, url) {
   if (method === 'POST' && path === '/recovery-codes/regenerate')   return regenerateRecoveryCodes(request, env);
 
   // ── Number matching ─────────────────────────────────────────────
-  // GET (email link) — action=approve|deny
-  if (method === 'GET'  && path === '/num-match/approve')           return approveNumMatch(request, env);
-  // GET — poll for status (new device)
+  // GET — poll for status (new device waiting for approval)
   if (method === 'GET'  && path === '/num-match/status')            return pollNumMatch(request, env);
+  // GET — trusted session checks if it has a pending approval to show
+  if (method === 'GET'  && path === '/num-match/pending')           return getPendingApproval(request, env);
+  // POST — trusted session submits approve/deny decision
+  if (method === 'POST' && path === '/num-match/respond')           return respondToApproval(request, env);
+  // GET (legacy email link) — kept for any in-flight links
+  if (method === 'GET'  && path === '/num-match/approve')           return approveNumMatch(request, env);
 
   // ── Account recovery ────────────────────────────────────────────
   if (method === 'POST' && path === '/recovery/start')              return recoveryStart(request, env);

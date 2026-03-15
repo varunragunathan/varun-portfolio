@@ -6,7 +6,7 @@
 //   3. Trusted device clicks email link → GET /num-match/approve?t={approvalToken}&action=approve|deny
 //   4. On approval, server issues pendingToken and deletes both KV entries.
 
-import { createPendingSession } from './session.js';
+import { createPendingSession, getSession } from './session.js';
 import { getUserById } from '../db.js';
 
 function json(data, status = 200, headers = {}) {
@@ -95,6 +95,65 @@ export async function pollNumMatch(request, env) {
 
   const pendingToken = await createPendingSession(env.AUTH_KV, { userId, email });
   return json({ status: 'approved', pendingToken });
+}
+
+// GET /api/auth/num-match/pending
+// Called by trusted sessions to check if there's a pending approval for their user.
+export async function getPendingApproval(request, env) {
+  const session = await getSession(env.AUTH_KV, request);
+  if (!session) return json({ error: 'Unauthorized' }, 401);
+
+  const raw = await env.AUTH_KV.get(`num_match_for_user:${session.userId}`);
+  if (!raw) return json({ pending: false });
+
+  const { approvalToken, code, userAgent } = JSON.parse(raw);
+
+  // Verify the approval is still live
+  const approvalRaw = await env.AUTH_KV.get(`num_match:${approvalToken}`);
+  if (!approvalRaw) {
+    await env.AUTH_KV.delete(`num_match_for_user:${session.userId}`);
+    return json({ pending: false });
+  }
+
+  const approval = JSON.parse(approvalRaw);
+  if (approval.approved || approval.denied) {
+    return json({ pending: false });
+  }
+
+  return json({ pending: true, approvalToken, code, userAgent });
+}
+
+// POST /api/auth/num-match/respond  { approvalToken, action: 'approve'|'deny' }
+// Called by the trusted session browser after user taps Approve or Deny.
+export async function respondToApproval(request, env) {
+  const session = await getSession(env.AUTH_KV, request);
+  if (!session) return json({ error: 'Unauthorized' }, 401);
+
+  const body = await request.json().catch(() => ({}));
+  const { approvalToken, action } = body;
+  if (!approvalToken || !['approve', 'deny'].includes(action)) {
+    return json({ error: 'Invalid request' }, 400);
+  }
+
+  const raw = await env.AUTH_KV.get(`num_match:${approvalToken}`);
+  if (!raw) return json({ error: 'Expired or not found' }, 404);
+
+  const data = JSON.parse(raw);
+
+  // Ensure this session's user owns the approval
+  if (data.userId !== session.userId) return json({ error: 'Forbidden' }, 403);
+
+  const approved = action === 'approve';
+  await env.AUTH_KV.put(
+    `num_match:${approvalToken}`,
+    JSON.stringify({ ...data, approved, denied: !approved }),
+    { expirationTtl: 60 },
+  );
+
+  // Clean up the user-level pointer
+  await env.AUTH_KV.delete(`num_match_for_user:${session.userId}`);
+
+  return json({ ok: true });
 }
 
 function resultPage(message, success) {

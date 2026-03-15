@@ -2,8 +2,10 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, useTheme } from './hooks/useTheme';
 import { SkipLink } from './components/UI';
-import { AuthProvider } from './hooks/useAuth.jsx';
+import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import Nav from './components/Nav';
+import { useNumMatchApproval } from './hooks/useNumMatchApproval.jsx';
+import NumMatchApprovalModal from './components/NumMatchApprovalModal.jsx';
 
 const Home = lazy(() => import('./pages/Home'));
 const Auth = lazy(() => import('./pages/Auth'));
@@ -20,6 +22,9 @@ function Loading() {
 
 function Shell() {
   const { t } = useTheme();
+  const { user } = useAuth();
+  const { approval, respond } = useNumMatchApproval(user);
+
   return (
     <div style={{ background: t.bg, minHeight: '100vh', transition: 'background 0.4s ease' }}>
       <SkipLink />
@@ -31,6 +36,7 @@ function Shell() {
           <Route path="/account/security" element={<Security />} />
         </Routes>
       </Suspense>
+      {approval && <NumMatchApprovalModal approval={approval} onRespond={respond} />}
     </div>
   );
 }

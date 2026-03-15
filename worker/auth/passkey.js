@@ -228,7 +228,7 @@ export async function verifyAuth(request, env) {
   const hasKnownTrusted = await hasTrustedSessions(db, userId);
 
   if (!knownDevice && hasKnownTrusted) {
-    // New device detected — require number matching approval
+    // New device detected — require number matching approval from a trusted session
     const displayCode = generateDisplayCode();
     const approvalToken = crypto.randomUUID();
     const tempToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
@@ -244,36 +244,12 @@ export async function verifyAuth(request, env) {
       JSON.stringify({ code: displayCode, approvalToken, userId, email: user.email }),
       { expirationTtl: TTL },
     );
-
-    // Send approval email
-    const { Resend } = await import('resend');
-    const resend = new Resend(env.RESEND_API_KEY);
-    const baseUrl = env.ORIGIN;
-    await resend.emails.send({
-      from: 'Varun <noreply@varunr.dev>',
-      to: user.email,
-      subject: `New sign-in attempt — code ${displayCode}`,
-      html: `
-        <div style="font-family:'IBM Plex Mono',monospace;max-width:440px;margin:0 auto;padding:48px 24px;background:#0a0a0a;color:#e5e5e5;border-radius:12px;">
-          <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#6b7280;margin-bottom:24px;">varunr.dev · Security Alert</div>
-          <p style="font-size:14px;color:#9ca3af;margin-bottom:8px;">A sign-in was attempted from a new device.</p>
-          <p style="font-size:13px;color:#6b7280;margin-bottom:24px;">Device: ${ua.slice(0, 80)}</p>
-          <p style="font-size:14px;color:#9ca3af;margin-bottom:8px;">Confirm this code matches what you see on the new device:</p>
-          <div style="font-size:48px;font-weight:300;letter-spacing:0.3em;color:#ffffff;margin:16px 0;">${displayCode}</div>
-          <div style="display:flex;gap:12px;margin-top:24px;">
-            <a href="${baseUrl}/api/auth/num-match/approve?t=${approvalToken}&action=approve"
-               style="padding:12px 24px;background:#22c55e;color:#000;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">
-              ✓ Approve
-            </a>
-            <a href="${baseUrl}/api/auth/num-match/approve?t=${approvalToken}&action=deny"
-               style="padding:12px 24px;background:#ef4444;color:#fff;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">
-              ✗ Deny
-            </a>
-          </div>
-          <p style="font-size:11px;color:#4b5563;margin-top:32px;">This link expires in 5 minutes. If you did not attempt to sign in, click Deny immediately.</p>
-        </div>
-      `,
-    });
+    // Allows any trusted session for this user to discover the pending approval
+    await env.AUTH_KV.put(
+      `num_match_for_user:${userId}`,
+      JSON.stringify({ approvalToken, code: displayCode, userAgent: ua }),
+      { expirationTtl: TTL },
+    );
 
     await logSecurityEvent(db, { userId, type: 'new_device', ip, userAgent: ua });
 
