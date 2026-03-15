@@ -13,7 +13,7 @@ export const STATS = [
   { value: 135, suffix: 'M+', label: 'Users served' },
   { value: 700, suffix: 'M+', label: 'Monthly visits' },
   { value: 100, suffix: 'M+', label: 'Revenue impact ($)' },
-  { value: 98, suffix: '%', label: 'Passkey success' },
+  { value: 93, suffix: '%', label: 'Passkey success' },
 ];
 
 export const PROJECTS = [
