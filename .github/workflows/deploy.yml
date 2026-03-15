@@ -16,11 +16,11 @@ jobs:
       - uses: actions/setup-node@v4.4.0
         with:
           node-version: 22
-          cache: npm
+          cache: yarn
 
-      - run: npm ci
+      - run: yarn install --frozen-lockfile
 
-      - run: npm run build
+      - run: yarn build
         env:
           VITE_ENABLE_AUTH: true
 

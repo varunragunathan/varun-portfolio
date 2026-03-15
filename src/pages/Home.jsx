@@ -22,7 +22,7 @@ function Hero() {
   useEffect(() => { setTimeout(() => setLoaded(true), 120); }, []);
 
   return (
-    <header aria-label="Introduction" style={{ position: 'relative', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', paddingTop: 52 }}>
+    <header aria-label="Introduction" style={{ position: 'relative', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', paddingTop: 'max(96px, 12vh)', paddingBottom: 40 }}>
       <ParticleField />
       <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: `radial-gradient(ellipse at 58% 38%, ${t.accentGhost} 0%, transparent 60%)`, pointerEvents: 'none' }} />
       <div aria-hidden="true" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, background: `linear-gradient(to top, ${t.bg}, transparent)`, pointerEvents: 'none' }} />
