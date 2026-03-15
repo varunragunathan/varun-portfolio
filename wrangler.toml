@@ -1,5 +1,23 @@
 name = "varun-portfolio"
 compatibility_date = "2025-09-27"
+compatibility_flags = ["nodejs_compat"]
+main = "worker/index.js"
+
+[vars]
+ENABLE_AUTH = "true"
+RP_ID = "varunr.dev"
+ORIGIN = "https://varunr.dev"
 
 [assets]
 directory = "./dist"
+
+# ── D1 (SQLite) ── permanent storage: users, passkey credentials
+[[d1_databases]]
+binding = "varun_portfolio_auth"
+database_name = "varun-portfolio-auth"
+database_id = "329e850c-713c-49fa-93bc-671ef8ced36d"
+
+# ── KV ── ephemeral storage: OTP codes, WebAuthn challenges, sessions
+[[kv_namespaces]]
+binding = "AUTH_KV"
+id = "050acce2056d4c2883fea6f6f3b32ee2"

@@ -66,15 +66,15 @@ export function Btn({ href, primary, children, external }) {
   );
 }
 
-/** Theme toggle button */
-export function ThemeToggle() {
+/** Theme toggle button. Pass inline=true when used inside Nav. */
+export function ThemeToggle({ inline = false }) {
   const { t, mode, toggle } = useTheme();
   return (
     <button
       onClick={toggle}
       aria-label={`Switch to ${mode === 'dark' ? 'light' : 'dark'} mode`}
       style={{
-        position: 'fixed', top: 18, right: 18, zIndex: 100,
+        ...(inline ? { position: 'static' } : { position: 'fixed', top: 18, right: 18, zIndex: 100 }),
         width: 38, height: 38, borderRadius: 10,
         background: t.surface, border: `1px solid ${t.border}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
