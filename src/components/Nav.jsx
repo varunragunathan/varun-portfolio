@@ -202,6 +202,22 @@ function AvatarMenu({ user, onLogout }) {
             </div>
           </div>
 
+          {/* Security page */}
+          <Link
+            to="/account/security"
+            onClick={() => setOpen(false)}
+            style={{
+              display: 'block', padding: '11px 14px', textDecoration: 'none',
+              fontFamily: F, fontSize: 13, color: t.text2,
+              borderBottom: `1px solid ${t.border}`,
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+          >
+            Security settings
+          </Link>
+
           {/* Log out */}
           <button
             onClick={() => { setOpen(false); onLogout(); }}

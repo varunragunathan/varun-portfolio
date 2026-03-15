@@ -1,4 +1,5 @@
 name = "varun-portfolio"
+account_id = "6207c412bd8462c5dac014004d8abdf4"
 compatibility_date = "2025-09-27"
 compatibility_flags = ["nodejs_compat"]
 main = "worker/index.js"

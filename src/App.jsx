@@ -7,6 +7,7 @@ import Nav from './components/Nav';
 
 const Home = lazy(() => import('./pages/Home'));
 const Auth = lazy(() => import('./pages/Auth'));
+const Security = lazy(() => import('./pages/Security'));
 
 function Loading() {
   const { t } = useTheme();
@@ -27,6 +28,7 @@ function Shell() {
         <Routes>
           <Route index element={<Home />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/account/security" element={<Security />} />
         </Routes>
       </Suspense>
     </div>
