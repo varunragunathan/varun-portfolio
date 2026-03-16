@@ -4,9 +4,6 @@ compatibility_date = "2025-09-27"
 compatibility_flags = ["nodejs_compat"]
 main = "worker/index.js"
 
-[limits]
-cpu_ms = 5000
-
 [vars]
 ENABLE_AUTH = "true"
 RP_ID = "varunr.dev"
