@@ -349,22 +349,8 @@ export default function Nav() {
 
           {/* Right side */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {enabled && !loading && (
-              user
-                ? <AvatarMenu user={user} onLogout={handleLogout} />
-                : (
-                  <Link
-                    to="/auth"
-                    style={{
-                      fontFamily: M, fontSize: 11, letterSpacing: '0.1em',
-                      color: t.accent, background: t.accentDim, border: `1px solid ${t.accentBorder}`,
-                      borderRadius: 7, padding: '5px 12px', textDecoration: 'none',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    Sign in / Register
-                  </Link>
-                )
+            {enabled && !loading && user && (
+              <AvatarMenu user={user} onLogout={handleLogout} />
             )}
           </div>
         </div>

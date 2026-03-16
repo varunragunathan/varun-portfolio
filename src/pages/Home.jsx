@@ -55,28 +55,16 @@ function GuestView() {
             <p style={{ fontFamily: F, fontSize: 13, color: t.text3, margin: '0 0 22px', lineHeight: 1.6 }}>
               The work, timeline, and everything else is just one passkey away. No password required.
             </p>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <Link
-                to="/auth"
-                style={{
-                  flex: 1, display: 'block', padding: '11px', borderRadius: 10, textAlign: 'center',
-                  fontFamily: F, fontSize: 14, fontWeight: 500, textDecoration: 'none',
-                  background: t.accentDim, color: t.accent, border: `1px solid ${t.accentBorder}`,
-                }}
-              >
-                Sign in →
-              </Link>
-              <Link
-                to="/auth"
-                style={{
-                  flex: 1, display: 'block', padding: '11px', borderRadius: 10, textAlign: 'center',
-                  fontFamily: F, fontSize: 14, textDecoration: 'none',
-                  color: t.text2, border: `1px solid ${t.border}`,
-                }}
-              >
-                Register
-              </Link>
-            </div>
+            <Link
+              to="/auth"
+              style={{
+                display: 'block', padding: '11px', borderRadius: 10, textAlign: 'center',
+                fontFamily: F, fontSize: 14, fontWeight: 500, textDecoration: 'none',
+                background: t.accentDim, color: t.accent, border: `1px solid ${t.accentBorder}`,
+              }}
+            >
+              Sign in →
+            </Link>
           </div>
         </div>
       </div>
