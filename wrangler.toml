@@ -30,4 +30,4 @@ class_name = "NumMatchDO"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["NumMatchDO"]
+new_sqlite_classes = ["NumMatchDO"]
