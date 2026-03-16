@@ -211,18 +211,22 @@ function ChatPanel({ onClose, t }) {
                 }
                 if (!status || status === 'rejected') {
                   return (
-                    <button
-                      onClick={() => setShowUpgrade(true)}
-                      style={{
-                        marginTop: 24,
-                        fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
-                        padding: '6px 16px', borderRadius: 20, cursor: 'pointer',
-                        background: t.accentDim, border: `1px solid ${t.accentBorder}`,
-                        color: t.accent,
-                      }}
-                    >
-                      ✦ Upgrade to Pro
-                    </button>
+                    <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                      <button
+                        onClick={() => setShowUpgrade(true)}
+                        style={{
+                          fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
+                          padding: '6px 16px', borderRadius: 20, cursor: 'pointer',
+                          background: t.accentDim, border: `1px solid ${t.accentBorder}`,
+                          color: t.accent,
+                        }}
+                      >
+                        ✦ Upgrade to Pro
+                      </button>
+                      <span style={{ fontFamily: F, fontSize: 11, color: t.text3 }}>
+                        More models · higher rate limits
+                      </span>
+                    </div>
                   );
                 }
                 return null;

@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTheme } from '../hooks/useTheme';
+import { useAuth } from '../hooks/useAuth';
 
 const F = "'Outfit', sans-serif";
 const M = "'IBM Plex Mono', monospace";
@@ -15,6 +16,7 @@ const BENEFITS = [
 
 export default function UpgradeModal({ onClose, onSuccess }) {
   const { t }            = useTheme();
+  const { setUser }      = useAuth();
   const [note,    setNote]    = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -52,6 +54,9 @@ export default function UpgradeModal({ onClose, onSuccess }) {
         throw new Error(d.error ?? 'Something went wrong');
       }
 
+      const data = await res.json().catch(() => ({}));
+      // Update auth context so the "under review" badge shows immediately
+      setUser(u => u ? { ...u, upgradeRequest: { status: 'pending', id: data.id, created_at: Date.now() } } : u);
       setSuccess(true);
       onSuccess?.();
     } catch (err) {

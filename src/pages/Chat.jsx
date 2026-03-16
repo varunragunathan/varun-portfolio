@@ -201,14 +201,16 @@ function Sidebar({ conversations, activeId, onSelect, onDelete, onNew, t }) {
 }
 
 // ── Main chat area ────────────────────────────────────────────────
-function ChatArea({ t }) {
-  const { messages, streaming, error, send } = useChat();
+function ChatArea({ t, onNewConversation }) {
+  const { messages, streaming, error, send, conversationId } = useChat();
   const { isPro, isAdmin, user }             = useAuth();
   const [input,          setInput]          = useState('');
   const [selectedModel,  setSelectedModel]  = useState(null);
   const [models,         setModels]         = useState([]);
   const [showUpgrade,    setShowUpgrade]    = useState(false);
-  const bottomRef = useRef(null);
+  const bottomRef     = useRef(null);
+  const prevConvIdRef = useRef(null);
+  const firstMsgRef   = useRef('');
 
   const canPickModel = isPro || isAdmin;
 
@@ -227,6 +229,15 @@ function ChatArea({ t }) {
       .catch(() => {});
   }, [canPickModel]);
 
+  // Notify parent when a brand-new conversation is created (null → id)
+  useEffect(() => {
+    if (conversationId && prevConvIdRef.current === null) {
+      const title = firstMsgRef.current.slice(0, 60).replace(/\s+/g, ' ').trim() || 'New conversation';
+      onNewConversation?.({ id: conversationId, title, created_at: Date.now(), updated_at: Date.now() });
+    }
+    prevConvIdRef.current = conversationId;
+  }, [conversationId, onNewConversation]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streaming]);
@@ -234,9 +245,10 @@ function ChatArea({ t }) {
   const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text || streaming) return;
+    if (!conversationId) firstMsgRef.current = text; // cache for sidebar title
     setInput('');
     await send(text, selectedModel);
-  }, [input, streaming, send, selectedModel]);
+  }, [input, streaming, send, selectedModel, conversationId]);
 
   const handleKey = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -312,17 +324,22 @@ function ChatArea({ t }) {
                     <span>⏳</span> Pro request under review
                   </div>
                 ) : upgradeStatus !== 'approved' && (
-                  <button
-                    onClick={() => setShowUpgrade(true)}
-                    style={{
-                      fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
-                      padding: '6px 16px', borderRadius: 20, cursor: 'pointer',
-                      background: t.accentDim, border: `1px solid ${t.accentBorder}`,
-                      color: t.accent,
-                    }}
-                  >
-                    ✦ Upgrade to Pro
-                  </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                    <button
+                      onClick={() => setShowUpgrade(true)}
+                      style={{
+                        fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
+                        padding: '6px 16px', borderRadius: 20, cursor: 'pointer',
+                        background: t.accentDim, border: `1px solid ${t.accentBorder}`,
+                        color: t.accent,
+                      }}
+                    >
+                      ✦ Upgrade to Pro
+                    </button>
+                    <span style={{ fontFamily: F, fontSize: 12, color: t.text3 }}>
+                      More models · higher rate limits
+                    </span>
+                  </div>
                 )}
               </div>
             )}
@@ -437,6 +454,11 @@ export default function ChatPage() {
     if (activeConvId === id) setActiveConvId(null);
   }, [activeConvId]);
 
+  const handleNewConversation = useCallback((conv) => {
+    setConversations(prev => [conv, ...prev.filter(c => c.id !== conv.id)]);
+    setActiveConvId(conv.id);
+  }, []);
+
   if (loading || !user) return null;
 
   return (
@@ -455,7 +477,7 @@ export default function ChatPage() {
         onNew={() => setActiveConvId(null)}
         t={t}
       />
-      <ChatArea key={activeConvId ?? 'new'} t={t} />
+      <ChatArea key={activeConvId ?? 'new'} t={t} onNewConversation={handleNewConversation} />
     </div>
   );
 }
