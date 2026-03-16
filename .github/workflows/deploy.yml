@@ -3,6 +3,11 @@ name: Deploy
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'logo-preview.html'
+      - '**.md'
+      - '.husky/**'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
