@@ -121,7 +121,7 @@ function UpgradeRequestsTab({ t }) {
             }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontFamily: M, fontSize: 12, color: t.text1, marginBottom: 4 }}>
-                  {req.masked_email ?? req.maskedEmail ?? '—'}
+                  {req.email ?? '—'}
                 </div>
                 {req.note && (
                   <div style={{ fontFamily: F, fontSize: 12, color: t.text3, marginBottom: 4 }}>
