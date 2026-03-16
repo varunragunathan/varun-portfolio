@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth.jsx';
@@ -305,6 +305,114 @@ function AvatarMenu({ user, onLogout }) {
   );
 }
 
+// ── Logo with animated terminal prefix ───────────────────────────
+const SYMBOLS   = ['~/', './', '> ', '$ ', '# ', '=>', '::', '&&', '<>', '**', '//', 'λ ', '∑ ', '∇ ', '∂ ', 'φ ', 'π '];
+const PHI       = 1.6180339887;
+const BASE_MS   = 520;
+const SETTLE_MS = 340;
+
+function lerpColor(hex1, hex2, t) {
+  const parse = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+  const [r1,g1,b1] = parse(hex1);
+  const [r2,g2,b2] = parse(hex2);
+  return `rgb(${Math.round(r1+(r2-r1)*t)},${Math.round(g1+(g2-g1)*t)},${Math.round(b1+(b2-b1)*t)})`;
+}
+
+function LogoMark() {
+  const prefixRef  = useRef(null);
+  const rafRef     = useRef(null);
+  const stateRef   = useRef({ hovering: false, startTime: null, leaveTime: null, leaveFrom: '~/', leaveFromY: 0 });
+
+  const tick = useCallback((ts) => {
+    const el = prefixRef.current;
+    if (!el) return;
+    const s = stateRef.current;
+    if (!s.startTime) s.startTime = ts;
+    const elapsed = ts - s.startTime;
+
+    if (s.hovering) {
+      const cycleLen = BASE_MS * PHI;
+      const pos      = (elapsed / cycleLen) % SYMBOLS.length;
+      const idx      = Math.floor(pos) % SYMBOLS.length;
+      const phase    = pos - Math.floor(pos);
+
+      const env   = Math.sin(phase * Math.PI);
+      const y     = (1 - phase) * Math.sin(phase * Math.PI * 2) * -5;
+
+      el.textContent     = SYMBOLS[idx];
+      el.style.opacity   = String(0.35 + 0.65 * env);
+      el.style.color     = lerpColor('#4b5563', '#6366f1', env);
+      el.style.transform = `translateY(${y.toFixed(2)}px)`;
+      rafRef.current = requestAnimationFrame(tick);
+    } else {
+      const t    = Math.min((ts - s.leaveTime) / SETTLE_MS, 1);
+      const ease = 0.5 - 0.5 * Math.cos(t * Math.PI);
+
+      if (t < 1) {
+        el.textContent     = s.leaveFrom;
+        el.style.opacity   = String(1 - ease);
+        el.style.color     = lerpColor('#4b5563', '#6366f1', 1 - ease);
+        el.style.transform = `translateY(${(s.leaveFromY * (1 - ease)).toFixed(2)}px)`;
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        el.textContent     = '~/';
+        el.style.opacity   = '1';
+        el.style.color     = '#4b5563';
+        el.style.transform = 'translateY(0px)';
+        rafRef.current = null;
+      }
+    }
+  }, []);
+
+  function onEnter() {
+    const s = stateRef.current;
+    s.hovering = true; s.startTime = null;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(tick);
+  }
+
+  function onLeave() {
+    const el = prefixRef.current;
+    const s  = stateRef.current;
+    s.hovering   = false;
+    s.leaveTime  = performance.now();
+    s.leaveFrom  = el?.textContent ?? '~/';
+    s.leaveFromY = parseFloat(el?.style.transform?.replace('translateY(','') ?? '0') || 0;
+    s.startTime  = null;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(tick);
+  }
+
+  useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); }, []);
+
+  return (
+    <Link
+      to="/"
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+      style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}
+    >
+      <span
+        ref={prefixRef}
+        style={{
+          fontFamily: M, fontSize: 13, letterSpacing: '0.03em',
+          color: '#4b5563', display: 'inline-block',
+          minWidth: 22, willChange: 'transform, opacity',
+          transition: 'none',
+        }}
+      >
+        ~/
+      </span>
+      <span style={{ fontFamily: M, fontSize: 13, letterSpacing: '0.03em', color: '#e5e5e5' }}>
+        varunr
+      </span>
+      <span style={{ fontFamily: M, fontSize: 13, letterSpacing: '0.03em', color: '#6366f1' }}>
+        .dev
+      </span>
+    </Link>
+  );
+}
+
 // ── Nav ───────────────────────────────────────────────────────────
 export default function Nav() {
   const { t } = useTheme();
@@ -337,18 +445,16 @@ export default function Nav() {
       >
         <div style={{
           maxWidth: 920, margin: '0 auto', padding: '0 24px',
-          height: 52, display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+          height: 52, display: 'flex', alignItems: 'center',
         }}>
-          {/* Logo */}
-          <Link
-            to="/"
-            style={{ fontFamily: M, fontSize: 13, color: t.text1, textDecoration: 'none', letterSpacing: '0.05em' }}
-          >
-            varunr.dev
-          </Link>
+          {/* Spacer left — mirrors avatar width so logo stays optically centred */}
+          <div style={{ flex: 1 }} />
+
+          {/* Centred logo */}
+          <LogoMark />
 
           {/* Right side */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
             {enabled && !loading && user && (
               <AvatarMenu user={user} onLogout={handleLogout} />
             )}

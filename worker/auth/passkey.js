@@ -160,14 +160,17 @@ export async function getAuthOptions(request, env) {
 
   const db = env.varun_portfolio_auth;
 
-  // Empty email = conditional mediation (browser autofill passkey flow)
+  // Empty email = conditional mediation (browser autofill passkey flow).
+  // Challenge is keyed by a short-lived condToken since we have no userId yet.
   if (!email) {
     const options = await generateAuthenticationOptions({
       rpID: env.RP_ID,
       userVerification: 'preferred',
       allowCredentials: [],
     });
-    return json({ options, userId: null });
+    const condToken = crypto.randomUUID();
+    await env.AUTH_KV.put(`cond_challenge:${condToken}`, options.challenge, { expirationTtl: 120 });
+    return json({ options, userId: null, condToken });
   }
 
   const user = await db.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
@@ -198,14 +201,30 @@ export async function getAuthOptions(request, env) {
 
 export async function verifyAuth(request, env) {
   const body = await request.json().catch(() => ({}));
-  const { userId, authResponse } = body;
-  if (!userId || !authResponse) return json({ error: 'Missing fields' }, 400);
+  const { userId: bodyUserId, authResponse, condToken } = body;
+  if (!authResponse) return json({ error: 'Missing fields' }, 400);
 
-  const challenge = await env.AUTH_KV.get(`auth_challenge:${userId}`);
-  if (!challenge) return json({ error: 'Challenge expired. Please try again.' }, 400);
-  await env.AUTH_KV.delete(`auth_challenge:${userId}`);
+  const db = env.varun_portfolio_auth;
+  let userId = bodyUserId;
+  let challenge;
 
-  const cred = await getPasskeyCredById(env.varun_portfolio_auth, authResponse.id);
+  if (condToken) {
+    // Conditional mediation path — challenge keyed by condToken, userId unknown upfront
+    challenge = await env.AUTH_KV.get(`cond_challenge:${condToken}`);
+    if (!challenge) return json({ error: 'Challenge expired. Please try again.' }, 400);
+    await env.AUTH_KV.delete(`cond_challenge:${condToken}`);
+    // Derive userId from the credential that was used
+    const credRow = await db.prepare('SELECT user_id FROM passkey_credentials WHERE id = ?').bind(authResponse.id).first();
+    if (!credRow) return json({ error: 'Credential not found' }, 400);
+    userId = credRow.user_id;
+  } else {
+    if (!userId) return json({ error: 'Missing fields' }, 400);
+    challenge = await env.AUTH_KV.get(`auth_challenge:${userId}`);
+    if (!challenge) return json({ error: 'Challenge expired. Please try again.' }, 400);
+    await env.AUTH_KV.delete(`auth_challenge:${userId}`);
+  }
+
+  const cred = await getPasskeyCredById(db, authResponse.id);
   if (!cred || cred.user_id !== userId) return json({ error: 'Credential not found' }, 400);
 
   let verification;
@@ -232,12 +251,11 @@ export async function verifyAuth(request, env) {
     return json({ error: 'Authenticator anomaly detected. Contact support.' }, 403);
   }
 
-  await updateSignCount(env.varun_portfolio_auth, cred.id, newCounter);
+  await updateSignCount(db, cred.id, newCounter);
 
-  const user = await getUserById(env.varun_portfolio_auth, userId);
+  const user = await getUserById(db, userId);
   const ua = request.headers.get('User-Agent') || '';
   const ip = getClientIP(request);
-  const db = env.varun_portfolio_auth;
 
   // ── Number matching: detect new device ───────────────────────────
   const knownDevice = await isKnownDevice(db, userId, ua);

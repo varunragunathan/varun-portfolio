@@ -515,7 +515,7 @@ function RegisterFlow({ onSuccess }) {
 
 // ── Sign-in flow ──────────────────────────────────────────────────
 // Backup method priority (strongest → weakest):
-//   1. Passkey          — always attempted first, auto-prompted
+//   1. Passkey          — always attempted first; conditional mediation arms autofill
 //   2. TOTP             — future (not yet implemented)
 //   3. Recovery code    — single-use backup code, sign-in without wiping passkeys
 // Full account recovery (wipes passkeys) lives in the separate "Recover" tab.
@@ -540,10 +540,70 @@ function SignInFlow({ onSuccess }) {
   const [pendingToken, setPendingToken] = useState(null);
   const [showTrust, setShowTrust]       = useState(false);
 
+  // Prevents conditional mediation from completing after user starts normal flow
+  const condActiveRef = useRef(true);
+
+  // ── Conditional mediation (passkey autofill) ──────────────────────
+  // Arms the browser's passkey autofill UI the moment the page loads.
+  // The email input's autoComplete="username webauthn" makes passkeys appear
+  // in the browser's autocomplete dropdown without the user clicking anything.
+  useEffect(() => {
+    condActiveRef.current = true;
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/passkey/auth/options', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: '' }),
+        });
+        if (!res.ok || !condActiveRef.current) return;
+        const { options, condToken } = await res.json();
+        if (!condActiveRef.current) return;
+
+        // useBrowserAutofill=true → mediation:'conditional', never shows a modal —
+        // resolves only when the user picks a passkey from the autofill dropdown.
+        const authResponse = await startAuthentication({ optionsJSON: options, useBrowserAutofill: true });
+        if (!condActiveRef.current) return;
+        condActiveRef.current = false;
+
+        await submitAuthResponse(authResponse, null, condToken);
+      } catch { /* user ignored autofill or browser doesn't support conditional UI */ }
+    })();
+    return () => { condActiveRef.current = false; };
+  }, []);
+
+  // ── Shared verify + handle result ────────────────────────────────
+  async function submitAuthResponse(authResponse, resolvedUid, condToken) {
+    setBusy(true); setError(null);
+    try {
+      const res = await fetch('/api/auth/passkey/auth/verify', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: resolvedUid ?? null, authResponse, ...(condToken && { condToken }) }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setPasskeyFailed(true); setError(data.error || 'Authentication failed'); return; }
+
+      if (data.pendingNumberMatch) {
+        setNumMatchCode(data.code);
+        setNumMatchTemp(data.tempToken);
+      } else {
+        setPendingToken(data.pendingToken);
+        setShowTrust(true);
+      }
+    } catch {
+      setPasskeyFailed(true);
+      setError('Network error. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function goToEmail() { setView('email'); setError(null); setPasskeyFailed(false); }
 
   async function handleEmailSubmit(e) {
     e.preventDefault();
+    condActiveRef.current = false; // cancel conditional mediation
     setBusy(true); setError(null);
     try {
       const res = await fetch('/api/auth/passkey/auth/options', {
@@ -578,29 +638,14 @@ function SignInFlow({ onSuccess }) {
           body: JSON.stringify({ email }),
         });
         const data = await res.json();
-        if (!res.ok) { setError(data.error || 'Failed to get options'); setPasskeyFailed(true); return; }
+        if (!res.ok) { setError(data.error || 'Failed to get options'); setPasskeyFailed(true); setBusy(false); return; }
         opts = data.options;
         resolvedUid = data.userId;
         setUserId(resolvedUid);
       }
 
       const authResponse = await startAuthentication({ optionsJSON: opts });
-
-      const res = await fetch('/api/auth/passkey/auth/verify', {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: resolvedUid, authResponse }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setPasskeyFailed(true); return setError(data.error || 'Authentication failed'); }
-
-      if (data.pendingNumberMatch) {
-        setNumMatchCode(data.code);
-        setNumMatchTemp(data.tempToken);
-      } else {
-        setPendingToken(data.pendingToken);
-        setShowTrust(true);
-      }
+      await submitAuthResponse(authResponse, resolvedUid, null);
     } catch (err) {
       setPasskeyFailed(true);
       if (err.name === 'NotAllowedError') {
@@ -608,7 +653,6 @@ function SignInFlow({ onSuccess }) {
       } else {
         setError(err.message || 'Authentication failed. Please try again.');
       }
-    } finally {
       setBusy(false);
     }
   }
@@ -659,7 +703,7 @@ function SignInFlow({ onSuccess }) {
 
       {view === 'email' && (
         <form onSubmit={handleEmailSubmit}>
-          <Input label="Email address" type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus placeholder="you@example.com" />
+          <Input label="Email address" type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus placeholder="you@example.com" autoComplete="username webauthn" />
           <PrimaryBtn loading={busy} type="submit">Continue →</PrimaryBtn>
           {error && <Message text={error} type="error" />}
         </form>
