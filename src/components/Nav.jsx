@@ -337,7 +337,7 @@ export default function Nav() {
       >
         <div style={{
           maxWidth: 920, margin: '0 auto', padding: '0 24px',
-          height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          height: 52, display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
         }}>
           {/* Logo */}
           <Link
