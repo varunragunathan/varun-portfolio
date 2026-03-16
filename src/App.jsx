@@ -1,5 +1,5 @@
-import React, { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import React, { Suspense, lazy, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { ThemeProvider, useTheme } from './hooks/useTheme';
 import { SkipLink, ThemeToggle } from './components/UI';
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
@@ -18,6 +18,12 @@ function Loading() {
       <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: '0.3em', textTransform: 'uppercase', color: t.text3 }}>Loading</div>
     </div>
   );
+}
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
 }
 
 function Footer() {
@@ -44,6 +50,7 @@ function Shell() {
 
   return (
     <div style={{ background: t.bg, minHeight: '100vh', transition: 'background 0.4s ease', display: 'flex', flexDirection: 'column' }}>
+      <ScrollToTop />
       <SkipLink />
       <Nav />
       <div style={{ flex: 1 }}>
