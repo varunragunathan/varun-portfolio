@@ -99,15 +99,20 @@ export async function verifyRegistration(request, env) {
   const authenticatorType = credential.type || 'platform';
   const isSynced = authenticatorType === 'cross-platform' || transports.includes('hybrid');
 
-  await savePasskeyCred(env.varun_portfolio_auth, {
-    id: credential.id,
-    userId,
-    publicKey: isoBase64URL.fromBuffer(credential.publicKey),
-    signCount: credential.counter,
-    authenticatorType,
-    isSynced,
-    transport: JSON.stringify(transports),
-  });
+  try {
+    await savePasskeyCred(env.varun_portfolio_auth, {
+      id: credential.id,
+      userId,
+      publicKey: isoBase64URL.fromBuffer(credential.publicKey),
+      signCount: credential.counter,
+      authenticatorType,
+      isSynced,
+      transport: JSON.stringify(transports),
+    });
+  } catch (e) {
+    console.error('savePasskeyCred failed:', e.message);
+    return json({ error: `Failed to save credential: ${e.message}` }, 500);
+  }
 
   // Clean up verification gates
   await env.AUTH_KV.delete(`email_verified:${email}`);

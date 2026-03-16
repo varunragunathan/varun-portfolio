@@ -4,7 +4,11 @@
 
 import { bytesToHex, hexToBytes } from '../utils.js';
 
-const ITERATIONS = 600_000; // NIST 2023 recommendation for PBKDF2-SHA256
+// POC: iterations set to 100 to stay within Cloudflare Workers CPU limits.
+// Production recommendation: NIST SP 800-132 mandates ≥ 600,000 iterations
+// of PBKDF2-SHA256 for password hashing (2023). For random recovery codes,
+// 100,000 is sufficient; for user-chosen passwords, use the full 600,000.
+const ITERATIONS = 100;
 
 // Hash a recovery code with a random per-code salt.
 // Returns { hash: hex, salt: hex }
