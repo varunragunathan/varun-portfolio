@@ -64,8 +64,10 @@ export async function finaliseSession(request, env) {
   const tokenHash = await sha256Hex(token);
   const expiresAt = Date.now() + TTL * 1000;
 
-  // Write real session to KV (fast lookup) and D1 (metadata/security page)
-  await env.AUTH_KV.put(`session:${token}`, JSON.stringify({ userId, email, sessionId }), { expirationTtl: TTL });
+  // Write real session to KV (fast lookup) and D1 (metadata/security page).
+  // KV is keyed by tokenHash (not raw token) so revocation can purge it using
+  // only the hash stored in D1 — no need to ever store the raw token server-side.
+  await env.AUTH_KV.put(`session:${tokenHash}`, JSON.stringify({ userId, email, sessionId }), { expirationTtl: TTL });
   await createSessionRecord(env.varun_portfolio_auth, {
     id: sessionId, userId, tokenHash, deviceName: name,
     userAgent: ua, ip, trusted: isTrusted, expiresAt,
@@ -85,7 +87,8 @@ export async function finaliseSession(request, env) {
 export async function getSession(kv, request) {
   const token = getTokenFromRequest(request);
   if (!token) return null;
-  const raw = await kv.get(`session:${token}`);
+  const tokenHash = await sha256Hex(token);
+  const raw = await kv.get(`session:${tokenHash}`);
   if (!raw) return null;
   return { token, ...JSON.parse(raw) };
 }
@@ -129,12 +132,11 @@ export async function getMe(request, env) {
 export async function logout(request, env) {
   const token = getTokenFromRequest(request);
   if (token) {
-    const raw = await env.AUTH_KV.get(`session:${token}`);
+    const tokenHash = await sha256Hex(token);
+    const raw = await env.AUTH_KV.get(`session:${tokenHash}`);
     if (raw) {
-      const { userId, sessionId } = JSON.parse(raw);
-      await env.AUTH_KV.delete(`session:${token}`);
-      // Remove D1 record
-      const tokenHash = await sha256Hex(token);
+      const { userId } = JSON.parse(raw);
+      await env.AUTH_KV.delete(`session:${tokenHash}`);
       const db = env.varun_portfolio_auth;
       await db.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(tokenHash).run();
       await logSecurityEvent(db, { userId, type: 'logout',

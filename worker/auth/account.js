@@ -63,6 +63,17 @@ export async function revokeSession(request, env, sessionId) {
   if (error) return error;
 
   const db = env.varun_portfolio_auth;
+
+  // Fetch token_hash before deleting so we can also purge the KV entry.
+  // Without this, the revoked session cookie stays valid until KV TTL expires.
+  const record = await db
+    .prepare('SELECT token_hash FROM sessions WHERE id = ? AND user_id = ?')
+    .bind(sessionId, session.userId)
+    .first();
+  if (record) {
+    await env.AUTH_KV.delete(`session:${record.token_hash}`);
+  }
+
   await deleteSessionById(db, sessionId, session.userId);
 
   await logSecurityEvent(db, {
@@ -86,6 +97,12 @@ export async function revokeOtherSessions(request, env) {
   })();
 
   if (currentSession) {
+    // Purge KV entries for all sessions being revoked before deleting from D1
+    const others = await db
+      .prepare('SELECT token_hash FROM sessions WHERE user_id = ? AND id != ?')
+      .bind(session.userId, currentSession.id)
+      .all();
+    await Promise.all((others.results ?? []).map(r => env.AUTH_KV.delete(`session:${r.token_hash}`)));
     await deleteAllSessionsByUserIdExcept(db, session.userId, currentSession.id);
   }
 
@@ -233,7 +250,8 @@ export async function deleteAccount(request, env) {
   }
 
   // Delete everything — KV session first, then all D1 records
-  await env.AUTH_KV.delete(`session:${session.token}`);
+  const currentHash = await sha256(session.token);
+  await env.AUTH_KV.delete(`session:${currentHash}`);
   await deleteUser(db, session.userId);
 
   return json({ ok: true }, 200, { 'Set-Cookie': sessionCookie('', 0) });
