@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
   id                        TEXT PRIMARY KEY,
   email                     TEXT UNIQUE NOT NULL,
   created_at                INTEGER NOT NULL,
+  nickname                  TEXT,
   frozen_until              INTEGER,
   recovery_rate_limit_until INTEGER
 );

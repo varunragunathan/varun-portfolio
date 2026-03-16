@@ -27,6 +27,13 @@ export function inferDeviceName(ua = '') {
   return 'Unknown Device';
 }
 
+// Mask an email: varun@gmail.com → v***@gmail.com
+export function maskEmail(email) {
+  if (!email) return '';
+  const [local, domain] = email.split('@');
+  return `${local[0]}***@${domain}`;
+}
+
 // Extract client IP from Cloudflare request headers
 export function getClientIP(request) {
   return request.headers.get('CF-Connecting-IP')

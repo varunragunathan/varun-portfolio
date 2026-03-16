@@ -812,7 +812,7 @@ export default function Auth() {
   function onSuccess() {
     fetch('/api/auth/me', { credentials: 'include' })
       .then(r => r.json())
-      .then(({ user }) => { setUser(user || null); navigate('/'); });
+      .then(({ user }) => { setUser(user ?? null); navigate('/'); });
   }
 
   if (loading || user) return null;

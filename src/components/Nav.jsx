@@ -151,10 +151,13 @@ function Identicon({ email, size = 32 }) {
 // ── Avatar button + dropdown ──────────────────────────────────────
 function AvatarMenu({ user, onLogout }) {
   const { t } = useTheme();
+  const { setUser } = useAuth();
   const [open, setOpen] = useState(false);
+  const [editingNick, setEditingNick] = useState(false);
+  const [nickDraft, setNickDraft] = useState('');
+  const [nickBusy, setNickBusy] = useState(false);
   const ref = useRef(null);
 
-  // Close on outside click
   useEffect(() => {
     if (!open) return;
     function handler(e) {
@@ -164,9 +167,30 @@ function AvatarMenu({ user, onLogout }) {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  function startEdit() {
+    setNickDraft(user.nickname || '');
+    setEditingNick(true);
+  }
+
+  async function saveNick(e) {
+    e.preventDefault();
+    if (!nickDraft.trim() || nickDraft.trim() === user.nickname) { setEditingNick(false); return; }
+    setNickBusy(true);
+    const res = await fetch('/api/auth/account/nickname', {
+      method: 'PATCH', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nickname: nickDraft.trim() }),
+    });
+    if (res.ok) {
+      const { nickname } = await res.json();
+      setUser(u => ({ ...u, nickname }));
+    }
+    setNickBusy(false);
+    setEditingNick(false);
+  }
+
   return (
     <div ref={ref} style={{ position: 'relative' }}>
-      {/* Avatar button */}
       <button
         onClick={() => setOpen(o => !o)}
         aria-label="Account menu"
@@ -179,27 +203,71 @@ function AvatarMenu({ user, onLogout }) {
           overflow: 'hidden', display: 'block',
         }}
       >
-        <Identicon email={user.email} size={28} />
+        <Identicon email={user.maskedEmail || user.nickname || ''} size={28} />
       </button>
 
-      {/* Dropdown */}
       {open && (
         <div style={{
           position: 'absolute', top: 'calc(100% + 10px)', right: 0,
-          minWidth: 200, borderRadius: 12,
+          minWidth: 220, borderRadius: 12,
           background: t.cardBg, border: `1px solid ${t.border}`,
           boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
           overflow: 'hidden',
           animation: 'fadeSlideDown 0.15s ease',
         }}>
-          {/* Email — display only */}
+          {/* Identity */}
           <div style={{ padding: '12px 14px', borderBottom: `1px solid ${t.border}` }}>
-            <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: t.text3, marginBottom: 4 }}>
-              Signed in as
-            </div>
-            <div style={{ fontFamily: M, fontSize: 11, color: t.text2, wordBreak: 'break-all' }}>
-              {user.email}
-            </div>
+            {editingNick ? (
+              <form onSubmit={saveNick} style={{ display: 'flex', gap: 6 }}>
+                <input
+                  value={nickDraft}
+                  onChange={e => setNickDraft(e.target.value)}
+                  autoFocus
+                  maxLength={32}
+                  style={{
+                    flex: 1, padding: '5px 8px', borderRadius: 7,
+                    fontFamily: M, fontSize: 12, color: t.text1,
+                    background: t.surface, border: `1px solid ${t.accentBorder}`,
+                    outline: 'none', minWidth: 0,
+                  }}
+                />
+                <button type="submit" disabled={nickBusy} style={{
+                  padding: '5px 10px', borderRadius: 7, border: 'none',
+                  background: t.accentDim, color: t.accent, fontFamily: F, fontSize: 12,
+                  cursor: 'pointer',
+                }}>
+                  {nickBusy ? '…' : 'Save'}
+                </button>
+                <button type="button" onClick={() => setEditingNick(false)} style={{
+                  padding: '5px 8px', borderRadius: 7, border: `1px solid ${t.border}`,
+                  background: 'none', color: t.text3, fontFamily: F, fontSize: 12, cursor: 'pointer',
+                }}>✕</button>
+              </form>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: F, fontSize: 13, color: t.text1, fontWeight: 500 }}>
+                    {user.nickname || 'Anonymous'}
+                  </div>
+                  <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginTop: 2 }}>
+                    {user.maskedEmail}
+                  </div>
+                </div>
+                <button
+                  onClick={startEdit}
+                  title="Edit nickname"
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    padding: 4, borderRadius: 5, color: t.text3, flexShrink: 0,
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Security page */}

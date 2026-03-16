@@ -16,6 +16,8 @@ import {
   generateAndStoreRecoveryCodes,
   logSecurityEvent,
   deleteUser,
+  updateUserNickname,
+  getUserById,
 } from '../db.js';
 import { sha256Hex as sha256 } from '../utils.js';
 
@@ -197,16 +199,38 @@ export async function regenerateRecoveryCodes(request, env) {
   return json({ ok: true, recoveryCodes });
 }
 
-// DELETE /api/auth/account  { stepUpToken }
+// PATCH /api/auth/account/nickname  { nickname }
+export async function updateNickname(request, env) {
+  const { session, error } = await requireSession(request, env);
+  if (error) return error;
+
+  const body = await request.json().catch(() => ({}));
+  const nickname = body.nickname?.trim();
+  if (!nickname) return json({ error: 'Missing nickname' }, 400);
+  if (nickname.length < 2 || nickname.length > 32) return json({ error: 'Nickname must be 2–32 characters' }, 400);
+  if (!/^[\w\-. ]+$/.test(nickname)) return json({ error: 'Only letters, numbers, spaces, hyphens, and dots allowed' }, 400);
+
+  await updateUserNickname(env.varun_portfolio_auth, session.userId, nickname);
+  return json({ ok: true, nickname });
+}
+
+// DELETE /api/auth/account  { stepUpToken, email }
 export async function deleteAccount(request, env) {
   const { session, error } = await requireSession(request, env);
   if (error) return error;
 
   const body = await request.json().catch(() => ({}));
+
   const valid = await consumeStepUpToken(env.AUTH_KV, body.stepUpToken, session.userId);
   if (!valid) return json({ error: 'Step-up authentication required or expired. Please verify your passkey again.' }, 403);
 
   const db = env.varun_portfolio_auth;
+
+  // Verify the submitted email matches the account — server-side check, never trust client
+  const user = await getUserById(db, session.userId);
+  if (!user || !body.email || body.email.trim().toLowerCase() !== user.email.toLowerCase()) {
+    return json({ error: 'Email address does not match your account.' }, 403);
+  }
 
   // Delete everything — KV session first, then all D1 records
   await env.AUTH_KV.delete(`session:${session.token}`);

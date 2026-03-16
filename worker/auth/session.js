@@ -6,8 +6,8 @@
 // The pending model means no usable session cookie is issued until
 // the user has explicitly chosen their trust level and device name.
 
-import { sha256Hex, inferDeviceName, getClientIP } from '../utils.js';
-import { createSessionRecord, updateSessionLastActive, getSessionByTokenHash, logSecurityEvent } from '../db.js';
+import { sha256Hex, inferDeviceName, getClientIP, maskEmail } from '../utils.js';
+import { createSessionRecord, updateSessionLastActive, getSessionByTokenHash, logSecurityEvent, getUserById, updateUserNickname } from '../db.js';
 
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
@@ -101,9 +101,28 @@ export async function touchSession(db, token) {
 export async function getMe(request, env) {
   const session = await getSession(env.AUTH_KV, request);
   if (!session) return json({ user: null });
-  // Fire-and-forget last_active update
   touchSession(env.varun_portfolio_auth, session.token).catch(() => {});
-  return json({ user: { email: session.email, userId: session.userId } });
+
+  const db = env.varun_portfolio_auth;
+  const dbUser = await getUserById(db, session.userId);
+
+  // Backfill nickname for accounts created before this column existed
+  let nickname = dbUser?.nickname;
+  if (!nickname) {
+    const ADJS  = ['swift','bright','calm','bold','keen','warm','cool','sharp','quiet','brave'];
+    const NOUNS = ['fox','owl','bear','wolf','hawk','deer','seal','hare','lynx','kite'];
+    const rand = crypto.getRandomValues(new Uint8Array(3));
+    nickname = `${ADJS[rand[0] % ADJS.length]}-${NOUNS[rand[1] % NOUNS.length]}-${rand[2] % 100}`;
+    await updateUserNickname(db, session.userId, nickname);
+  }
+
+  return json({
+    user: {
+      userId: session.userId,
+      nickname,
+      maskedEmail: maskEmail(session.email),
+    },
+  });
 }
 
 // POST /api/auth/logout

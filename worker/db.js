@@ -4,6 +4,18 @@
 
 import { hashRecoveryCode, generateRecoveryCode, verifyRecoveryCode } from './auth/crypto.js';
 
+// ── Nickname generator ────────────────────────────────────────────
+const ADJS  = ['swift','bright','calm','bold','keen','warm','cool','sharp','quiet','brave','gentle','clever','vivid','nimble','serene'];
+const NOUNS = ['fox','owl','bear','wolf','hawk','deer','seal','hare','lynx','kite','crane','finch','raven','otter','gecko'];
+
+function generateNickname() {
+  const rand = crypto.getRandomValues(new Uint8Array(3));
+  const adj  = ADJS[rand[0]  % ADJS.length];
+  const noun = NOUNS[rand[1] % NOUNS.length];
+  const num  = rand[2] % 100;
+  return `${adj}-${noun}-${num}`;
+}
+
 // ── Users ─────────────────────────────────────────────────────────
 
 export async function getUserByEmail(db, email) {
@@ -19,11 +31,19 @@ export async function getOrCreateUser(db, email) {
   if (existing) return existing;
   const id = crypto.randomUUID();
   const now = Date.now();
+  const nickname = generateNickname();
   await db
-    .prepare('INSERT INTO users (id, email, created_at) VALUES (?, ?, ?)')
-    .bind(id, email, now)
+    .prepare('INSERT INTO users (id, email, created_at, nickname) VALUES (?, ?, ?, ?)')
+    .bind(id, email, now, nickname)
     .run();
-  return { id, email, created_at: now };
+  return { id, email, created_at: now, nickname };
+}
+
+export async function updateUserNickname(db, userId, nickname) {
+  await db
+    .prepare('UPDATE users SET nickname = ? WHERE id = ?')
+    .bind(nickname, userId)
+    .run();
 }
 
 export async function setUserFrozen(db, userId, frozenUntil) {

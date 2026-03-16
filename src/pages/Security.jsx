@@ -374,12 +374,12 @@ function SecurityEvents() {
 
 // ── Security page ─────────────────────────────────────────────────
 // ── Delete account ────────────────────────────────────────────────
-function DeleteAccount({ userEmail, onDeleted }) {
+function DeleteAccount({ onDeleted }) {
   const { t } = useTheme();
   // 'idle' | 'verifying' | 'confirm' | 'deleting'
   const [stage, setStage] = useState('idle');
   const [stepUpToken, setStepUpToken] = useState(null);
-  const [confirm, setConfirm] = useState('');
+  const [email, setEmail] = useState('');
   const [error, setError] = useState(null);
 
   async function startDelete() {
@@ -422,7 +422,7 @@ function DeleteAccount({ userEmail, onDeleted }) {
     const res = await fetch('/api/auth/account', {
       method: 'DELETE', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ stepUpToken }),
+      body: JSON.stringify({ stepUpToken, email: email.trim() }),
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -435,7 +435,7 @@ function DeleteAccount({ userEmail, onDeleted }) {
 
   function cancel() {
     setStage('idle');
-    setConfirm('');
+    setEmail('');
     setError(null);
     setStepUpToken(null);
   }
@@ -487,12 +487,13 @@ function DeleteAccount({ userEmail, onDeleted }) {
               Delete account
             </h2>
             <p style={{ fontFamily: F, fontSize: 14, color: t.text2, lineHeight: 1.6, marginBottom: 24 }}>
-              This will permanently delete your account and all associated data. Type your email to confirm.
+              This will permanently delete your account and all associated data. Enter your email address to confirm.
             </p>
             <input
-              value={confirm}
-              onChange={e => setConfirm(e.target.value)}
-              placeholder={userEmail}
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="your@email.com"
               autoFocus
               style={{
                 width: '100%', boxSizing: 'border-box',
@@ -515,11 +516,11 @@ function DeleteAccount({ userEmail, onDeleted }) {
               </button>
               <button
                 onClick={handleDelete}
-                disabled={confirm !== userEmail}
+                disabled={!email.trim()}
                 style={{
                   flex: 1, padding: '11px', borderRadius: 10,
                   fontFamily: F, fontSize: 14, fontWeight: 500,
-                  cursor: confirm !== userEmail ? 'not-allowed' : 'pointer',
+                  cursor: !email.trim() ? 'not-allowed' : 'pointer',
                   background: 'rgba(239,68,68,0.15)', color: '#f87171',
                   border: '1px solid rgba(239,68,68,0.3)',
                   opacity: confirm !== userEmail ? 0.5 : 1,
@@ -554,9 +555,12 @@ export default function Security() {
         <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.accentMuted, marginBottom: 10 }}>
           Account
         </div>
-        <h1 style={{ fontFamily: F, fontWeight: 300, fontSize: 32, color: t.text1, margin: '0 0 8px' }}>
-          Security
+        <h1 style={{ fontFamily: F, fontWeight: 300, fontSize: 32, color: t.text1, margin: '0 0 4px' }}>
+          {user.nickname || 'Security'}
         </h1>
+        <p style={{ fontFamily: M, fontSize: 11, color: t.text3, margin: '0 0 6px' }}>
+          {user.maskedEmail}
+        </p>
         <p style={{ fontFamily: F, fontSize: 14, color: t.text2 }}>
           Manage your sessions, passkeys, and recovery options.
         </p>
@@ -579,7 +583,6 @@ export default function Security() {
       </Section>
 
       <DeleteAccount
-        userEmail={user.email}
         onDeleted={() => { setUser(null); navigate('/'); }}
       />
     </main>

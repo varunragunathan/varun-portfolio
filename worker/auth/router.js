@@ -10,6 +10,7 @@ import {
   listSecurityEvents,
   recoveryCodesStatus, regenerateRecoveryCodes,
   deleteAccount,
+  updateNickname,
 } from './account.js';
 
 function json(data, status = 200) {
@@ -77,6 +78,9 @@ export async function handleAuth(request, env, url) {
   if (method === 'POST' && path === '/num-match/respond')           return respondToApproval(request, env);
   // GET (legacy email link) — kept for any in-flight links
   if (method === 'GET'  && path === '/num-match/approve')           return approveNumMatch(request, env);
+
+  // ── Profile ─────────────────────────────────────────────────────
+  if (method === 'PATCH' && path === '/account/nickname')           return updateNickname(request, env);
 
   // ── Step-up authentication ──────────────────────────────────────
   if (method === 'POST' && path === '/step-up/options')             return stepUpOptions(request, env);
