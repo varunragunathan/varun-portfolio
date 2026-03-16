@@ -25,6 +25,17 @@ function json(data, status = 200, headers = {}) {
   });
 }
 
+// In local dev the wrangler port can vary, so derive expectedOrigin from
+// the request's Origin header for localhost. In production, always use
+// the configured ORIGIN env var (authoritative, never trust the client).
+function expectedOrigin(request, env) {
+  const reqOrigin = request.headers.get('Origin') || '';
+  if (reqOrigin.startsWith('http://localhost') || reqOrigin.startsWith('http://127.0.0.1')) {
+    return reqOrigin;
+  }
+  return env.ORIGIN;
+}
+
 // ── Registration ──────────────────────────────────────────────────
 
 export async function getRegisterOptions(request, env) {
@@ -81,7 +92,7 @@ export async function verifyRegistration(request, env) {
     verification = await verifyRegistrationResponse({
       response: registrationResponse,
       expectedChallenge: challenge,
-      expectedOrigin: env.ORIGIN,
+      expectedOrigin: expectedOrigin(request, env),
       expectedRPID: env.RP_ID,
     });
   } catch (e) {
@@ -202,7 +213,7 @@ export async function verifyAuth(request, env) {
     verification = await verifyAuthenticationResponse({
       response: authResponse,
       expectedChallenge: challenge,
-      expectedOrigin: env.ORIGIN,
+      expectedOrigin: expectedOrigin(request, env),
       expectedRPID: env.RP_ID,
       credential: {
         id: cred.id,
@@ -257,6 +268,19 @@ export async function verifyAuth(request, env) {
     );
 
     await logSecurityEvent(db, { userId, type: 'new_device', ip, userAgent: ua });
+
+    // Push approval request to any trusted devices already connected via WebSocket.
+    // Fire-and-forget — if the DO isn't running yet, trusted devices will receive
+    // the pending approval from KV when they next connect.
+    try {
+      const doId = env.NUM_MATCH_DO.idFromName(userId);
+      const stub = env.NUM_MATCH_DO.get(doId);
+      await stub.fetch(new Request('http://do-internal/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approvalToken, code: displayCode, userAgent: ua, userId }),
+      }));
+    } catch { /* non-fatal: KV is the source of truth */ }
 
     return json({ pendingNumberMatch: true, code: displayCode, tempToken });
   }

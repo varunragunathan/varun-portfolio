@@ -1,185 +1,70 @@
-// ── Number Matching ───────────────────────────────────────────────
-// Flow:
-//   1. verifyAuth detects new device → stores num_match:{approvalToken} and
-//      num_match_pending:{tempToken} in KV, sends email with Approve/Deny links.
-//   2. New device polls /num-match/status?t={tempToken} until approved/denied/expired.
-//   3. Trusted device clicks email link → GET /num-match/approve?t={approvalToken}&action=approve|deny
-//   4. On approval, server issues pendingToken and deletes both KV entries.
+// ── Number Matching — WebSocket broker ────────────────────────────
+// Replaced polling architecture with Durable Objects + WebSocket.
+//
+// Two WebSocket endpoints:
+//   GET /num-match/subscribe  — trusted device subscribes for approval requests
+//   GET /num-match/wait       — new device waits for approval result
+//
+// The NumMatchDO Durable Object handles all coordination. The worker
+// only validates identity before forwarding the WebSocket upgrade to the DO.
 
-import { createPendingSession, getSession } from './session.js';
-import { getUserById } from '../db.js';
+import { getSession } from './session.js';
 
-function json(data, status = 200, headers = {}) {
+function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json', ...headers },
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 
-function html(body, status = 200) {
-  return new Response(body, {
-    status,
-    headers: { 'Content-Type': 'text/html;charset=UTF-8' },
-  });
+// GET /api/auth/num-match/subscribe
+// Trusted sessions connect here. Worker verifies the session is both
+// valid and trusted before forwarding to the DO.
+export async function numMatchSubscribe(request, env) {
+  if (request.headers.get('Upgrade') !== 'websocket') {
+    return json({ error: 'WebSocket upgrade required' }, 426);
+  }
+
+  const session = await getSession(env.AUTH_KV, request);
+  if (!session) return json({ error: 'Unauthorized' }, 401);
+
+  // Only trusted sessions can approve sign-ins
+  const db = env.varun_portfolio_auth;
+  const sessionRecord = await db
+    .prepare('SELECT trusted FROM sessions WHERE user_id = ? AND trusted = 1 AND expires_at > ? LIMIT 1')
+    .bind(session.userId, Date.now())
+    .first();
+  if (!sessionRecord) return json({ error: 'Requires a trusted session' }, 403);
+
+  const doId  = env.NUM_MATCH_DO.idFromName(session.userId);
+  const stub  = env.NUM_MATCH_DO.get(doId);
+  const url   = new URL(request.url);
+  url.searchParams.set('type', 'trusted');
+  url.searchParams.set('userId', session.userId);
+  return stub.fetch(new Request(url.toString(), request));
 }
 
-// GET /api/auth/num-match/approve?t={approvalToken}&action=approve|deny
-// Called by the trusted device via email link.
-export async function approveNumMatch(request, env) {
-  const url = new URL(request.url);
-  const approvalToken = url.searchParams.get('t');
-  const action = url.searchParams.get('action');
-
-  if (!approvalToken || !['approve', 'deny'].includes(action)) {
-    return html(resultPage('Invalid link', false));
+// GET /api/auth/num-match/wait?token={tempToken}
+// New device connects here after verifyAuth returns pendingNumberMatch.
+// Worker validates the tempToken from KV before forwarding to the DO.
+export async function numMatchWait(request, env) {
+  if (request.headers.get('Upgrade') !== 'websocket') {
+    return json({ error: 'WebSocket upgrade required' }, 426);
   }
 
-  const raw = await env.AUTH_KV.get(`num_match:${approvalToken}`);
-  if (!raw) {
-    return html(resultPage('This link has expired or already been used.', false));
-  }
-
-  const data = JSON.parse(raw);
-
-  if (action === 'deny') {
-    await env.AUTH_KV.put(
-      `num_match:${approvalToken}`,
-      JSON.stringify({ ...data, denied: true }),
-      { expirationTtl: 60 },
-    );
-    return html(resultPage('Sign-in denied. The new device will not be granted access.', false));
-  }
-
-  // Approved — mark in KV so the polling endpoint can pick it up
-  await env.AUTH_KV.put(
-    `num_match:${approvalToken}`,
-    JSON.stringify({ ...data, approved: true }),
-    { expirationTtl: 60 },
-  );
-
-  return html(resultPage('Sign-in approved! The new device can now complete sign-in.', true));
-}
-
-// GET /api/auth/num-match/status?t={tempToken}
-// Polled by the new device. Returns { status: 'pending'|'approved'|'denied'|'expired' }
-// On approval, issues a pendingToken so the client can proceed to finaliseSession.
-export async function pollNumMatch(request, env) {
-  const url = new URL(request.url);
-  const tempToken = url.searchParams.get('t');
+  const url       = new URL(request.url);
+  const tempToken = url.searchParams.get('token');
   if (!tempToken) return json({ error: 'Missing token' }, 400);
 
   const raw = await env.AUTH_KV.get(`num_match_pending:${tempToken}`);
-  if (!raw) return json({ status: 'expired' });
+  if (!raw) return json({ error: 'Invalid or expired token' }, 400);
 
-  const { approvalToken, userId, email } = JSON.parse(raw);
+  const { approvalToken, userId } = JSON.parse(raw);
 
-  const approvalRaw = await env.AUTH_KV.get(`num_match:${approvalToken}`);
-  if (!approvalRaw) return json({ status: 'expired' });
-
-  const approval = JSON.parse(approvalRaw);
-
-  if (approval.denied) {
-    // Clean up both entries
-    await env.AUTH_KV.delete(`num_match_pending:${tempToken}`);
-    await env.AUTH_KV.delete(`num_match:${approvalToken}`);
-    return json({ status: 'denied' });
-  }
-
-  if (!approval.approved) {
-    return json({ status: 'pending' });
-  }
-
-  // Approved — clean up and issue pending session
-  await env.AUTH_KV.delete(`num_match_pending:${tempToken}`);
-  await env.AUTH_KV.delete(`num_match:${approvalToken}`);
-
-  const pendingToken = await createPendingSession(env.AUTH_KV, { userId, email });
-  return json({ status: 'approved', pendingToken });
-}
-
-// GET /api/auth/num-match/pending
-// Called by trusted sessions to check if there's a pending approval for their user.
-export async function getPendingApproval(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
-  if (!session) return json({ error: 'Unauthorized' }, 401);
-
-  const raw = await env.AUTH_KV.get(`num_match_for_user:${session.userId}`);
-  if (!raw) return json({ pending: false });
-
-  const { approvalToken, code, userAgent } = JSON.parse(raw);
-
-  // Verify the approval is still live
-  const approvalRaw = await env.AUTH_KV.get(`num_match:${approvalToken}`);
-  if (!approvalRaw) {
-    await env.AUTH_KV.delete(`num_match_for_user:${session.userId}`);
-    return json({ pending: false });
-  }
-
-  const approval = JSON.parse(approvalRaw);
-  if (approval.approved || approval.denied) {
-    return json({ pending: false });
-  }
-
-  return json({ pending: true, approvalToken, code, userAgent });
-}
-
-// POST /api/auth/num-match/respond  { approvalToken, action: 'approve'|'deny' }
-// Called by the trusted session browser after user taps Approve or Deny.
-export async function respondToApproval(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
-  if (!session) return json({ error: 'Unauthorized' }, 401);
-
-  const body = await request.json().catch(() => ({}));
-  const { approvalToken, action } = body;
-  if (!approvalToken || !['approve', 'deny'].includes(action)) {
-    return json({ error: 'Invalid request' }, 400);
-  }
-
-  const raw = await env.AUTH_KV.get(`num_match:${approvalToken}`);
-  if (!raw) return json({ error: 'Expired or not found' }, 404);
-
-  const data = JSON.parse(raw);
-
-  // Ensure this session's user owns the approval
-  if (data.userId !== session.userId) return json({ error: 'Forbidden' }, 403);
-
-  const approved = action === 'approve';
-  await env.AUTH_KV.put(
-    `num_match:${approvalToken}`,
-    JSON.stringify({ ...data, approved, denied: !approved }),
-    { expirationTtl: 60 },
-  );
-
-  // Clean up the user-level pointer
-  await env.AUTH_KV.delete(`num_match_for_user:${session.userId}`);
-
-  return json({ ok: true });
-}
-
-function resultPage(message, success) {
-  const color = success ? '#22c55e' : '#ef4444';
-  const icon = success ? '✓' : '✗';
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Sign-in ${success ? 'Approved' : 'Denied'} · varunr.dev</title>
-  <style>
-    body{font-family:'IBM Plex Mono',monospace;background:#0a0a0a;color:#e5e5e5;
-         display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
-    .card{max-width:400px;padding:48px 32px;text-align:center;}
-    .icon{font-size:48px;color:${color};margin-bottom:16px;}
-    h1{font-size:20px;font-weight:400;margin:0 0 12px;}
-    p{font-size:14px;color:#9ca3af;margin:0;}
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="icon">${icon}</div>
-    <h1>${success ? 'Approved' : 'Denied'}</h1>
-    <p>${message}</p>
-  </div>
-</body>
-</html>`;
+  const doId = env.NUM_MATCH_DO.idFromName(userId);
+  const stub = env.NUM_MATCH_DO.get(doId);
+  url.searchParams.set('type', 'waiting');
+  url.searchParams.set('approvalToken', approvalToken);
+  url.searchParams.set('userId', userId);
+  return stub.fetch(new Request(url.toString(), request));
 }

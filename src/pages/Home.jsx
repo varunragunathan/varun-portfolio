@@ -1,5 +1,7 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
+import { useAuth } from '../hooks/useAuth.jsx';
 import { useTypewriter, useCounter } from '../hooks/useAnimations';
 import { Fade, SectionHeader, Btn } from '../components/UI';
 import ParticleField from '../components/ParticleField';
@@ -9,7 +11,80 @@ import { useState, useEffect } from 'react';
 const F = "'Outfit', sans-serif";
 const M = "'IBM Plex Mono', monospace";
 
-// ─── Hero ─────────────────────────────────────────────────────────
+// ─── Guest view (unauthenticated) ─────────────────────────────────
+function GuestView() {
+  const { t } = useTheme();
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => { setTimeout(() => setLoaded(true), 100); }, []);
+
+  return (
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 'max(96px, 12vh) 24px 60px',
+      opacity: loaded ? 1 : 0, transform: loaded ? 'translateY(0)' : 'translateY(20px)',
+      transition: 'opacity 0.7s cubic-bezier(0.22,1,0.36,1), transform 0.7s cubic-bezier(0.22,1,0.36,1)',
+    }}>
+      <div style={{ width: '100%', maxWidth: 400, textAlign: 'center' }}>
+        {/* Headshot */}
+        <div style={{ width: 120, height: 120, borderRadius: '50%', margin: '0 auto 20px', background: `linear-gradient(135deg, ${t.accent}, ${t.accentDim})`, padding: 2 }}>
+          <img
+            src="/varun.png"
+            alt="Varun Ragunathan"
+            style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+          />
+        </div>
+
+        <h1 style={{ fontFamily: F, fontWeight: 400, fontSize: 22, color: t.text1, margin: '0 0 4px' }}>
+          Varun Ragunathan
+        </h1>
+        <p style={{ fontFamily: M, fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: t.accentMuted, margin: '0 0 32px' }}>
+          Staff Software Engineer
+        </p>
+
+        {/* Sign-in card */}
+        <div style={{
+          background: t.cardBg, border: `1px solid ${t.border}`,
+          borderRadius: 18, padding: '28px 28px 24px',
+          position: 'relative', overflow: 'hidden',
+        }}>
+          <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: `radial-gradient(ellipse at 50% 0%, ${t.accentGhost} 0%, transparent 70%)`, pointerEvents: 'none' }} />
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <p style={{ fontFamily: F, fontSize: 15, color: t.text1, fontWeight: 500, margin: '0 0 6px' }}>
+              Sign in to learn more
+            </p>
+            <p style={{ fontFamily: F, fontSize: 13, color: t.text3, margin: '0 0 22px', lineHeight: 1.6 }}>
+              The work, timeline, and everything else is just one passkey away. No password required.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Link
+                to="/auth"
+                style={{
+                  flex: 1, display: 'block', padding: '11px', borderRadius: 10, textAlign: 'center',
+                  fontFamily: F, fontSize: 14, fontWeight: 500, textDecoration: 'none',
+                  background: t.accentDim, color: t.accent, border: `1px solid ${t.accentBorder}`,
+                }}
+              >
+                Sign in →
+              </Link>
+              <Link
+                to="/auth"
+                style={{
+                  flex: 1, display: 'block', padding: '11px', borderRadius: 10, textAlign: 'center',
+                  fontFamily: F, fontSize: 14, textDecoration: 'none',
+                  color: t.text2, border: `1px solid ${t.border}`,
+                }}
+              >
+                Register
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Hero (authenticated) ──────────────────────────────────────────
 function Hero() {
   const { t } = useTheme();
   const typed = useTypewriter([
@@ -32,7 +107,6 @@ function Hero() {
         opacity: loaded ? 1 : 0, transform: loaded ? 'translateY(0)' : 'translateY(26px)',
         transition: 'opacity 0.85s cubic-bezier(0.22,1,0.36,1), transform 0.85s cubic-bezier(0.22,1,0.36,1)',
       }}>
-        {/* Avatar */}
         <div style={{ width: 96, height: 96, borderRadius: '50%', margin: '0 auto 18px', background: `linear-gradient(135deg, ${t.accent}, ${t.accentDim})`, padding: 2 }}>
           <img
             src="/varun.png"
@@ -286,17 +360,31 @@ function Footer() {
 
 // ─── Page ─────────────────────────────────────────────────────────
 export default function Home() {
+  const { user, loading, enabled } = useAuth();
+  // Show full content if auth is disabled or user is signed in.
+  // While loading, render nothing extra (avoids flash of guest → full).
+  const authenticated = !enabled || (!loading && !!user);
+  const showGuest = enabled && !loading && !user;
+
   return (
     <>
-      <Hero />
-      <StatsBar />
-      <ProjectsSection />
-      <SkillsSection />
-      <PhilosophySection />
-      <TimelineSection />
-      <EducationSection />
-      <CTASection />
-      <Footer />
+      {showGuest ? <GuestView /> : (
+        <>
+          <Hero />
+          {authenticated && (
+            <>
+              <StatsBar />
+              <ProjectsSection />
+              <SkillsSection />
+              <PhilosophySection />
+              <TimelineSection />
+              <EducationSection />
+              <CTASection />
+            </>
+          )}
+          <Footer />
+        </>
+      )}
     </>
   );
 }

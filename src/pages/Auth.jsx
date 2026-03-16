@@ -263,30 +263,51 @@ function RecoveryCodesModal({ codes, onDone }) {
 function NumberMatchScreen({ code, tempToken, onApproved, onDenied }) {
   const { t } = useTheme();
   const [status, setStatus] = useState('pending'); // pending | approved | denied | expired
-  const intervalRef = useRef(null);
 
   useEffect(() => {
-    intervalRef.current = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/auth/num-match/status?t=${tempToken}`, { credentials: 'include' });
-        const data = await res.json();
-        if (data.status === 'approved') {
-          clearInterval(intervalRef.current);
-          setStatus('approved');
-          onApproved(data.pendingToken);
-        } else if (data.status === 'denied') {
-          clearInterval(intervalRef.current);
-          setStatus('denied');
-          onDenied();
-        } else if (data.status === 'expired') {
-          clearInterval(intervalRef.current);
-          setStatus('expired');
+    let ws;
+    let reconnectTimer;
+    let done = false;
+
+    function connect() {
+      if (done) return;
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host;
+      ws = new WebSocket(`${protocol}//${host}/api/auth/num-match/wait?token=${tempToken}`);
+
+      ws.addEventListener('message', event => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'result') {
+            done = true;
+            if (msg.approved) {
+              setStatus('approved');
+              onApproved(msg.pendingToken);
+            } else {
+              setStatus('denied');
+              onDenied();
+            }
+          }
+        } catch {}
+      });
+
+      ws.addEventListener('close', () => {
+        if (!done) {
+          // 5s grace — server may have briefly restarted
+          reconnectTimer = setTimeout(connect, 5000);
         }
-      } catch {
-        // Network error — keep polling
-      }
-    }, 2000);
-    return () => clearInterval(intervalRef.current);
+      });
+
+      ws.addEventListener('error', () => ws.close());
+    }
+
+    connect();
+
+    return () => {
+      done = true;
+      clearTimeout(reconnectTimer);
+      if (ws) ws.close();
+    };
   }, [tempToken]);
 
   return (

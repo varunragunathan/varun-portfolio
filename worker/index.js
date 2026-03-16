@@ -3,6 +3,7 @@
 // Everything else falls through to static assets (the React build).
 
 import { handleAuth } from './auth/router.js';
+export { NumMatchDO } from './numMatchDO.js';
 
 const ALLOWED_ORIGINS = ['https://varunr.dev', 'http://localhost:5173'];
 
@@ -39,7 +40,10 @@ export default {
 
       try {
         const response = await handleAuth(request, env, url);
-        // Attach CORS headers to every auth response
+        // WebSocket 101 responses must pass through unmodified — wrapping
+        // them in a new Response drops the webSocket property and breaks the upgrade.
+        if (response.status === 101) return response;
+        // Attach CORS headers to every regular auth response
         const headers = new Headers(response.headers);
         Object.entries(cors).forEach(([k, v]) => headers.set(k, v));
         return new Response(response.body, { status: response.status, headers });

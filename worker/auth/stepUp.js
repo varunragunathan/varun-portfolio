@@ -84,7 +84,10 @@ export async function stepUpVerify(request, env) {
     verification = await verifyAuthenticationResponse({
       response: authResponse,
       expectedChallenge: challenge,
-      expectedOrigin: env.ORIGIN,
+      expectedOrigin: (() => {
+        const o = request.headers.get('Origin') || '';
+        return (o.startsWith('http://localhost') || o.startsWith('http://127.0.0.1')) ? o : env.ORIGIN;
+      })(),
       expectedRPID: env.RP_ID,
       credential: {
         id: cred.id,

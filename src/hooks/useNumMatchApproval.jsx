@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 
-const POLL_INTERVAL = 3000; // 3 seconds
-
-// Polls /api/auth/num-match/pending while the user is authenticated.
-// Returns { pending, approvalToken, code, userAgent, respond, dismiss }.
+// Connects via WebSocket to /api/auth/num-match/subscribe while the user is
+// authenticated with a trusted session. The server pushes approval requests
+// instead of the client polling.
+// Returns { approval, respond }.
 export function useNumMatchApproval(user) {
   const [approval, setApproval] = useState(null);
-  const intervalRef = useRef(null);
+  const wsRef = useRef(null);
 
   useEffect(() => {
     if (!user) {
@@ -14,33 +14,53 @@ export function useNumMatchApproval(user) {
       return;
     }
 
-    async function poll() {
-      try {
-        const res = await fetch('/api/auth/num-match/pending', { credentials: 'include' });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.pending) {
-          setApproval(data);
-        } else {
-          // Clear if it resolved while modal was open
-          setApproval(prev => (prev && !data.pending ? null : prev));
+    let ws;
+    let reconnectTimer;
+    let destroyed = false;
+
+    function connect() {
+      if (destroyed) return;
+
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host;
+      ws = new WebSocket(`${protocol}//${host}/api/auth/num-match/subscribe`);
+      wsRef.current = ws;
+
+      ws.addEventListener('message', event => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'approval_request') {
+            setApproval({ approvalToken: msg.approvalToken, code: msg.code, userAgent: msg.userAgent });
+          } else if (msg.type === 'resolved') {
+            setApproval(prev => prev?.approvalToken === msg.approvalToken ? null : prev);
+          }
+        } catch {}
+      });
+
+      ws.addEventListener('close', () => {
+        if (!destroyed) {
+          // Reconnect after 3s — server may have restarted
+          reconnectTimer = setTimeout(connect, 3000);
         }
-      } catch {
-        // Ignore network errors — keep polling
-      }
+      });
+
+      ws.addEventListener('error', () => ws.close());
     }
 
-    poll();
-    intervalRef.current = setInterval(poll, POLL_INTERVAL);
-    return () => clearInterval(intervalRef.current);
+    connect();
+
+    return () => {
+      destroyed = true;
+      clearTimeout(reconnectTimer);
+      if (wsRef.current) wsRef.current.close();
+    };
   }, [user]);
 
-  async function respond(approvalToken, action) {
-    await fetch('/api/auth/num-match/respond', {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ approvalToken, action }),
-    });
+  function respond(approvalToken, action) {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'respond', approvalToken, approved: action === 'approve' }));
+    }
     setApproval(null);
   }
 

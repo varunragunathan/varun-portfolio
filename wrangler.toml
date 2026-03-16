@@ -22,3 +22,12 @@ database_id = "329e850c-713c-49fa-93bc-671ef8ced36d"
 [[kv_namespaces]]
 binding = "AUTH_KV"
 id = "050acce2056d4c2883fea6f6f3b32ee2"
+
+# ── Durable Objects ── WebSocket broker for number-match approval
+[[durable_objects.bindings]]
+name = "NUM_MATCH_DO"
+class_name = "NumMatchDO"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["NumMatchDO"]
