@@ -214,7 +214,7 @@ export async function verifyAuth(request, env) {
     if (!challenge) return json({ error: 'Challenge expired. Please try again.' }, 400);
     await env.AUTH_KV.delete(`cond_challenge:${condToken}`);
     // Derive userId from the credential that was used
-    const credRow = await db.prepare('SELECT user_id FROM passkey_credentials WHERE id = ?').bind(authResponse.id).first();
+    const credRow = await db.prepare('SELECT user_id FROM passkey_creds WHERE id = ?').bind(authResponse.id).first();
     if (!credRow) return json({ error: 'Credential not found' }, 400);
     userId = credRow.user_id;
   } else {
