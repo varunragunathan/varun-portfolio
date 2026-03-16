@@ -11,42 +11,46 @@ This chapter describes the full system architecture: every layer, every service,
 The system has two fundamental pieces: a React [SPA](../glossary/README.md#spa) (the frontend) and a Cloudflare Worker (the backend). They are deployed together as a single Cloudflare project, but they serve completely different concerns.
 
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│                        Browser                                  │
-│  React SPA (HTML + JS bundle from dist/)                        │
-│  ┌──────────────────┐  ┌───────────────────────────────────┐    │
-│  │  Static pages    │  │  Auth flows (passkey, OTP, etc.)  │    │
-│  │  Home, Settings  │  │  fetch('/api/auth/*')             │    │
-│  └──────────────────┘  └───────────────────────────────────┘    │
-└─────────────────┬──────────────────────────┬────────────────────┘
-                  │ Static assets            │ /api/auth/* requests
-                  ▼                          ▼
-┌─────────────────────────────────────────────────────────────────┐
-│              Cloudflare Edge (Worker)                           │
-│  worker/index.js                                                │
-│  ┌─────────────────────────┐  ┌──────────────────────────────┐  │
-│  │  ASSETS binding         │  │  handleAuth() router         │  │
-│  │  Serves static build    │  │  worker/auth/router.js       │  │
-│  │  (React bundle, icons,  │  │                              │  │
-│  │   SW, manifest)         │  │  OTP · Passkey · Session     │  │
-│  └─────────────────────────┘  │  NumMatch · StepUp           │  │
-│                               │  Recovery · Account          │  │
-│                               └──────────────┬───────────────┘  │
-└──────────────────────────────────────────────┼──────────────────┘
-                                               │
-           ┌───────────────┬──────────────────┴────────────────┐
-           ▼               ▼                                   ▼
-┌─────────────────┐ ┌─────────────────┐             ┌──────────────────────┐
-│  D1 (SQLite)    │ │  KV Namespace   │             │  Durable Objects      │
-│  Persistent     │ │  AUTH_KV        │             │  NUM_MATCH_DO         │
-│  structured     │ │  Ephemeral,     │             │  One instance/userId  │
-│  data:          │ │  fast:          │             │  WebSocket broker     │
-│  users          │ │  OTP codes      │             │  for number matching  │
-│  passkey_creds  │ │  challenges     │             └──────────────────────┘
-│  sessions       │ │  pending sess.  │
-│  recovery_codes │ │  active sess.   │
-│  security_events│ │  num_match keys │
-└─────────────────┘ └─────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                              Browser                                     │
+│  React SPA (HTML + JS bundle from dist/)                                 │
+│  ┌──────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐  │
+│  │  Static pages    │  │  Auth flows          │  │  Chat UI            │  │
+│  │  Home, Settings  │  │  fetch('/api/auth/*')│  │  fetch('/api/chat') │  │
+│  └──────────────────┘  └─────────────────────┘  └─────────────────────┘  │
+└──────────────┬──────────────────────┬───────────────────────┬────────────┘
+               │ Static assets        │ /api/auth/*           │ /api/chat*
+               ▼                      ▼                       ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│                    Cloudflare Edge (Worker)                              │
+│  worker/index.js                                                         │
+│  ┌───────────────────┐  ┌──────────────────────┐  ┌────────────────────┐ │
+│  │  ASSETS binding   │  │  handleAuth() router  │  │  chat.js router    │ │
+│  │  Serves static    │  │  worker/auth/router.js│  │  postChat          │ │
+│  │  build (React     │  │                       │  │  listConversations │ │
+│  │  bundle, SW,      │  │  OTP · Passkey        │  │  getConversation   │ │
+│  │  manifest)        │  │  Session · NumMatch   │  │  deleteConversation│ │
+│  └───────────────────┘  │  StepUp · Recovery    │  └────────┬───────────┘ │
+│                         │  Account              │           │             │
+│                         └──────────┬────────────┘           │             │
+└────────────────────────────────────┼────────────────────────┼────────────┘
+                                     │                        │
+       ┌──────────────┬──────────────┤              ┌─────────┴────────────┐
+       ▼              ▼              ▼              ▼                      ▼
+┌────────────┐ ┌────────────┐ ┌──────────────┐ ┌──────────────┐  ┌──────────────┐
+│ D1 (SQLite)│ │ KV (AUTH_KV│ │Durable Objects│ │  Vectorize   │  │ Workers AI   │
+│ Persistent │ │ Ephemeral, │ │NUM_MATCH_DO  │ │varun-portfolio│  │ env.AI       │
+│ structured │ │ fast:      │ │One/userId    │ │-rag index    │  │ bge-base-en  │
+│ data:      │ │ OTP codes  │ │WebSocket     │ │768-dim cosine│  │ (embeddings) │
+│ users      │ │ challenges │ │broker for    │ │vector store  │  │ llama-3.3-70b│
+│ passkeys   │ │ sessions   │ │number match  │ │for RAG chat  │  │ (generation) │
+│ sessions   │ │ num_match  │ └──────────────┘ └──────────────┘  └──────────────┘
+│ recovery   │ │ step_up    │
+│ security   │ └────────────┘
+│ events     │
+│ conversations│
+│ chat_messages│
+└────────────┘
 ```
 
 ---
@@ -137,7 +141,59 @@ The `ENABLE_AUTH` flag is a safety valve. When set to `"false"`, the entire auth
 
 ---
 
-## 2.5 CORS Handling and Why It Matters
+## 2.5 The `/api/chat` Route Block
+
+The RAG chat system (see [Chapter 15](./15-rag-system.md)) adds a second routing block to `worker/index.js`, evaluated before the `/api/auth/` block:
+
+```js
+// worker/index.js lines 33-71
+if (url.pathname.startsWith('/api/chat')) {
+  try {
+    const path   = url.pathname;
+    const method = request.method;
+    let response;
+
+    const convMatch = path.match(/^\/api\/chat\/conversations\/([^/]+)$/);
+    if (convMatch) {
+      const id = convMatch[1];
+      if (method === 'GET')         response = await getConversation(request, env, id);
+      else if (method === 'DELETE') response = await deleteConversation(request, env, id);
+      else response = new Response('Method Not Allowed', { status: 405 });
+    } else if (path === '/api/chat/conversations') {
+      if (method === 'GET') response = await listConversations(request, env);
+      else response = new Response('Method Not Allowed', { status: 405 });
+    } else if (path === '/api/chat') {
+      if (method === 'POST') response = await postChat(request, env);
+      else response = new Response('Method Not Allowed', { status: 405 });
+    } else { ... }
+
+    // SSE responses must pass through unmodified
+    if (response.headers.get('Content-Type')?.startsWith('text/event-stream')) return response;
+
+    // All other chat responses get CORS headers attached
+    const headers = new Headers(response.headers);
+    Object.entries(cors).forEach(([k, v]) => headers.set(k, v));
+    return new Response(response.body, { status: response.status, headers });
+  } catch (err) { ... }
+}
+```
+
+The routes are:
+
+| Method | Path | Handler | Purpose |
+|--------|------|---------|---------|
+| `POST` | `/api/chat` | `postChat` | Send message, receive SSE stream |
+| `GET` | `/api/chat/conversations` | `listConversations` | List user's conversations (max 50) |
+| `GET` | `/api/chat/conversations/:id` | `getConversation` | Get messages for a conversation |
+| `DELETE` | `/api/chat/conversations/:id` | `deleteConversation` | Delete conversation and its messages |
+
+Unlike `/api/auth/*`, the chat routes have no `ENABLE_AUTH` feature flag. They are always present. They do require an active session (each handler calls `getSession` as its first operation), so unauthenticated requests receive a 401 before any chat logic runs.
+
+The SSE pass-through rule (`if (response.headers.get('Content-Type')?.startsWith('text/event-stream')) return response`) prevents the CORS-header-attachment code from consuming the `postChat` response body. Constructing a `new Response(response.body, ...)` with a streaming body would create a new stream backed by the original — this is generally safe, but `transformStream` already sets the `ReadableStream` in motion before `postChat` returns. Passing it through directly is simpler and avoids any risk of inadvertently buffering the stream.
+
+---
+
+## 2.6 CORS Handling and Why It Matters
 
 [CORS](../glossary/README.md#cors) (Cross-Origin Resource Sharing) is the browser mechanism that controls whether JavaScript running on one origin can read responses from a different origin. Without the right CORS headers, the React app's `fetch('/api/auth/...')` calls would be blocked by the browser.
 
@@ -181,7 +237,7 @@ if (response.status === 101) return response;
 
 ---
 
-## 2.6 Request Lifecycle
+## 2.7 Request Lifecycle
 
 A complete request lifecycle for a passkey authentication attempt:
 
@@ -246,7 +302,7 @@ A complete request lifecycle for a passkey authentication attempt:
 
 ---
 
-## 2.7 The Compatibility Date and nodejs_compat Flag
+## 2.8 The Compatibility Date and nodejs_compat Flag
 
 The `wrangler.toml` specifies:
 
@@ -263,8 +319,9 @@ The `nodejs_compat` flag enables a set of Node.js-compatible APIs in the Workers
 
 ## Key Takeaways
 
-- The system has three storage layers chosen by data lifetime and access pattern: D1 for persistent structured data, KV for ephemeral keyed data with TTLs, and Durable Objects for real-time coordination.
-- The entire backend — API and static file serving — runs as a single Cloudflare Worker with no separate server.
+- The system has five storage/compute layers: D1 for persistent structured data, KV for ephemeral keyed data with TTLs, Durable Objects for real-time WebSocket coordination, Vectorize for vector similarity search, and Workers AI for embeddings and LLM inference.
+- The entire backend — API, static file serving, and RAG chat — runs as a single Cloudflare Worker with no separate server.
 - CORS headers must include `Allow-Credentials: true` for session cookies to work; `Vary: Origin` prevents incorrect caching.
-- WebSocket 101 upgrade responses must be passed through without wrapping.
+- SSE streaming responses must bypass CORS header attachment in the same way that WebSocket 101 responses must bypass wrapping — consuming the body to attach headers would break the stream.
 - The `compatibility_date` and `nodejs_compat` flag are not boilerplate — they have real behavioral implications.
+- The chat routing block (`/api/chat*`) evaluates before the auth block and has no `ENABLE_AUTH` flag. All chat routes require an active session regardless.

@@ -1,6 +1,10 @@
 // ── Auth context ─────────────────────────────────────────────────
 // Gated by VITE_ENABLE_AUTH. When false, useAuth() returns a no-op
 // so the rest of the app doesn't need to know auth exists.
+//
+// After fetching /api/auth/me (which may return role once backend is updated),
+// also fetches /api/user/upgrade-request to attach upgradeRequest status.
+// Derives isPro and isAdmin from the role field.
 
 import { createContext, useContext, useEffect, useState } from 'react';
 
@@ -14,9 +18,30 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (!ENABLED) return;
+
     fetch('/api/auth/me', { credentials: 'include' })
       .then(r => r.json())
-      .then(({ user }) => setUser(user || null))
+      .then(async ({ user: meUser }) => {
+        if (!meUser) {
+          setUser(null);
+          return;
+        }
+
+        // Attempt to fetch upgrade request status for signed-in users.
+        // Silently ignore errors (e.g. 404 = no request yet).
+        let upgradeRequest = null;
+        try {
+          const ur = await fetch('/api/user/upgrade-request', { credentials: 'include' });
+          if (ur.ok) {
+            const urData = await ur.json();
+            upgradeRequest = urData.request ?? urData ?? null;
+          }
+        } catch {
+          // non-fatal
+        }
+
+        setUser({ ...meUser, upgradeRequest });
+      })
       .catch(() => setUser(null));
   }, []);
 
@@ -25,8 +50,19 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const loading  = user === undefined;
+  const isPro    = user?.role === 'pro'   || user?.role === 'admin';
+  const isAdmin  = user?.role === 'admin';
+
   return (
-    <AuthContext.Provider value={{ user, setUser, loading: user === undefined, logout, enabled: ENABLED }}>
+    <AuthContext.Provider value={{
+      user, setUser,
+      loading,
+      logout,
+      enabled: ENABLED,
+      isPro,
+      isAdmin,
+    }}>
       {children}
     </AuthContext.Provider>
   );

@@ -5,3 +5,5 @@ dist
 /.wrangler
 /dist
 package-lock.json
+/private
+/docs/export

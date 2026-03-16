@@ -119,11 +119,16 @@ export async function getMe(request, env) {
     await updateUserNickname(db, session.userId, nickname);
   }
 
+  const role = session.email && env.ADMIN_EMAIL && session.email === env.ADMIN_EMAIL
+    ? 'admin'
+    : (dbUser?.role ?? 'user');
+
   return json({
     user: {
       userId: session.userId,
       nickname,
       maskedEmail: maskEmail(session.email),
+      role,
     },
   });
 }

@@ -285,6 +285,24 @@ function AvatarMenu({ user, onLogout }) {
             Settings
           </Link>
 
+          {/* Admin link — only for admins */}
+          {user.role === 'admin' && (
+            <Link
+              to="/admin"
+              onClick={() => setOpen(false)}
+              style={{
+                display: 'block', padding: '11px 14px', textDecoration: 'none',
+                fontFamily: F, fontSize: 13, color: '#f5a623',
+                borderBottom: `1px solid ${t.border}`,
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(245,166,35,0.06)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+            >
+              Admin
+            </Link>
+          )}
+
           {/* Log out */}
           <button
             onClick={() => { setOpen(false); onLogout(); }}
@@ -319,9 +337,13 @@ function lerpColor(hex1, hex2, t) {
 }
 
 function LogoMark() {
+  const { t }      = useTheme();
   const prefixRef  = useRef(null);
   const rafRef     = useRef(null);
   const stateRef   = useRef({ hovering: false, startTime: null, leaveTime: null, leaveFrom: '~/', leaveFromY: 0 });
+  // Holds the current theme's rest colour for the prefix so tick() (stable ref) always reads the latest value.
+  const baseColorRef = useRef(t.text3);
+  useEffect(() => { baseColorRef.current = t.text3; }, [t.text3]);
 
   const tick = useCallback((ts) => {
     const el = prefixRef.current;
@@ -341,7 +363,7 @@ function LogoMark() {
 
       el.textContent     = SYMBOLS[idx];
       el.style.opacity   = String(0.35 + 0.65 * env);
-      el.style.color     = lerpColor('#4b5563', '#6366f1', env);
+      el.style.color     = lerpColor(baseColorRef.current, '#6366f1', env);
       el.style.transform = `translateY(${y.toFixed(2)}px)`;
       rafRef.current = requestAnimationFrame(tick);
     } else {
@@ -351,13 +373,13 @@ function LogoMark() {
       if (t < 1) {
         el.textContent     = s.leaveFrom;
         el.style.opacity   = String(1 - ease);
-        el.style.color     = lerpColor('#4b5563', '#6366f1', 1 - ease);
+        el.style.color     = lerpColor(baseColorRef.current, '#6366f1', 1 - ease);
         el.style.transform = `translateY(${(s.leaveFromY * (1 - ease)).toFixed(2)}px)`;
         rafRef.current = requestAnimationFrame(tick);
       } else {
         el.textContent     = '~/';
         el.style.opacity   = '1';
-        el.style.color     = '#4b5563';
+        el.style.color     = baseColorRef.current;
         el.style.transform = 'translateY(0px)';
         rafRef.current = null;
       }
@@ -396,14 +418,14 @@ function LogoMark() {
         ref={prefixRef}
         style={{
           fontFamily: M, fontSize: 13, letterSpacing: '0.03em',
-          color: '#4b5563', display: 'inline-block',
+          color: t.text3, display: 'inline-block',
           minWidth: 22, willChange: 'transform, opacity',
           transition: 'none',
         }}
       >
         ~/
       </span>
-      <span style={{ fontFamily: M, fontSize: 13, letterSpacing: '0.03em', color: '#e5e5e5' }}>
+      <span style={{ fontFamily: M, fontSize: 13, letterSpacing: '0.03em', color: t.text1 }}>
         varunr
       </span>
       <span style={{ fontFamily: M, fontSize: 13, letterSpacing: '0.03em', color: '#6366f1' }}>

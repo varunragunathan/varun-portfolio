@@ -8,6 +8,9 @@ main = "worker/index.js"
 ENABLE_AUTH = "true"
 RP_ID = "varunr.dev"
 ORIGIN = "https://varunr.dev"
+ADMIN_EMAIL = "ragunathanvarun@gmail.com"
+
+
 
 [assets]
 directory = "./dist"
@@ -22,6 +25,15 @@ database_id = "329e850c-713c-49fa-93bc-671ef8ced36d"
 [[kv_namespaces]]
 binding = "AUTH_KV"
 id = "050acce2056d4c2883fea6f6f3b32ee2"
+
+# ── Vectorize ── vector store for RAG
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "varun-portfolio-rag"
+
+# ── Workers AI ── embeddings + optional local generation
+[ai]
+binding = "AI"
 
 # ── Durable Objects ── WebSocket broker for number-match approval
 [[durable_objects.bindings]]

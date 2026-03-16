@@ -244,7 +244,74 @@ The `cond_challenge:` keys use a short-lived UUID (`condToken`) as the suffix ra
 
 ---
 
-## 3.5 Schema Deletion Order
+## 3.5 D1 Schema — Chat Tables
+
+The RAG chat system (see [Chapter 15](./15-rag-system.md)) adds two tables to `worker/schema.sql`.
+
+### Table: `conversations`
+
+```sql
+CREATE TABLE IF NOT EXISTS conversations (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL REFERENCES users(id),
+  title      TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+```
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `id` | TEXT (UUID) | Primary key. Generated with `crypto.randomUUID()` at conversation creation. |
+| `user_id` | TEXT | Foreign key to `users.id`. All conversation queries are scoped to a specific user — no conversation can be retrieved by a different user, even if the UUID is guessed. |
+| `title` | TEXT | Auto-derived from the first 60 characters of the first message, with whitespace collapsed. Never updated after creation. Used in the conversation list sidebar on the `/chat` page. |
+| `created_at` | INTEGER | Unix timestamp in milliseconds. Set once at creation. |
+| `updated_at` | INTEGER | Unix timestamp in milliseconds. Updated on every `saveMessages` call. Used to sort the conversation list by recency (`ORDER BY updated_at DESC`). |
+
+The conversation list query caps at 50 results (`LIMIT 50`). Older conversations are not shown but still exist in D1 and can be deleted. There is no automatic pruning.
+
+---
+
+### Table: `chat_messages`
+
+```sql
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id              TEXT PRIMARY KEY,
+  conversation_id TEXT NOT NULL REFERENCES conversations(id),
+  role            TEXT NOT NULL,
+  content         TEXT NOT NULL,
+  created_at      INTEGER NOT NULL
+);
+```
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `id` | TEXT (UUID) | Primary key. |
+| `conversation_id` | TEXT | Foreign key to `conversations.id`. All message queries are scoped to a conversation. |
+| `role` | TEXT | `'user'` or `'assistant'`. Mirrors the chat completion message format used by the Workers AI API. |
+| `content` | TEXT | The full message text. For user messages, this is the raw input. For assistant messages, this is the complete response accumulated during streaming via the `onFullText` callback in `transformStream`. |
+| `created_at` | INTEGER | Unix timestamp in milliseconds. User and assistant messages for the same turn use `now` and `now + 1` respectively, guaranteeing correct `ORDER BY created_at ASC` ordering even when both rows are inserted in the same millisecond. |
+
+**Why persist after streaming completes, not before?** The assistant message is not known until the stream ends. The `onFullText` callback is invoked by `transformStream` when it receives the `[DONE]` SSE event, at which point `fullText` contains the entire assistant response. Attempting to write incrementally would require either a streaming D1 upsert (not supported) or complex partial-write logic. Writing once at stream end is simpler and correct.
+
+**Conversation history retrieval** for multi-turn context uses:
+
+```js
+// worker/chat.js — getConversationHistory
+const result = await db
+  .prepare(`SELECT role, content FROM chat_messages
+            WHERE conversation_id = ?
+            ORDER BY created_at DESC LIMIT ${HISTORY_MESSAGES}`)
+  .bind(conversationId)
+  .all();
+return result.results.reverse();
+```
+
+`HISTORY_MESSAGES = 10`. The query fetches the 10 most recent messages in reverse order and then reverses the result array in JavaScript to restore chronological order. This is logically equivalent to `ORDER BY created_at ASC LIMIT 10 OFFSET (total - 10)` but avoids a count subquery.
+
+---
+
+## 3.6 Schema Deletion Order
 
 Because the schema uses foreign key references but no `ON DELETE CASCADE`, the `deleteUser` function in `worker/db.js` deletes child rows first, then the user:
 
@@ -270,3 +337,4 @@ The order (recovery_codes, security_events, passkey_creds, sessions, users) ensu
 - The database never stores raw session tokens or raw recovery codes in plaintext. Only hashes.
 - KV key naming follows `prefix:identifier` consistently. The `session:` prefix uses the token hash, not the token.
 - Synced passkeys are detected by checking for `cross-platform` authenticator type or `hybrid` transport, because they need different sign count handling.
+- Chat conversations and messages are stored in D1, not KV. Chat content is permanent and structured (queries, joins, sort by recency) — it belongs in D1. The `updated_at + 1ms` trick ensures correct ordering when user and assistant messages are written in the same millisecond.

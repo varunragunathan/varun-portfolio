@@ -36,6 +36,14 @@ In the WebAuthn context, an authenticator is the hardware or software entity tha
 
 ---
 
+## bge-base-en-v1.5
+
+A 109-million-parameter bi-encoder embedding model from the Beijing Academy of Artificial Intelligence (BAAI). The model's full identifier on Workers AI is `@cf/baai/bge-base-en-v1.5`. It produces 768-dimensional dense float vectors from input text. Bi-encoder models are trained on large-scale text pairs to produce semantically similar vectors for semantically similar inputs, making them useful for nearest-neighbor retrieval. This project uses bge-base-en-v1.5 as both the ingestion embedding model (`scripts/ingest-docs.js`) and the query embedding model (`worker/chat.js`). Using the same model for both is required — vectors from different models are not compatible. See [Chapter 15](../chapters/15-rag-system.md).
+
+*See also:* [BAAI BGE Models](https://huggingface.co/BAAI)
+
+---
+
 ## Binding
 
 In the Cloudflare Workers context, a binding is a configuration that gives a Worker access to a resource — a D1 database, a KV namespace, a Durable Object class, or an ASSETS directory. Bindings are declared in `wrangler.toml` and accessible in Worker code as properties of the `env` parameter. Example: `env.AUTH_KV` (KV binding), `env.varun_portfolio_auth` (D1 binding).
@@ -57,6 +65,12 @@ The browser's built-in dropdown that appears when a user focuses an input field 
 Concise Binary Object Representation (CBOR, RFC 7049) is a binary data serialization format designed to be compact and efficient. WebAuthn uses CBOR extensively in the authenticator data structures, including encoding public keys in COSE format. The `@simplewebauthn/server` library handles all CBOR parsing internally; application developers typically don't interact with CBOR directly.
 
 *See also:* [RFC 7049](https://www.rfc-editor.org/rfc/rfc7049)
+
+---
+
+## Chunking (text)
+
+The process of splitting a large document into smaller pieces (chunks) before embedding and storing in a vector index. Chunks must be small enough to fit within the embedding model's context window and to represent a focused semantic unit. Chunks that are too large produce vectors that average over many topics, reducing retrieval precision. Chunks that are too small lose context. This project uses two chunking strategies: heading-boundary chunking for markdown (splitting on `#`, `##`, `###` headers) and blank-line chunking for code (splitting on double newlines between top-level declarations). Overlap between adjacent chunks (80 tokens in this project) prevents information loss at split boundaries. See [Chapter 15](../chapters/15-rag-system.md#153-the-ingestion-pipeline).
 
 ---
 
@@ -87,6 +101,14 @@ A WebAuthn feature (`mediation: 'conditional'` in `navigator.credentials.get()`)
 ## Contract Ratio
 
 See [WCAG](#wcag).
+
+---
+
+## Cosine Similarity
+
+A measure of similarity between two vectors based on the angle between them, computed as the dot product of the vectors divided by the product of their magnitudes: `cos(θ) = (A · B) / (|A| |B|)`. The result is between -1 (opposite directions) and 1 (identical directions), with 0 indicating orthogonality (no similarity). Cosine similarity is the standard metric for text embedding retrieval because it is invariant to vector magnitude — two short and two long texts with the same semantic content will produce vectors that point in the same direction, even if their lengths differ. This project configures the [Vectorize](#vectorize) index with `--metric=cosine`. See [Chapter 15](../chapters/15-rag-system.md#154-the-vectorize-index).
+
+*See also:* [Wikipedia: Cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity)
 
 ---
 
@@ -173,6 +195,14 @@ A Cloudflare Workers primitive that provides a stateful, single-instance actor. 
 Running computation at network edge locations (datacenters distributed globally, close to end users) rather than in a centralized cloud region. Cloudflare Workers is an edge computing platform — a Worker runs at whichever of Cloudflare's 300+ datacenters is closest to the requesting user. This reduces latency and eliminates the need to manage server infrastructure.
 
 *See also:* [Cloudflare Workers](https://workers.cloudflare.com/)
+
+---
+
+## Embedding (vector)
+
+A dense numerical representation of a piece of text as a fixed-length array of floating-point numbers (a vector). Embedding models are trained so that semantically similar texts produce vectors that are close together in vector space (by cosine similarity or Euclidean distance). A question about "passkey authentication" and a documentation section titled "Passkeys and WebAuthn" should produce similar vectors even if they share no exact words — because they describe the same concept. Embeddings are the foundation of the [RAG](#rag-retrieval-augmented-generation) retrieval step: the query is embedded, and the nearest document embeddings in the vector index are returned as context. This project uses [bge-base-en-v1.5](#bge-base-en-v15) to produce 768-dimensional embeddings. See [Chapter 15](../chapters/15-rag-system.md).
+
+*See also:* [Cloudflare Workers AI: Text Embeddings](https://developers.cloudflare.com/workers-ai/models/text-embeddings/)
 
 ---
 
@@ -340,6 +370,14 @@ A mechanism that caps the number of requests a client can make in a time window.
 
 ---
 
+## RAG (Retrieval-Augmented Generation)
+
+A pattern for grounding large language model (LLM) responses in a specific knowledge base. Instead of relying on the model's training data alone, RAG adds a retrieval step: the query is converted to a vector embedding, nearest-neighbor search finds the most relevant document chunks, and those chunks are inserted into the model's context as a prompt prefix. The model generates a response based on the retrieved context rather than (or in addition to) its training data. RAG is preferable to fine-tuning when the knowledge base changes frequently (no retraining needed) and preferable to large context windows when cost and latency matter (only relevant chunks are included). This project implements RAG using [Vectorize](#vectorize) for chunk storage and retrieval, [bge-base-en-v1.5](#bge-base-en-v15) for embedding, and [Workers AI](#workers-ai) for LLM inference. See [Chapter 15](../chapters/15-rag-system.md).
+
+*See also:* [Retrieval-Augmented Generation (Lewis et al., 2020)](https://arxiv.org/abs/2005.11401)
+
+---
+
 ## React
 
 A JavaScript library for building user interfaces using a component model. Components declare what the UI should look like given a state, and React handles updating the DOM when state changes. This project uses React 18 (with concurrent features via `createRoot`) and React Router v6 for client-side routing.
@@ -396,6 +434,14 @@ This project uses `SameSite=Strict` for the session cookie, providing CSRF prote
 A cookie attribute that restricts the cookie to HTTPS connections only. A cookie with the `Secure` flag is never sent over HTTP, preventing interception by network attackers. This project's session cookie uses `Secure`.
 
 *See also:* [MDN: Set-Cookie Secure](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie#secure)
+
+---
+
+## Server-Sent Events (SSE)
+
+A browser standard (W3C `EventSource` API) for one-directional server-to-client streaming over a standard HTTP connection. The server sends a `Content-Type: text/event-stream` response and emits events as `data: <payload>\n\n` lines. The browser's `EventSource` API or a manual `ReadableStream` reader can receive these events in real time. SSE is simpler than WebSocket for one-way streaming (no handshake, works over HTTP/2, automatically retries). This project uses SSE to stream LLM inference tokens from the Worker to the browser in the RAG chat system. The `transformStream` function in `worker/chat.js` translates Workers AI's native SSE format into the client-facing format. See [Chapter 15](../chapters/15-rag-system.md#156-sse-streaming-protocol).
+
+*See also:* [MDN: Server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events)
 
 ---
 
@@ -481,6 +527,14 @@ A fast frontend build tool and dev server. Vite uses native ES modules in develo
 
 ---
 
+## Vectorize
+
+Cloudflare's managed vector database service for Workers. Vectorize stores high-dimensional float vectors and supports approximate nearest-neighbor (ANN) queries by cosine similarity or Euclidean distance. Vectors are indexed at creation time and queried with a `query(vector, { topK, returnMetadata })` call. Metadata (arbitrary JSON up to ~10 KB per vector) can be stored alongside each vector and returned with query results. Vectorize is accessed in Workers via a binding declared in `wrangler.toml` and exposed as `env.VECTORIZE`. This project uses a 768-dimensional cosine index named `varun-portfolio-rag` to store document chunk embeddings for the RAG chat system. See [Chapter 15](../chapters/15-rag-system.md#154-the-vectorize-index).
+
+*See also:* [Cloudflare Vectorize](https://developers.cloudflare.com/vectorize/)
+
+---
+
 ## WCAG
 
 Web Content Accessibility Guidelines. A W3C standard for making web content accessible to people with disabilities. The most cited metric is contrast ratio: the ratio of relative luminance between foreground and background colors. WCAG AA requires 4.5:1 for normal text and 3:1 for large text and non-text elements (icons, diagrams). The `Identicon` component enforces the 3:1 non-text threshold (per SC 1.4.11) using the WCAG luminance formula.
@@ -510,6 +564,14 @@ A protocol providing full-duplex, persistent communication over a single TCP con
 The Cloudflare Workers runtime environment. Based on V8 isolates (the same JavaScript engine as Chrome and Node.js), but with a different global API surface than Node.js. Workers expose W3C standards (`fetch`, `crypto.subtle`, `URL`, `Request`, `Response`, `WebSocket`) rather than Node-specific APIs (`fs`, `net`, `path`). The `nodejs_compat` flag extends the runtime with some Node.js compatibility shims.
 
 *See also:* [Cloudflare Workers Runtime APIs](https://developers.cloudflare.com/workers/runtime-apis/)
+
+---
+
+## Workers AI
+
+Cloudflare's serverless AI inference platform, accessible from Workers via the `env.AI` binding. Workers AI hosts a curated set of open-source models for text generation, embeddings, image generation, speech recognition, and more. Models are invoked with `env.AI.run(modelId, input)`. The binding is declared in `wrangler.toml` under `[ai]`. This project uses Workers AI for two purposes: generating text embeddings with `@cf/baai/bge-base-en-v1.5` (768-dim float vectors) and streaming chat completions with `@cf/meta/llama-3.3-70b-instruct-fp8-fast`. The free tier provides a limited daily quota of "neurons" (Cloudflare's unit of AI compute). See [Chapter 15](../chapters/15-rag-system.md#1510-the-model-choice).
+
+*See also:* [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/)
 
 ---
 

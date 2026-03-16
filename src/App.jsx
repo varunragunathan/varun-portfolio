@@ -4,14 +4,17 @@ import { ThemeProvider, useTheme } from './hooks/useTheme';
 import { SkipLink, ThemeToggle } from './components/UI';
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import Nav from './components/Nav';
+import ChatWidget from './components/ChatWidget.jsx';
 import { useNumMatchApproval } from './hooks/useNumMatchApproval.jsx';
 import NumMatchApprovalModal from './components/NumMatchApprovalModal.jsx';
 import { usePrefersReducedMotion } from './hooks/useAnimations.js';
 import pkg from '../package.json';
 
-const Home = lazy(() => import('./pages/Home'));
-const Auth = lazy(() => import('./pages/Auth'));
-const Settings = lazy(() => import('./pages/Security'));
+const Home      = lazy(() => import('./pages/Home'));
+const Auth      = lazy(() => import('./pages/Auth'));
+const Settings  = lazy(() => import('./pages/Security'));
+const ChatPage  = lazy(() => import('./pages/Chat'));
+const AdminPage = lazy(() => import('./pages/Admin'));
 
 function Loading() {
   const { t } = useTheme();
@@ -129,10 +132,13 @@ function Shell() {
             <Route index element={<Home />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/account/settings" element={<Settings />} />
+            <Route path="/chat" element={<ChatPage />} />
+            <Route path="/admin" element={<AdminPage />} />
           </Routes>
         </Suspense>
       </div>
       <Footer />
+      {user && <ChatWidget />}
       {approval && <NumMatchApprovalModal approval={approval} onRespond={respond} />}
     </div>
   );

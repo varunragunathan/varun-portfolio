@@ -4,6 +4,8 @@
 
 This chapter describes future improvements with technical rationale for each. It covers security enhancements, UX improvements, infrastructure maturity, and testing infrastructure. Nothing here is speculative — each item is grounded in a specific gap identified in the current codebase.
 
+> **Note:** An earlier version of this chapter listed a RAG-powered chat assistant as future work. That feature has since been fully implemented. See [Chapter 15](./15-rag-system.md) for the complete technical documentation of the RAG system, including the ingestion pipeline, Vectorize index, streaming chat endpoint, multi-turn conversation design, and frontend components.
+
 ---
 
 ## 14.1 TOTP as a Second Backup Method
@@ -204,6 +206,85 @@ This is a one-line fix that brings the recovery OTP in line with the regular OTP
 
 ---
 
+## 14.12 Upgrade to Claude API for Chat Inference
+
+**The gap:** The current RAG chat system uses `@cf/meta/llama-3.3-70b-instruct-fp8-fast` via Workers AI because it is available on the free tier. The quality is good for a free model, but there is a measurable gap compared to Anthropic's Claude models on technical explanation, security tradeoff analysis, and code walkthrough tasks. See [Chapter 15, Section 15.10](./15-rag-system.md#1510-the-model-choice) for the full model comparison.
+
+**What Claude offers:**
+- Significantly better instruction-following and reasoning depth on complex technical questions
+- More accurate citation of context — it is better at referencing the retrieved chunk rather than synthesizing from training data
+- Honest acknowledgment of gaps — Claude is calibrated to say "this context doesn't cover that" rather than confabulate
+- Longer output without quality degradation (Claude Sonnet handles 2000+ token explanations cleanly)
+
+**The migration path:**
+
+The `streamWorkersAI` function in `worker/chat.js` is the only call site that needs to change. The Anthropic API uses a compatible messages format:
+
+```js
+// Replace streamWorkersAI with a Claude streaming call:
+const response = await fetch('https://api.anthropic.com/v1/messages', {
+  method: 'POST',
+  headers: {
+    'x-api-key':         env.ANTHROPIC_API_KEY,
+    'anthropic-version': '2023-06-01',
+    'content-type':      'application/json',
+  },
+  body: JSON.stringify({
+    model:      'claude-sonnet-4-5',
+    max_tokens: 2048,
+    system:     systemPrompt,
+    messages:   aiMessages.filter(m => m.role !== 'system'),
+    stream:     true,
+  }),
+});
+```
+
+The Anthropic streaming format is different from Workers AI's format. Claude emits SSE events of type `content_block_delta` with `delta.text` fields, rather than `{ response: "token" }`:
+
+```text
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"The"}}
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}
+data: {"type":"message_stop"}
+```
+
+The `transformStream` function in `worker/chat.js` would need a parallel `transformAnthropicStream` implementation that parses these events and emits the same `{ type: 'delta', text }` / `{ type: 'done' }` client protocol. Because the client-facing SSE format does not change, the `useChat` hook and all frontend components require no modification.
+
+**Cost estimate at current Claude pricing (March 2026):**
+- Claude Sonnet: approximately $3.00 per million input tokens, $15.00 per million output tokens
+- An average RAG query with system prompt + 5 chunks + 10 history turns ≈ 3,000 input tokens, 800 output tokens
+- At 100 queries/day: ≈ $0.90/day input + $1.20/day output = ~$2.10/day
+- At 1,000 queries/day: ~$21/day
+
+For a personal portfolio with modest traffic (tens to low hundreds of queries per day), the cost is meaningful but not prohibitive. The break-even question is: is the quality improvement worth the cost for this specific use case?
+
+**The `ANTHROPIC_API_KEY` secret** would be added to `wrangler.toml` as:
+
+```toml
+# wrangler.toml
+[vars]
+# ... existing vars
+```
+
+And stored encrypted with:
+```bash
+npx wrangler secret put ANTHROPIC_API_KEY
+```
+
+Secrets are available as `env.ANTHROPIC_API_KEY` in the Worker. They are encrypted at rest in Cloudflare's systems and never appear in `wrangler.toml` or source control.
+
+**Keeping the Workers AI fallback:** A practical hybrid would keep the Workers AI path as a fallback when the Anthropic key is not set:
+
+```js
+const useAnthropic = !!env.ANTHROPIC_API_KEY;
+const stream = useAnthropic
+  ? await streamAnthropic(env, systemPrompt, aiMessages)
+  : await streamWorkersAI(env.AI, systemPrompt, aiMessages);
+```
+
+This preserves the free-tier behavior and allows testing the Claude path in a separate Cloudflare environment without changing production.
+
+---
+
 ## Key Takeaways
 
 - TOTP and backup security key would round out the recovery options and reduce email dependency.
@@ -211,3 +292,4 @@ This is a one-line fix that brings the recovery OTP in line with the regular OTP
 - Two quick code fixes have real security value: KV cleanup on full recovery, and `Math.random()` → `crypto.getRandomValues` for the recovery OTP.
 - A test suite using `@cloudflare/vitest-pool-workers` would make the auth logic verifiable and catch regressions on future changes.
 - Geographic anomaly detection is available for free using `request.cf.country` — no external service needed.
+- Upgrading the chat system to Claude requires changing only `streamWorkersAI` in `worker/chat.js` and writing a parallel `transformAnthropicStream` adapter. The client-facing SSE protocol and all frontend components remain unchanged.
