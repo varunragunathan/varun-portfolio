@@ -3,6 +3,7 @@ import { startAuthentication } from '@simplewebauthn/browser';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth.jsx';
+import { ThemeToggle } from '../components/UI';
 
 const F = "'Outfit', sans-serif";
 const M = "'IBM Plex Mono', monospace";
@@ -537,10 +538,11 @@ function DeleteAccount({ onDeleted }) {
   );
 }
 
-export default function Security() {
+export default function Settings() {
   const { t } = useTheme();
   const { user, loading, enabled, setUser } = useAuth();
   const navigate = useNavigate();
+  const [tab, setTab] = useState('security');
 
   useEffect(() => {
     if (!enabled) { navigate('/'); return; }
@@ -551,40 +553,75 @@ export default function Security() {
 
   return (
     <main style={{ minHeight: '100vh', padding: '96px 24px 60px', maxWidth: 700, margin: '0 auto' }}>
-      <div style={{ marginBottom: 40 }}>
+      <div style={{ marginBottom: 32 }}>
         <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.accentMuted, marginBottom: 10 }}>
-          Account
+          Settings
         </div>
         <h1 style={{ fontFamily: F, fontWeight: 300, fontSize: 32, color: t.text1, margin: '0 0 4px' }}>
-          {user.nickname || 'Security'}
+          {user.nickname || 'Settings'}
         </h1>
-        <p style={{ fontFamily: M, fontSize: 11, color: t.text3, margin: '0 0 6px' }}>
+        <p style={{ fontFamily: M, fontSize: 11, color: t.text3, margin: 0 }}>
           {user.maskedEmail}
-        </p>
-        <p style={{ fontFamily: F, fontSize: 14, color: t.text2 }}>
-          Manage your sessions, passkeys, and recovery options.
         </p>
       </div>
 
-      <Section title="Active sessions" subtitle="Devices currently signed in to your account">
-        <Sessions />
-      </Section>
+      {/* Tab bar */}
+      <div style={{
+        display: 'flex', background: t.cardBg, borderRadius: 11, padding: 4,
+        marginBottom: 32, border: `1px solid ${t.border}`, width: 'fit-content',
+      }}>
+        {[{ id: 'security', label: 'Security' }, { id: 'account', label: 'Account' }].map(({ id, label }) => (
+          <button key={id} onClick={() => setTab(id)} style={{
+            padding: '8px 22px', borderRadius: 8, border: 'none', cursor: 'pointer',
+            fontFamily: F, fontSize: 13, fontWeight: 500,
+            background: tab === id ? t.accentDim : 'transparent',
+            color: tab === id ? t.accent : t.text2,
+            transition: 'all 0.2s',
+          }}>
+            {label}
+          </button>
+        ))}
+      </div>
 
-      <Section title="Passkeys" subtitle="Biometric credentials registered to your account">
-        <Passkeys />
-      </Section>
+      {/* ── Security tab ── */}
+      {tab === 'security' && (
+        <>
+          <Section title="Active sessions" subtitle="Devices currently signed in to your account">
+            <Sessions />
+          </Section>
 
-      <Section title="Recovery codes" subtitle="One-time codes for account recovery if you lose your passkey">
-        <RecoveryCodes />
-      </Section>
+          <Section title="Passkeys" subtitle="Biometric credentials registered to your account">
+            <Passkeys />
+          </Section>
 
-      <Section title="Recent activity" subtitle="Last 20 security events on your account">
-        <SecurityEvents />
-      </Section>
+          <Section title="Recovery codes" subtitle="One-time codes for account recovery if you lose your passkey">
+            <RecoveryCodes />
+          </Section>
 
-      <DeleteAccount
-        onDeleted={() => { setUser(null); navigate('/'); }}
-      />
+          <Section title="Recent activity" subtitle="Last 20 security events on your account">
+            <SecurityEvents />
+          </Section>
+
+          <DeleteAccount onDeleted={() => { setUser(null); navigate('/'); }} />
+        </>
+      )}
+
+      {/* ── Account tab ── */}
+      {tab === 'account' && (
+        <>
+          <Section title="Appearance" subtitle="Display and accessibility preferences">
+            <Row last>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: F, fontSize: 14, color: t.text1, marginBottom: 2 }}>Theme</div>
+                <div style={{ fontFamily: F, fontSize: 12, color: t.text3 }}>
+                  Auto follows your system preference. Override with Light or Dark.
+                </div>
+              </div>
+              <ThemeToggle />
+            </Row>
+          </Section>
+        </>
+      )}
     </main>
   );
 }

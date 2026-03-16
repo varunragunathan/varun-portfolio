@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth.jsx';
-import { ThemeToggle } from './UI';
 
 const M = "'IBM Plex Mono', monospace";
 const F = "'Outfit', sans-serif";
@@ -272,7 +271,7 @@ function AvatarMenu({ user, onLogout }) {
 
           {/* Security page */}
           <Link
-            to="/account/security"
+            to="/account/settings"
             onClick={() => setOpen(false)}
             style={{
               display: 'block', padding: '11px 14px', textDecoration: 'none',
@@ -283,7 +282,7 @@ function AvatarMenu({ user, onLogout }) {
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'none')}
           >
-            Security settings
+            Settings
           </Link>
 
           {/* Log out */}
@@ -367,7 +366,6 @@ export default function Nav() {
                   </Link>
                 )
             )}
-            <ThemeToggle inline />
           </div>
         </div>
       </nav>

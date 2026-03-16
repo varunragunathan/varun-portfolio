@@ -95,11 +95,11 @@ const MODES = ['auto', 'light', 'dark'];
 const MODE_ICONS = { auto: AutoIcon, light: SunIcon, dark: MoonIcon };
 const MODE_LABELS = { auto: 'Auto', light: 'Light', dark: 'Dark' };
 
-/** 3-segment theme control. Pass inline=true when used inside Nav. */
-export function ThemeToggle({ inline = false }) {
+/** 3-segment theme control (auto / light / dark). */
+export function ThemeToggle() {
   const { t, preference, setPreference } = useTheme();
 
-  const segments = (
+  return (
     <div
       role="group"
       aria-label="Theme preference"
@@ -129,14 +129,6 @@ export function ThemeToggle({ inline = false }) {
           </button>
         );
       })}
-    </div>
-  );
-
-  if (inline) return segments;
-
-  return (
-    <div style={{ position: 'fixed', top: 14, right: 14, zIndex: 100 }}>
-      {segments}
     </div>
   );
 }
