@@ -21,6 +21,7 @@ import {
   setUserFrozen,
   logSecurityEvent,
 } from '../db.js';
+import { createPendingSession } from './session.js';
 import { getClientIP } from '../utils.js';
 
 function json(data, status = 200) {
@@ -114,6 +115,60 @@ export async function recoveryStart(request, env) {
   });
 
   return json({ ok: true });
+}
+
+// POST /api/auth/recovery/signin
+// Backup sign-in: verifies a recovery code and issues a pending session directly.
+// Unlike /recovery/start+verify (full account recovery), this does NOT wipe
+// existing passkeys or sessions — it's a backup sign-in for when the passkey
+// is unavailable (e.g. new device, passkey deleted, hardware changed).
+// The consumed code is marked used; remaining codes stay intact.
+export async function recoverySignIn(request, env) {
+  const body = await request.json().catch(() => ({}));
+  const { email, recoveryCode } = body;
+  if (!email || !recoveryCode) return json({ error: 'Missing fields' }, 400);
+
+  const db = env.varun_portfolio_auth;
+  const ip = getClientIP(request);
+
+  // Rate limit by email
+  const rateLimitKey = `recovery_signin_rate:${email}`;
+  const rateLimitRaw = await env.AUTH_KV.get(rateLimitKey);
+  const rateData = rateLimitRaw ? JSON.parse(rateLimitRaw) : { count: 0 };
+  if (rateData.count >= RATE_LIMIT) {
+    return json({ error: 'Too many attempts. Please wait 10 minutes.' }, 429);
+  }
+  await env.AUTH_KV.put(
+    rateLimitKey,
+    JSON.stringify({ count: rateData.count + 1 }),
+    { expirationTtl: RATE_WINDOW },
+  );
+
+  const user = await getUserByEmail(db, email);
+  // Don't leak whether user exists — return same error as invalid code
+  if (!user) return json({ error: 'Invalid recovery code.' }, 400);
+
+  if (await isUserFrozen(db, user.id)) {
+    return json({ error: 'Account is frozen. Please contact support.' }, 403);
+  }
+
+  const valid = await consumeRecoveryCode(db, user.id, recoveryCode);
+  if (!valid) {
+    await logSecurityEvent(db, {
+      userId: user.id, type: 'recovery_signin_failed',
+      ip, userAgent: request.headers.get('User-Agent') || '',
+    });
+    return json({ error: 'Invalid recovery code.' }, 400);
+  }
+
+  await logSecurityEvent(db, {
+    userId: user.id, type: 'recovery_signin',
+    ip, userAgent: request.headers.get('User-Agent') || '',
+  });
+
+  // Issue pending session — passkeys and existing sessions untouched
+  const pendingToken = await createPendingSession(env.AUTH_KV, { userId: user.id, email });
+  return json({ ok: true, pendingToken });
 }
 
 // POST /api/auth/recovery/verify

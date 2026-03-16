@@ -3,7 +3,7 @@ import { getRegisterOptions, verifyRegistration, getAuthOptions, verifyAuth } fr
 import { getMe, logout, finaliseSession } from './session.js';
 import { approveNumMatch, pollNumMatch, getPendingApproval, respondToApproval } from './numMatch.js';
 import { stepUpOptions, stepUpVerify } from './stepUp.js';
-import { recoveryStart, recoveryVerify } from './recovery.js';
+import { recoveryStart, recoveryVerify, recoverySignIn } from './recovery.js';
 import {
   listSessions, revokeSession, revokeOtherSessions, renameSession,
   listPasskeys, revokePasskey, renamePasskey,
@@ -92,6 +92,7 @@ export async function handleAuth(request, env, url) {
   // ── Account recovery ────────────────────────────────────────────
   if (method === 'POST' && path === '/recovery/start')              return recoveryStart(request, env);
   if (method === 'POST' && path === '/recovery/verify')             return recoveryVerify(request, env);
+  if (method === 'POST' && path === '/recovery/signin')             return recoverySignIn(request, env);
 
   return json({ error: 'Not found' }, 404);
 }

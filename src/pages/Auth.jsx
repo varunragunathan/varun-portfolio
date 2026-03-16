@@ -493,12 +493,23 @@ function RegisterFlow({ onSuccess }) {
 }
 
 // ── Sign-in flow ──────────────────────────────────────────────────
+// Backup method priority (strongest → weakest):
+//   1. Passkey          — always attempted first, auto-prompted
+//   2. TOTP             — future (not yet implemented)
+//   3. Recovery code    — single-use backup code, sign-in without wiping passkeys
+// Full account recovery (wipes passkeys) lives in the separate "Recover" tab.
 function SignInFlow({ onSuccess }) {
-  const [step, setStep] = useState(0);
-  const [email, setEmail] = useState('');
-  const [userId, setUserId] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
+  const { t } = useTheme();
+  // view: 'email' | 'passkey' | 'recovery'
+  const [view, setView]               = useState('email');
+  const [email, setEmail]             = useState('');
+  const [userId, setUserId]           = useState('');
+  const [busy, setBusy]               = useState(false);
+  const [error, setError]             = useState(null);
+  const [passkeyFailed, setPasskeyFailed] = useState(false);
+
+  // Recovery code sign-in
+  const [recoveryCode, setRecoveryCode] = useState('');
 
   // Number matching state
   const [numMatchCode, setNumMatchCode] = useState(null);
@@ -506,7 +517,9 @@ function SignInFlow({ onSuccess }) {
 
   // Trust modal state
   const [pendingToken, setPendingToken] = useState(null);
-  const [showTrust, setShowTrust] = useState(false);
+  const [showTrust, setShowTrust]       = useState(false);
+
+  function goToEmail() { setView('email'); setError(null); setPasskeyFailed(false); }
 
   async function handleEmailSubmit(e) {
     e.preventDefault();
@@ -517,12 +530,12 @@ function SignInFlow({ onSuccess }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-      const { options, userId: uid } = await res.json();
+      const data = await res.json();
       if (!res.ok) return setError('Something went wrong. Please try again.');
-
-      setUserId(uid);
-      setStep(1);
-      await promptPasskey(uid, options);
+      setUserId(data.userId);
+      setView('passkey');
+      setPasskeyFailed(false);
+      await promptPasskey(data.userId, data.options);
     } catch {
       setError('Network error. Please try again.');
     } finally {
@@ -530,34 +543,70 @@ function SignInFlow({ onSuccess }) {
     }
   }
 
-  async function promptPasskey(uid, options) {
-    setBusy(true); setError(null);
+  async function promptPasskey(uid, existingOptions) {
+    setBusy(true); setError(null); setPasskeyFailed(false);
     try {
-      const authResponse = await startAuthentication({ optionsJSON: options });
+      let opts = existingOptions;
+      let resolvedUid = uid;
+
+      // Re-fetch fresh challenge on retry (old challenge already consumed)
+      if (!opts) {
+        const res = await fetch('/api/auth/passkey/auth/options', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json();
+        if (!res.ok) { setError(data.error || 'Failed to get options'); setPasskeyFailed(true); return; }
+        opts = data.options;
+        resolvedUid = data.userId;
+        setUserId(resolvedUid);
+      }
+
+      const authResponse = await startAuthentication({ optionsJSON: opts });
 
       const res = await fetch('/api/auth/passkey/auth/verify', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: uid, authResponse }),
+        body: JSON.stringify({ userId: resolvedUid, authResponse }),
       });
       const data = await res.json();
-      if (!res.ok) return setError(data.error || 'Authentication failed');
+      if (!res.ok) { setPasskeyFailed(true); return setError(data.error || 'Authentication failed'); }
 
       if (data.pendingNumberMatch) {
-        // New device — show number matching screen
         setNumMatchCode(data.code);
         setNumMatchTemp(data.tempToken);
       } else {
-        // Known device — show trust modal
         setPendingToken(data.pendingToken);
         setShowTrust(true);
       }
     } catch (err) {
+      setPasskeyFailed(true);
       if (err.name === 'NotAllowedError') {
-        setError('Passkey prompt was dismissed. Please try again.');
+        setError('Passkey prompt dismissed.');
       } else {
         setError(err.message || 'Authentication failed. Please try again.');
       }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRecoverySignIn(e) {
+    e.preventDefault();
+    setBusy(true); setError(null);
+    try {
+      const res = await fetch('/api/auth/recovery/signin', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, recoveryCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) return setError(data.error || 'Invalid recovery code');
+      setPendingToken(data.pendingToken);
+      setShowTrust(true);
+    } catch {
+      setError('Network error. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -568,59 +617,129 @@ function SignInFlow({ onSuccess }) {
     onSuccess();
   }
 
-  if (showTrust) {
-    return <TrustDeviceModal onFinish={handleTrustChoice} />;
-  }
+  if (showTrust) return <TrustDeviceModal onFinish={handleTrustChoice} />;
 
   if (numMatchCode) {
     return (
       <NumberMatchScreen
         code={numMatchCode}
         tempToken={numMatchTemp}
-        onApproved={(pt) => {
-          setNumMatchCode(null);
-          setNumMatchTemp(null);
-          setPendingToken(pt);
-          setShowTrust(true);
-        }}
-        onDenied={() => {
-          setNumMatchCode(null);
-          setNumMatchTemp(null);
-          setStep(0);
-          setError('Sign-in was denied from your trusted device.');
-        }}
+        onApproved={(pt) => { setNumMatchCode(null); setNumMatchTemp(null); setPendingToken(pt); setShowTrust(true); }}
+        onDenied={() => { setNumMatchCode(null); setNumMatchTemp(null); setView('passkey'); setPasskeyFailed(true); setError('Sign-in was denied from your trusted device.'); }}
       />
     );
   }
 
+  const stepIndex = view === 'email' ? 0 : 1;
+
   return (
     <div>
-      <Steps steps={SIGNIN_STEPS} current={step} />
+      <Steps steps={SIGNIN_STEPS} current={stepIndex} />
 
-      {step === 0 && (
+      {view === 'email' && (
         <form onSubmit={handleEmailSubmit}>
           <Input label="Email address" type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus placeholder="you@example.com" />
           <PrimaryBtn loading={busy} type="submit">Continue →</PrimaryBtn>
+          {error && <Message text={error} type="error" />}
         </form>
       )}
 
-      {step === 1 && (
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 40, marginBottom: 16 }}>🔑</div>
-          <p style={{ fontFamily: F, fontSize: 14, color: '#9ca3af', lineHeight: 1.6, marginBottom: 20 }}>
-            Use your passkey for <strong style={{ color: '#e5e5e5' }}>{email}</strong>
-          </p>
+      {view === 'passkey' && (
+        <div>
+          <div style={{ textAlign: 'center', marginBottom: 20 }}>
+            <div style={{ fontSize: 36, marginBottom: 10 }}>🔑</div>
+            <p style={{ fontFamily: F, fontSize: 14, color: t.text2, lineHeight: 1.6 }}>
+              Use your passkey for <strong style={{ color: t.text1 }}>{email}</strong>
+            </p>
+          </div>
+
           <PrimaryBtn loading={busy} onClick={() => promptPasskey(userId, null)}>
-            Try passkey again
+            {passkeyFailed ? 'Try passkey again' : 'Use passkey'}
           </PrimaryBtn>
-          <button type="button" onClick={() => { setStep(0); setError(null); }}
-            style={{ width: '100%', marginTop: 10, padding: '10px', background: 'none', border: 'none', fontFamily: F, fontSize: 13, color: '#6b7280', cursor: 'pointer' }}>
+
+          {error && <Message text={error} type="error" />}
+
+          {/* Backup methods — shown after first passkey failure */}
+          {passkeyFailed && (
+            <div style={{ marginTop: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                <div style={{ flex: 1, height: 1, background: t.border }} />
+                <span style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.1em', color: t.text3, whiteSpace: 'nowrap' }}>
+                  TRY ANOTHER WAY
+                </span>
+                <div style={{ flex: 1, height: 1, background: t.border }} />
+              </div>
+
+              {/* Recovery code — available now */}
+              <button
+                onClick={() => { setView('recovery'); setError(null); setRecoveryCode(''); }}
+                style={{
+                  width: '100%', padding: '11px 14px', borderRadius: 10,
+                  background: 'none', border: `1px solid ${t.border}`,
+                  fontFamily: F, fontSize: 13, color: t.text2, cursor: 'pointer',
+                  textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10,
+                  transition: 'border-color 0.2s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = t.accentBorder)}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = t.border)}
+              >
+                <span style={{ fontSize: 16 }}>🔒</span>
+                <div>
+                  <div style={{ fontWeight: 500, marginBottom: 2 }}>Use a recovery code</div>
+                  <div style={{ fontSize: 11, color: t.text3 }}>Single-use backup code from your saved list</div>
+                </div>
+              </button>
+
+              {/* TOTP — future */}
+              <button
+                disabled
+                title="Coming soon"
+                style={{
+                  width: '100%', padding: '11px 14px', borderRadius: 10, marginTop: 8,
+                  background: 'none', border: `1px solid ${t.border}`,
+                  fontFamily: F, fontSize: 13, color: t.text3, cursor: 'not-allowed',
+                  textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10,
+                  opacity: 0.45,
+                }}
+              >
+                <span style={{ fontSize: 16 }}>🔐</span>
+                <div>
+                  <div style={{ fontWeight: 500, marginBottom: 2 }}>Use authenticator app (TOTP)</div>
+                  <div style={{ fontSize: 11, color: t.text3 }}>Coming soon</div>
+                </div>
+              </button>
+            </div>
+          )}
+
+          <button type="button" onClick={goToEmail}
+            style={{ width: '100%', marginTop: 16, padding: '10px', background: 'none', border: 'none', fontFamily: F, fontSize: 13, color: t.text3, cursor: 'pointer' }}>
             ← Different email
           </button>
         </div>
       )}
 
-      {error && <Message text={error} type="error" />}
+      {view === 'recovery' && (
+        <form onSubmit={handleRecoverySignIn}>
+          <p style={{ fontFamily: F, fontSize: 14, color: t.text2, lineHeight: 1.6, marginBottom: 20 }}>
+            Enter a recovery code for <strong style={{ color: t.text1 }}>{email}</strong>. Each code can only be used once.
+          </p>
+          <Input
+            label="Recovery code"
+            type="text"
+            value={recoveryCode}
+            onChange={e => setRecoveryCode(e.target.value.toUpperCase())}
+            required autoFocus
+            placeholder="XXXXX-XXXXX"
+            spellCheck={false}
+          />
+          <PrimaryBtn loading={busy} type="submit">Sign in with recovery code →</PrimaryBtn>
+          {error && <Message text={error} type="error" />}
+          <button type="button" onClick={() => { setView('passkey'); setError(null); }}
+            style={{ width: '100%', marginTop: 10, padding: '10px', background: 'none', border: 'none', fontFamily: F, fontSize: 13, color: t.text3, cursor: 'pointer' }}>
+            ← Back to passkey
+          </button>
+        </form>
+      )}
     </div>
   );
 }
