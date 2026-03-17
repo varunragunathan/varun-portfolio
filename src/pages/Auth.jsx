@@ -987,6 +987,9 @@ function RecoverFlow({ onSuccess }) {
   const [email, setEmail] = useState('');
   const [recoveryCode, setRecoveryCode] = useState('');
   const [otp, setOtp] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+  const [otpMethod, setOtpMethod] = useState('email'); // 'email' | 'totp'
+  const [hasTOTP, setHasTOTP] = useState(false);
   const [recoveryToken, setRecoveryToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
@@ -1012,7 +1015,13 @@ function RecoverFlow({ onSuccess }) {
       });
       const data = await res.json();
       if (!res.ok) return setError(data.error || 'Recovery failed');
-      setInfo('If that code was valid, a verification email has been sent.');
+      if (data.hasTOTP) {
+        setHasTOTP(true);
+        setOtpMethod('totp'); // default to TOTP when available
+        setMsg(null);
+      } else {
+        setInfo('If that code was valid, a verification email has been sent.');
+      }
       setStep(2);
     } catch {
       setError('Network error. Please try again.');
@@ -1029,6 +1038,27 @@ function RecoverFlow({ onSuccess }) {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp }),
+      });
+      const data = await res.json();
+      if (!res.ok) return setError(data.error || 'Invalid code');
+      setRecoveryToken(data.recoveryToken);
+      setMsg(null);
+      setStep(3);
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleVerifyTOTP(e) {
+    e.preventDefault();
+    setBusy(true); setMsg(null);
+    try {
+      const res = await fetch('/api/auth/recovery/verify-totp', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, totpCode }),
       });
       const data = await res.json();
       if (!res.ok) return setError(data.error || 'Invalid code');
@@ -1127,13 +1157,46 @@ function RecoverFlow({ onSuccess }) {
       )}
 
       {step === 2 && (
-        <form onSubmit={handleVerifyOTP}>
-          <p style={{ fontFamily: F, fontSize: 14, color: '#9ca3af', marginBottom: 20, lineHeight: 1.6 }}>
-            Enter the 6-digit code sent to <strong style={{ color: '#e5e5e5' }}>{email}</strong>. This is the second factor of your recovery.
-          </p>
-          <Input label="Email verification code" type="text" inputMode="numeric" value={otp} onChange={e => setOtp(e.target.value)} maxLength={6} required autoFocus placeholder="000000" />
-          <PrimaryBtn loading={busy} type="submit">Verify code →</PrimaryBtn>
-        </form>
+        <div>
+          {hasTOTP && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+              {['totp', 'email'].map(m => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => { setOtpMethod(m); setMsg(null); }}
+                  style={{
+                    flex: 1, padding: '8px', borderRadius: 8, cursor: 'pointer',
+                    fontFamily: M, fontSize: 11, letterSpacing: '0.06em',
+                    background: otpMethod === m ? 'rgba(99,102,241,0.15)' : 'transparent',
+                    border: `1px solid ${otpMethod === m ? 'rgba(99,102,241,0.5)' : '#374151'}`,
+                    color: otpMethod === m ? '#818cf8' : '#6b7280',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {m === 'totp' ? '🔐 Authenticator app' : '📧 Email code'}
+                </button>
+              ))}
+            </div>
+          )}
+          {otpMethod === 'totp' ? (
+            <form onSubmit={handleVerifyTOTP}>
+              <p style={{ fontFamily: F, fontSize: 14, color: '#9ca3af', marginBottom: 20, lineHeight: 1.6 }}>
+                Enter the 6-digit code from your authenticator app.
+              </p>
+              <Input label="Authenticator code" type="text" inputMode="numeric" value={totpCode} onChange={e => setTotpCode(e.target.value)} maxLength={6} required autoFocus placeholder="000000" />
+              <PrimaryBtn loading={busy} type="submit">Verify code →</PrimaryBtn>
+            </form>
+          ) : (
+            <form onSubmit={handleVerifyOTP}>
+              <p style={{ fontFamily: F, fontSize: 14, color: '#9ca3af', marginBottom: 20, lineHeight: 1.6 }}>
+                Enter the 6-digit code sent to <strong style={{ color: '#e5e5e5' }}>{email}</strong>. This is the second factor of your recovery.
+              </p>
+              <Input label="Email verification code" type="text" inputMode="numeric" value={otp} onChange={e => setOtp(e.target.value)} maxLength={6} required autoFocus placeholder="000000" />
+              <PrimaryBtn loading={busy} type="submit">Verify code →</PrimaryBtn>
+            </form>
+          )}
+        </div>
       )}
 
       {step === 3 && (

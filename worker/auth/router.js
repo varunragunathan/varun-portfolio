@@ -3,7 +3,7 @@ import { getRegisterOptions, verifyRegistration, getAuthOptions, verifyAuth } fr
 import { getMe, logout, finaliseSession } from './session.js';
 import { numMatchSubscribe, numMatchWait } from './numMatch.js';
 import { stepUpOptions, stepUpVerify } from './stepUp.js';
-import { recoveryStart, recoveryVerify, recoverySignIn } from './recovery.js';
+import { recoveryStart, recoveryVerify, recoveryVerifyTOTP, recoverySignIn } from './recovery.js';
 import { totpStatus, totpSetup, totpEnable, totpDisable, totpSignin } from './totp.js';
 import {
   listSessions, revokeSession, revokeOtherSessions, renameSession,
@@ -93,6 +93,7 @@ export async function handleAuth(request, env, url) {
   // ── Account recovery ────────────────────────────────────────────
   if (method === 'POST' && path === '/recovery/start')              return recoveryStart(request, env);
   if (method === 'POST' && path === '/recovery/verify')             return recoveryVerify(request, env);
+  if (method === 'POST' && path === '/recovery/verify-totp')        return recoveryVerifyTOTP(request, env);
   if (method === 'POST' && path === '/recovery/signin')             return recoverySignIn(request, env);
 
   // ── TOTP ─────────────────────────────────────────────────────────

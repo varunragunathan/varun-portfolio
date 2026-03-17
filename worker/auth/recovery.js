@@ -22,6 +22,7 @@ import {
   logSecurityEvent,
 } from '../db.js';
 import { createPendingSession } from './session.js';
+import { decryptTotpSecret, verifyTotp } from './totp.js';
 import { getClientIP } from '../utils.js';
 
 function json(data, status = 200) {
@@ -94,7 +95,18 @@ export async function recoveryStart(request, env) {
   await logSecurityEvent(db, { userId: user.id, type: 'recovery_code_used', ip,
     userAgent: request.headers.get('User-Agent') || '' });
 
-  // Send OTP via Resend (second factor of 2-of-2 recovery)
+  // Check if user has TOTP available as an alternative second factor
+  let hasTOTP = false;
+  if (user.totp_enabled && user.totp_secret && env.TOTP_ENCRYPTION_KEY) {
+    hasTOTP = true;
+    await env.AUTH_KV.put(
+      `recovery_totp_pending:${email}`,
+      JSON.stringify({ userId: user.id }),
+      { expirationTtl: 600 },
+    );
+  }
+
+  // Send OTP via Resend (second factor of 2-of-2 recovery — always sent as fallback)
   const otp = String(Math.floor(100000 + Math.random() * 900000));
   await env.AUTH_KV.put(`recovery_otp:${email}`, otp, { expirationTtl: 600 });
 
@@ -114,7 +126,7 @@ export async function recoveryStart(request, env) {
     `,
   });
 
-  return json({ ok: true });
+  return json({ ok: true, hasTOTP });
 }
 
 // POST /api/auth/recovery/signin
@@ -169,6 +181,59 @@ export async function recoverySignIn(request, env) {
   // Issue pending session — passkeys and existing sessions untouched
   const pendingToken = await createPendingSession(env.AUTH_KV, { userId: user.id, email });
   return json({ ok: true, pendingToken });
+}
+
+// POST /api/auth/recovery/verify-totp
+// Alternative second factor for account recovery: verifies the user's TOTP code
+// instead of the email OTP. Only available if the user had TOTP enabled.
+// Issues the same recovery_gate token as /recovery/verify.
+export async function recoveryVerifyTOTP(request, env) {
+  const body = await request.json().catch(() => ({}));
+  const { email, totpCode } = body;
+  if (!email || !totpCode) return json({ error: 'Missing fields' }, 400);
+
+  const pendingRaw = await env.AUTH_KV.get(`recovery_totp_pending:${email}`);
+  if (!pendingRaw) return json({ error: 'No recovery in progress or session expired.' }, 400);
+
+  const { userId } = JSON.parse(pendingRaw);
+
+  const db = env.varun_portfolio_auth;
+  const user = await db
+    .prepare('SELECT totp_secret, totp_enabled FROM users WHERE id = ?')
+    .bind(userId)
+    .first();
+
+  if (!user?.totp_enabled || !user?.totp_secret) return json({ error: 'Invalid code.' }, 400);
+  if (!env.TOTP_ENCRYPTION_KEY) return json({ error: 'TOTP not configured.' }, 503);
+
+  let secret;
+  try {
+    secret = await decryptTotpSecret(user.totp_secret, env.TOTP_ENCRYPTION_KEY);
+  } catch {
+    return json({ error: 'Invalid code.' }, 400);
+  }
+
+  if (!await verifyTotp(secret, totpCode)) return json({ error: 'Invalid code.' }, 400);
+
+  await env.AUTH_KV.delete(`recovery_totp_pending:${email}`);
+
+  await deleteAllPasskeyCredsByUserId(db, userId);
+  await deleteAllSessionsByUserId(db, userId);
+
+  await logSecurityEvent(db, {
+    userId, type: 'account_recovery',
+    ip: getClientIP(request),
+    userAgent: request.headers.get('User-Agent') || '',
+  });
+
+  const recoveryToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+  await env.AUTH_KV.put(
+    `recovery_gate:${recoveryToken}`,
+    JSON.stringify({ userId, email }),
+    { expirationTtl: 300 },
+  );
+
+  return json({ ok: true, recoveryToken, email });
 }
 
 // POST /api/auth/recovery/verify

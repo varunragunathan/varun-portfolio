@@ -231,8 +231,8 @@ function Sidebar({ conversations, activeId, onSelect, onDelete, onNew, open, onC
 }
 
 // ── Main chat area ────────────────────────────────────────────────
-function ChatArea({ t, onNewConversation, onOpenSidebar, isMobile }) {
-  const { messages, streaming, error, send, conversationId } = useChat();
+function ChatArea({ t, onNewConversation, onOpenSidebar, isMobile, initialConversationId }) {
+  const { messages, streaming, error, send, conversationId, loadConversation } = useChat();
   const { isPro, isAdmin, user }             = useAuth();
   const [input,          setInput]          = useState('');
   const [selectedModel,  setSelectedModel]  = useState(null);
@@ -244,6 +244,11 @@ function ChatArea({ t, onNewConversation, onOpenSidebar, isMobile }) {
   const firstMsgRef   = useRef('');
 
   const canPickModel = isPro || isAdmin;
+
+  // Load existing conversation messages on mount (when selecting from sidebar)
+  useEffect(() => {
+    if (initialConversationId) loadConversation(initialConversationId);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!canPickModel) return;
@@ -371,6 +376,43 @@ function ChatArea({ t, onNewConversation, onOpenSidebar, isMobile }) {
                   }}>
                     <span>⏳</span> Request under review
                   </div>
+                ) : upgradeStatus === 'rejected' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                    <div style={{
+                      fontFamily: M, fontSize: 11, letterSpacing: '0.06em',
+                      padding: '5px 14px', borderRadius: 20,
+                      background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.25)',
+                      color: '#ff3b30',
+                    }}>
+                      ✕ Previous request not approved
+                    </div>
+                    <span style={{ fontFamily: F, fontSize: 12, color: t.text3 }}>
+                      You can submit a new request
+                    </span>
+                    <button
+                      onClick={() => { setUpgradeTier('pro'); setShowUpgrade(true); }}
+                      style={{
+                        fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
+                        padding: '6px 16px', borderRadius: 20, cursor: 'pointer',
+                        background: t.accentDim, border: `1px solid ${t.accentBorder}`,
+                        color: t.accent,
+                      }}
+                    >
+                      ✦ Re-submit for Pro
+                    </button>
+                    <button
+                      onClick={() => { setUpgradeTier('student'); setShowUpgrade(true); }}
+                      style={{
+                        fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
+                        padding: '4px 14px', borderRadius: 20, cursor: 'pointer',
+                        background: 'transparent',
+                        border: '1px solid rgba(52,199,89,0.3)',
+                        color: '#34c759',
+                      }}
+                    >
+                      Request student access
+                    </button>
+                  </div>
                 ) : upgradeStatus !== 'approved' && (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                     <button
@@ -494,7 +536,8 @@ export default function ChatPage() {
   const { isMobile }    = useResponsive();
 
   const [conversations,  setConversations]  = useState([]);
-  const [activeConvId,   setActiveConvId]   = useState(null);
+  const [activeConvId,   setActiveConvId]   = useState(null); // sidebar highlight only
+  const [chatKey,        setChatKey]        = useState('new'); // controls ChatArea remount
   const [sidebarOpen,    setSidebarOpen]    = useState(false);
 
   // Redirect if not signed in
@@ -514,12 +557,30 @@ export default function ChatPage() {
   const handleDelete = useCallback(async (id) => {
     await fetch(`/api/chat/conversations/${id}`, { method: 'DELETE', credentials: 'include' });
     setConversations(prev => prev.filter(c => c.id !== id));
-    if (activeConvId === id) setActiveConvId(null);
+    if (activeConvId === id) {
+      setActiveConvId(null);
+      setChatKey('new-' + Date.now());
+    }
   }, [activeConvId]);
 
+  // Called by ChatArea when it creates a new conversation on first send.
+  // Only updates the sidebar list + highlight — does NOT change chatKey,
+  // so ChatArea does not remount and the live conversation is preserved.
   const handleNewConversation = useCallback((conv) => {
     setConversations(prev => [conv, ...prev.filter(c => c.id !== conv.id)]);
     setActiveConvId(conv.id);
+  }, []);
+
+  // Called when the user clicks a conversation in the sidebar.
+  const handleSelectConversation = useCallback((id) => {
+    setActiveConvId(id);
+    setChatKey(id); // remount ChatArea to load selected conversation
+  }, []);
+
+  // Called when the user clicks "+ New conversation" in the sidebar.
+  const handleNewChat = useCallback(() => {
+    setActiveConvId(null);
+    setChatKey('new-' + Date.now()); // remount ChatArea fresh
   }, []);
 
   if (loading || !user) return null;
@@ -536,17 +597,18 @@ export default function ChatPage() {
       <Sidebar
         conversations={conversations}
         activeId={activeConvId}
-        onSelect={setActiveConvId}
+        onSelect={handleSelectConversation}
         onDelete={handleDelete}
-        onNew={() => setActiveConvId(null)}
+        onNew={handleNewChat}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         isMobile={isMobile}
         t={t}
       />
       <ChatArea
-        key={activeConvId ?? 'new'}
+        key={chatKey}
         t={t}
+        initialConversationId={chatKey !== 'new' && !chatKey.startsWith('new-') ? chatKey : null}
         onNewConversation={handleNewConversation}
         onOpenSidebar={() => setSidebarOpen(true)}
         isMobile={isMobile}
