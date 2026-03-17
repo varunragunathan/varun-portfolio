@@ -8,7 +8,7 @@ import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
 import { useChat } from '../hooks/useChat';
 import { useResponsive } from '../hooks/useResponsive';
-import StreamingStatus from '../components/StreamingStatus';
+import PixelOwl from '../components/PixelOwl';
 import ModelPicker from '../components/ModelPicker';
 import UpgradeModal from '../components/UpgradeModal';
 
@@ -70,8 +70,42 @@ function renderContent(text, t) {
   return out;
 }
 
+// ── Owl thinking indicator ────────────────────────────────────────
+const THINK_MSGS = [
+  'vectorizing your query…',
+  'cosine similarity intensifies…',
+  'retrieving chunks from the void…',
+  'bribing the embeddings…',
+  'warming up attention heads…',
+  'doing math you don\'t want to know about…',
+  'running inference at the edge…',
+  'asking llama-70b nicely…',
+  'whispering to the transformer…',
+  'computing dot products at light speed…',
+  'hallucination filters engaged…',
+  'context window loading…',
+  'tokens incoming…',
+  'gradient descent complete, probably…',
+];
+
+function OwlWaiting({ t }) {
+  const [idx, setIdx] = useState(() => Math.floor(Math.random() * THINK_MSGS.length));
+  useEffect(() => {
+    const id = setInterval(() => setIdx(i => (i + 1) % THINK_MSGS.length), 1800);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16, padding: '4px 0' }}>
+      <PixelOwl size={4} state="thinking" />
+      <span style={{ fontFamily: M, fontSize: 12, color: t.accentMuted, letterSpacing: '0.02em' }}>
+        {THINK_MSGS[idx]}
+      </span>
+    </div>
+  );
+}
+
 // ── Message bubble ────────────────────────────────────────────────
-function MessageBubble({ message, t }) {
+function MessageBubble({ message, t, isStreaming }) {
   const isUser = message.role === 'user';
   return (
     <div style={{
@@ -80,14 +114,8 @@ function MessageBubble({ message, t }) {
       marginBottom:   16,
     }}>
       {!isUser && (
-        <div style={{
-          width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-          background: t.accentDim, border: `1px solid ${t.accentBorder}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          marginRight: 10, marginTop: 2,
-          fontFamily: M, fontSize: 10, color: t.accent,
-        }}>
-          ai
+        <div style={{ flexShrink: 0, marginRight: 10, marginTop: 2 }}>
+          <PixelOwl size={2} state={isStreaming ? 'streaming' : 'idle'} />
         </div>
       )}
       <div style={{
@@ -330,11 +358,14 @@ function ChatArea({ t, onNewConversation, onOpenSidebar, isMobile, initialConver
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px 12px' : '24px 28px' }}>
         {messages.length === 0 && (
-          <div style={{ textAlign: 'center', marginTop: 80 }}>
-            <div style={{ fontFamily: M, fontSize: 12, letterSpacing: '0.15em', color: t.accentMuted, textTransform: 'uppercase' }}>
+          <div style={{ textAlign: 'center', marginTop: 60 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+              <PixelOwl size={8} state="idle" />
+            </div>
+            <div style={{ fontFamily: M, fontSize: 11, letterSpacing: '0.15em', color: t.accentMuted, textTransform: 'uppercase' }}>
               RAG · llama-3.3-70b · multi-turn
             </div>
-            <h2 style={{ fontFamily: F, fontWeight: 300, fontSize: 28, color: t.text1, marginTop: 16, marginBottom: 8 }}>
+            <h2 style={{ fontFamily: F, fontWeight: 300, fontSize: 26, color: t.text1, marginTop: 14, marginBottom: 8 }}>
               Ask me anything
             </h2>
             <p style={{ fontFamily: F, fontSize: 15, color: t.text3, lineHeight: 1.6 }}>
@@ -448,10 +479,12 @@ function ChatArea({ t, onNewConversation, onOpenSidebar, isMobile, initialConver
           </div>
         )}
         {messages.map((m, i) => {
-          const isWaiting = streaming && i === messages.length - 1 && m.role === 'assistant' && !m.content;
+          const isLast     = i === messages.length - 1;
+          const isWaiting  = streaming && isLast && m.role === 'assistant' && !m.content;
+          const isStreaming = streaming && isLast && m.role === 'assistant' && !!m.content;
           return isWaiting
-            ? <StreamingStatus key={m.id} t={t} />
-            : <MessageBubble key={m.id} message={m} t={t} />;
+            ? <OwlWaiting key={m.id} t={t} />
+            : <MessageBubble key={m.id} message={m} t={t} isStreaming={isStreaming} />;
         })}
         {error && (
           <div style={{

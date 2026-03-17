@@ -50,11 +50,11 @@ class ErrorBoundary extends Component {
   }
 }
 
-const Home      = lazy(() => import('./pages/Home'));
-const Auth      = lazy(() => import('./pages/Auth'));
-const Settings  = lazy(() => import('./pages/Security'));
-const ChatPage  = lazy(() => import('./pages/Chat'));
-const AdminPage = lazy(() => import('./pages/Admin'));
+const Home        = lazy(() => import('./pages/Home'));
+const Auth        = lazy(() => import('./pages/Auth'));
+const Settings    = lazy(() => import('./pages/Security'));
+const ChatPage    = lazy(() => import('./pages/Chat'));
+const AdminPage   = lazy(() => import('./pages/Admin'));
 
 function Loading() {
   const { t } = useTheme();
