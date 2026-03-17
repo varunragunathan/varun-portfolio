@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect, useState, useCallback, Component } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, matchPath } from 'react-router-dom';
 import { ThemeProvider, useTheme } from './hooks/useTheme';
 import { SkipLink, ThemeToggle } from './components/UI';
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
@@ -147,6 +147,8 @@ function Shell() {
 
   const handleShake = useCallback(() => setFeedbackOpen(true), []);
   const { shakeState, requestPermission } = useShake(handleShake);
+  const { pathname } = useLocation();
+  const hideFooter = !!matchPath('/chat', pathname);
 
   return (
     <div style={{ background: t.bg, minHeight: '100vh', transition: 'background 0.4s ease', display: 'flex', flexDirection: 'column' }}>
@@ -164,7 +166,7 @@ function Shell() {
           </Routes>
         </Suspense>
       </div>
-      <Footer shakeState={shakeState} onShakeEnable={requestPermission} />
+      {!hideFooter && <Footer shakeState={shakeState} onShakeEnable={requestPermission} />}
       {user && <ChatWidget />}
       {approval && <NumMatchApprovalModal approval={approval} onRespond={respond} />}
       {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
