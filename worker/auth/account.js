@@ -139,6 +139,7 @@ export async function listPasskeys(request, env) {
     id: c.id,
     nickname: c.nickname,
     authenticatorType: c.authenticator_type,
+    transport: c.transport ?? null,
     isSynced: !!c.is_synced,
     createdAt: c.created_at,
     lastUsedAt: c.last_used_at,

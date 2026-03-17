@@ -16,7 +16,7 @@ import {
   getTrustedDeviceByHash, updateTrustedDeviceLastUsed,
   listTrustedDevicesByUserId,
 } from '../db.js';
-import { createPendingSession } from './session.js';
+import { createPendingSession, getSession } from './session.js';
 import { generateDisplayCode } from './crypto.js';
 import { getClientIP, sha256Hex } from '../utils.js';
 
@@ -327,4 +327,97 @@ export async function verifyAuth(request, env) {
   // Known device — issue pending session for trust prompt
   const pendingToken = await createPendingSession(env.AUTH_KV, { userId, email: user.email, method: 'passkey' });
   return json({ ok: true, pendingToken });
+}
+
+// ── Add passkey to existing authenticated account ─────────────────
+// These endpoints are for logged-in users who want to register an
+// additional passkey from the Settings page.
+
+export async function addPasskeyOptions(request, env) {
+  const session = await getSession(env.AUTH_KV, request);
+  if (!session) return json({ error: 'Unauthorized' }, 401);
+
+  const body = await request.json().catch(() => ({}));
+  const { authenticatorAttachment } = body; // 'platform' | 'cross-platform' | undefined
+
+  const db = env.varun_portfolio_auth;
+  const user = await getUserById(db, session.userId);
+  if (!user) return json({ error: 'User not found' }, 404);
+
+  const existingCreds = await getPasskeyCredsByUserId(db, session.userId);
+
+  const authenticatorSelection = {
+    residentKey: 'preferred',
+    userVerification: 'preferred',
+    ...(authenticatorAttachment ? { authenticatorAttachment } : {}),
+  };
+
+  const options = await generateRegistrationOptions({
+    rpName: 'varunr.dev',
+    rpID: env.RP_ID,
+    userID: new TextEncoder().encode(session.userId),
+    userName: user.email,
+    userDisplayName: user.email,
+    excludeCredentials: existingCreds.map(c => ({ id: c.id, type: 'public-key' })),
+    authenticatorSelection,
+  });
+
+  await env.AUTH_KV.put(`reg_challenge:${session.userId}`, options.challenge, { expirationTtl: 120 });
+  return json(options);
+}
+
+export async function addPasskeyVerify(request, env) {
+  const session = await getSession(env.AUTH_KV, request);
+  if (!session) return json({ error: 'Unauthorized' }, 401);
+
+  const body = await request.json().catch(() => ({}));
+  if (!body.id) return json({ error: 'Missing registration response' }, 400);
+
+  const challenge = await env.AUTH_KV.get(`reg_challenge:${session.userId}`);
+  if (!challenge) return json({ error: 'Challenge expired. Please try again.' }, 400);
+  await env.AUTH_KV.delete(`reg_challenge:${session.userId}`);
+
+  let verification;
+  try {
+    verification = await verifyRegistrationResponse({
+      response: body,
+      expectedChallenge: challenge,
+      expectedOrigin: expectedOrigin(request, env),
+      expectedRPID: env.RP_ID,
+    });
+  } catch (e) {
+    return json({ error: `Registration failed: ${e.message}` }, 400);
+  }
+
+  if (!verification.verified || !verification.registrationInfo) {
+    return json({ error: 'Verification failed' }, 400);
+  }
+
+  const { credential } = verification.registrationInfo;
+  const transports = body.response?.transports || [];
+  const authenticatorType = credential.type || 'platform';
+  const isSynced = authenticatorType === 'cross-platform' || transports.includes('hybrid');
+
+  try {
+    await savePasskeyCred(env.varun_portfolio_auth, {
+      id: credential.id,
+      userId: session.userId,
+      publicKey: isoBase64URL.fromBuffer(credential.publicKey),
+      signCount: credential.counter,
+      authenticatorType,
+      isSynced,
+      transport: JSON.stringify(transports),
+    });
+  } catch (e) {
+    return json({ error: `Failed to save passkey: ${e.message}` }, 500);
+  }
+
+  await logSecurityEvent(env.varun_portfolio_auth, {
+    userId: session.userId, type: 'passkey_added',
+    ip: getClientIP(request),
+    userAgent: request.headers.get('User-Agent') || '',
+    metadata: { authenticatorType, isSynced },
+  });
+
+  return json({ ok: true, isSynced, authenticatorType });
 }

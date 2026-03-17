@@ -185,12 +185,39 @@ function Sessions() {
   );
 }
 
+// ── Passkey helpers ───────────────────────────────────────────────
+function passkeyIcon(p) {
+  const transports = (() => { try { return JSON.parse(p.transport || '[]'); } catch { return []; } })();
+  const isHybrid   = transports.includes('hybrid');
+  const isUsb      = transports.includes('usb');
+  const isNfc      = transports.includes('nfc');
+  const isPlatform = p.authenticatorType === 'platform' || transports.includes('internal');
+
+  const style = { width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16 };
+
+  if (isHybrid)    return <div style={{ ...style, background: 'rgba(99,102,241,0.12)' }}>📱</div>;
+  if (isUsb || isNfc) return <div style={{ ...style, background: 'rgba(245,158,11,0.12)' }}>🔑</div>;
+  if (isPlatform)  return <div style={{ ...style, background: 'rgba(34,197,94,0.12)' }}>🔐</div>;
+  return <div style={{ ...style, background: 'rgba(107,114,128,0.12)' }}>🗝️</div>;
+}
+
+function freshnessColor(lastUsedAt) {
+  if (!lastUsedAt) return '#ef4444';
+  const days = (Date.now() - lastUsedAt) / 86_400_000;
+  if (days < 7)  return '#22c55e';
+  if (days < 90) return '#f59e0b';
+  return '#ef4444';
+}
+
 // ── Passkeys ──────────────────────────────────────────────────────
 function Passkeys() {
   const { t } = useTheme();
-  const [passkeys, setPasskeys] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [revoking, setRevoking] = useState(null);
+  const [passkeys,  setPasskeys]  = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [revoking,  setRevoking]  = useState(null);
+  const [renaming,  setRenaming]  = useState(null); // { id, value }
+  const [adding,    setAdding]    = useState(false);
+  const [addError,  setAddError]  = useState('');
 
   async function load() {
     const res = await fetch('/api/auth/passkeys', { credentials: 'include' });
@@ -211,16 +238,83 @@ function Passkeys() {
     setRevoking(null);
   }
 
+  async function saveNickname(id) {
+    if (!renaming || renaming.id !== id) return;
+    const val = renaming.value.trim();
+    setRenaming(null);
+    if (!val) return;
+    await fetch(`/api/auth/passkeys/${id}`, {
+      method: 'PATCH', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nickname: val }),
+    });
+    await load();
+  }
+
+  async function addPasskey(attachment) {
+    setAdding(attachment);
+    setAddError('');
+    try {
+      const optRes = await fetch('/api/auth/passkey/add/options', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authenticatorAttachment: attachment }),
+      });
+      if (!optRes.ok) { setAddError('Could not start registration.'); return; }
+      const options = await optRes.json();
+
+      const { startRegistration } = await import('@simplewebauthn/browser');
+      const attResp = await startRegistration({ optionsJSON: options });
+
+      const verRes = await fetch('/api/auth/passkey/add/verify', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(attResp),
+      });
+      if (!verRes.ok) { const d = await verRes.json().catch(() => ({})); setAddError(d.error || 'Registration failed.'); return; }
+      await load();
+    } catch (err) {
+      if (err.name !== 'NotAllowedError') setAddError('Registration was cancelled.');
+    } finally {
+      setAdding(false);
+    }
+  }
+
   if (loading) return <Row last><span style={{ fontFamily: F, fontSize: 14, color: t.text3 }}>Loading…</span></Row>;
-  if (!passkeys.length) return <Row last><span style={{ fontFamily: F, fontSize: 14, color: t.text3 }}>No passkeys registered.</span></Row>;
 
   return (
     <>
       {passkeys.map((p, i) => (
-        <Row key={p.id} last={i === passkeys.length - 1}>
+        <Row key={p.id} last={false}>
+          {passkeyIcon(p)}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-              <span style={{ fontFamily: F, fontSize: 14, color: t.text1 }}>{p.nickname || 'Passkey'}</span>
+              {renaming?.id === p.id ? (
+                <input
+                  autoFocus
+                  value={renaming.value}
+                  onChange={e => setRenaming({ id: p.id, value: e.target.value })}
+                  onBlur={() => saveNickname(p.id)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveNickname(p.id); if (e.key === 'Escape') setRenaming(null); }}
+                  style={{
+                    fontFamily: F, fontSize: 14, color: t.text1,
+                    background: t.surfaceAlt, border: `1px solid ${t.accentBorder}`,
+                    borderRadius: 6, padding: '2px 8px', outline: 'none', width: 180,
+                  }}
+                />
+              ) : (
+                <button
+                  onClick={() => setRenaming({ id: p.id, value: p.nickname || '' })}
+                  title="Click to rename"
+                  style={{
+                    fontFamily: F, fontSize: 14, color: t.text1,
+                    background: 'none', border: 'none', padding: 0, cursor: 'text',
+                    textDecoration: 'underline dotted', textUnderlineOffset: 3,
+                  }}
+                >
+                  {p.nickname || 'Passkey'}
+                </button>
+              )}
               {p.isSynced
                 ? <Badge color="#6366f1">Synced</Badge>
                 : <Badge color="#f59e0b">Device-bound</Badge>
@@ -228,7 +322,10 @@ function Passkeys() {
             </div>
             <span style={{ fontFamily: M, fontSize: 11, color: t.text3 }}>
               Added {formatDate(p.createdAt)}
-              {p.lastUsedAt ? ` · Last used ${formatRelative(p.lastUsedAt)}` : ''}
+              {p.lastUsedAt
+                ? <> · <span style={{ color: freshnessColor(p.lastUsedAt) }}>Last used {formatRelative(p.lastUsedAt)}</span></>
+                : <> · <span style={{ color: '#ef4444' }}>Never used</span></>
+              }
             </span>
           </div>
           <DangerBtn onClick={() => revoke(p.id)} loading={revoking === p.id} disabled={passkeys.length <= 1}>
@@ -236,6 +333,40 @@ function Passkeys() {
           </DangerBtn>
         </Row>
       ))}
+
+      {/* Add passkey row */}
+      <Row last>
+        <div style={{ flex: 1 }}>
+          <span style={{ fontFamily: M, fontSize: 11, color: t.text3, letterSpacing: '0.04em' }}>
+            Add another passkey
+          </span>
+          {addError && <div style={{ fontFamily: F, fontSize: 12, color: '#ef4444', marginTop: 4 }}>{addError}</div>}
+        </div>
+        <button
+          onClick={() => addPasskey('platform')}
+          disabled={!!adding}
+          style={{
+            fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
+            padding: '6px 14px', borderRadius: 8, cursor: adding ? 'default' : 'pointer',
+            background: t.accentDim, border: `1px solid ${t.accentBorder}`, color: t.accent,
+            opacity: adding ? 0.6 : 1,
+          }}
+        >
+          {adding === 'platform' ? '…' : '+ This device'}
+        </button>
+        <button
+          onClick={() => addPasskey('cross-platform')}
+          disabled={!!adding}
+          style={{
+            fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
+            padding: '6px 14px', borderRadius: 8, cursor: adding ? 'default' : 'pointer',
+            background: 'transparent', border: `1px solid ${t.border}`, color: t.text2,
+            opacity: adding ? 0.6 : 1,
+          }}
+        >
+          {adding === 'cross-platform' ? '…' : '+ Another device'}
+        </button>
+      </Row>
     </>
   );
 }

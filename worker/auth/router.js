@@ -1,5 +1,5 @@
 import { sendOTP, verifyOTP } from './otp.js';
-import { getRegisterOptions, verifyRegistration, getAuthOptions, verifyAuth } from './passkey.js';
+import { getRegisterOptions, verifyRegistration, getAuthOptions, verifyAuth, addPasskeyOptions, addPasskeyVerify } from './passkey.js';
 import { getMe, logout, finaliseSession } from './session.js';
 import { numMatchSubscribe, numMatchWait } from './numMatch.js';
 import { stepUpOptions, stepUpVerify } from './stepUp.js';
@@ -63,6 +63,8 @@ export async function handleAuth(request, env, url) {
   if (method === 'POST' && path === '/passkey/register/verify')     return verifyRegistration(request, env);
   if (method === 'POST' && path === '/passkey/auth/options')        return getAuthOptions(request, env);
   if (method === 'POST' && path === '/passkey/auth/verify')         return verifyAuth(request, env);
+  if (method === 'POST' && path === '/passkey/add/options')         return addPasskeyOptions(request, env);
+  if (method === 'POST' && path === '/passkey/add/verify')          return addPasskeyVerify(request, env);
 
   // ── Session ─────────────────────────────────────────────────────
   if (method === 'GET'  && path === '/me')                          return getMe(request, env);
