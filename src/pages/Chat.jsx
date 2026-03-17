@@ -3,7 +3,7 @@
 // Right panel: active conversation with streaming messages.
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
 import { useChat } from '../hooks/useChat';
@@ -561,6 +561,69 @@ function ChatArea({ t, onNewConversation, onOpenSidebar, isMobile, initialConver
   );
 }
 
+// ── Chat gate (unauthenticated) ───────────────────────────────────
+function ChatGate() {
+  const { t } = useTheme();
+  return (
+    <main style={{
+      minHeight: 'calc(100vh - 53px)', marginTop: 53,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '40px 24px',
+    }}>
+      <div style={{ width: '100%', maxWidth: 460, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24 }}>
+        <PixelOwl size={6} state="idle" />
+
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', color: t.accentMuted, marginBottom: 10 }}>
+            RAG · llama-3.3-70b · multi-turn
+          </div>
+          <h1 style={{ fontFamily: F, fontWeight: 300, fontSize: 26, color: t.text1, margin: '0 0 10px' }}>
+            AI assistant
+          </h1>
+          <p style={{ fontFamily: F, fontSize: 14, color: t.text3, lineHeight: 1.7, margin: 0 }}>
+            Ask anything about the site's architecture, passkey auth,<br />
+            the RAG pipeline, deployment, or anything in the docs.
+          </p>
+        </div>
+
+        {/* Mock Q&A */}
+        <div style={{ width: '100%', background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 14, padding: '16px 16px 32px', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ fontFamily: M, fontSize: 9, letterSpacing: '0.15em', textTransform: 'uppercase', color: t.text3, marginBottom: 12 }}>
+            example
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+            <div style={{ maxWidth: '80%', padding: '9px 13px', borderRadius: '14px 14px 4px 14px', background: t.accentDim, border: `1px solid ${t.accentBorder}`, fontFamily: F, fontSize: 13, color: t.text1, lineHeight: 1.5 }}>
+              What's the RAG pipeline?
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <div style={{ flexShrink: 0, marginTop: 2 }}><PixelOwl size={2} state="idle" /></div>
+            <div style={{ padding: '9px 13px', borderRadius: '14px 14px 14px 4px', background: t.surface, border: `1px solid ${t.border}`, fontFamily: F, fontSize: 13, color: t.text2, lineHeight: 1.6 }}>
+              Docs are chunked, embedded via Cloudflare AI, and stored in Vectorize. Your question is embedded at query time, top chunks are cosine-matched and injected into llama-3.3-70b as context.
+            </div>
+          </div>
+          <div aria-hidden="true" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, background: `linear-gradient(to bottom, transparent, ${t.cardBg})`, pointerEvents: 'none' }} />
+        </div>
+
+        <Link
+          to="/auth"
+          style={{
+            display: 'block', width: '100%', maxWidth: 320, textAlign: 'center',
+            padding: '12px', borderRadius: 12, textDecoration: 'none',
+            fontFamily: F, fontSize: 15, fontWeight: 500,
+            background: t.accentDim, color: t.accent, border: `1px solid ${t.accentBorder}`,
+          }}
+        >
+          Sign in to chat →
+        </Link>
+        <span style={{ fontFamily: M, fontSize: 10, color: t.text3, letterSpacing: '0.04em' }}>
+          No password · passkey required
+        </span>
+      </div>
+    </main>
+  );
+}
+
 // ── Page ─────────────────────────────────────────────────────────
 export default function ChatPage() {
   const { t }           = useTheme();
@@ -572,11 +635,6 @@ export default function ChatPage() {
   const [activeConvId,   setActiveConvId]   = useState(null); // sidebar highlight only
   const [chatKey,        setChatKey]        = useState('new'); // controls ChatArea remount
   const [sidebarOpen,    setSidebarOpen]    = useState(false);
-
-  // Redirect if not signed in
-  useEffect(() => {
-    if (!loading && !user) navigate('/auth');
-  }, [user, loading, navigate]);
 
   // Load conversation list
   useEffect(() => {
@@ -616,7 +674,8 @@ export default function ChatPage() {
     setChatKey('new-' + Date.now()); // remount ChatArea fresh
   }, []);
 
-  if (loading || !user) return null;
+  if (loading) return null;
+  if (!user) return <ChatGate />;
 
   return (
     <div style={{

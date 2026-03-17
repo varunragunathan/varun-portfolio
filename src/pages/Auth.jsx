@@ -1263,8 +1263,10 @@ export default function Auth() {
           <h1 style={{ fontFamily: F, fontWeight: 300, fontSize: isMobile ? 26 : 28, color: t.text1, marginBottom: 8 }}>
             {titles[tab]}
           </h1>
-          <p style={{ fontFamily: F, fontSize: isMobile ? 16 : 14, color: t.text2 }}>
-            Passwordless. Secured by your device.
+          <p style={{ fontFamily: F, fontSize: isMobile ? 16 : 14, color: t.text2, lineHeight: 1.6 }}>
+            {tab === 'recover'
+              ? 'Restore access using your recovery code.'
+              : 'Unlock the full portfolio and AI assistant. No password required.'}
           </p>
         </div>
 

@@ -18,6 +18,7 @@ import {
   updatePersonas,
 } from './admin.js';
 import { submitUpgradeRequest, getUpgradeRequest } from './userTier.js';
+import { submitFeedbackHandler } from './feedback.js';
 import { getMetrics } from './metrics.js';
 import { logEndpointRequest, getEndpointMetrics } from './endpointMetrics.js';
 export { NumMatchDO } from './numMatchDO.js';
@@ -145,6 +146,18 @@ async function handleRequest(request, env) {
       return new Response(JSON.stringify({ error: 'Internal server error' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json', ...cors },
+      });
+    }
+  }
+
+  // ── /api/feedback ─────────────────────────────────────────────
+  if (url.pathname === '/api/feedback' && request.method === 'POST') {
+    try {
+      return withCors(await submitFeedbackHandler(request, env), cors);
+    } catch (err) {
+      console.error('Feedback error:', err);
+      return new Response(JSON.stringify({ error: 'Internal server error' }), {
+        status: 500, headers: { 'Content-Type': 'application/json', ...cors },
       });
     }
   }

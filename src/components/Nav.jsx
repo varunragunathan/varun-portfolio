@@ -480,6 +480,20 @@ export default function Nav() {
             {enabled && !loading && user && (
               <AvatarMenu user={user} onLogout={handleLogout} />
             )}
+            {enabled && !loading && !user && (
+              <Link
+                to="/auth"
+                style={{
+                  fontFamily: M, fontSize: 11, letterSpacing: '0.08em', textDecoration: 'none',
+                  color: t.text3, border: `1px solid ${t.border}`, borderRadius: 8,
+                  padding: '5px 12px', transition: 'color 0.15s, border-color 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = t.accent; e.currentTarget.style.borderColor = t.accentBorder; }}
+                onMouseLeave={e => { e.currentTarget.style.color = t.text3; e.currentTarget.style.borderColor = t.border; }}
+              >
+                sign in
+              </Link>
+            )}
           </div>
         </div>
       </nav>

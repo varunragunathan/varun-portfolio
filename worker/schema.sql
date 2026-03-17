@@ -159,3 +159,12 @@ INSERT OR IGNORE INTO allowed_models (id, model_id, label, tier, enabled, added_
   ('model-llama-70b', '@cf/meta/llama-3.3-70b-instruct-fp8-fast', 'Llama 3.3 70B Fast', 'pro', 1, 0),
   ('model-llama-8b',  '@cf/meta/llama-3.1-8b-instruct',           'Llama 3.1 8B',        'pro', 1, 0),
   ('model-claude',    'claude-sonnet-4-6',                         'Claude Sonnet 4.6',   'pro', 0, 0);
+
+-- ── Feedback ──────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS feedback (
+  id          TEXT    PRIMARY KEY,
+  message     TEXT    NOT NULL,
+  page        TEXT,
+  user_agent  TEXT,
+  created_at  INTEGER NOT NULL
+);

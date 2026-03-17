@@ -6,6 +6,7 @@ import { useTypewriter, useCounter } from '../hooks/useAnimations';
 import { Fade, SectionHeader, Btn } from '../components/UI';
 import ParticleField from '../components/ParticleField';
 import { PERSONAL, STATS, PROJECTS, SKILLS, PRINCIPLES, TIMELINE, EDUCATION } from '../data/portfolio';
+import PixelOwl from '../components/PixelOwl';
 import { useState, useEffect } from 'react';
 import { useResponsive } from '../hooks/useResponsive';
 
@@ -13,9 +14,14 @@ const F = "'Outfit', sans-serif";
 const M = "'IBM Plex Mono', monospace";
 
 // ─── Guest view (unauthenticated) ─────────────────────────────────
+const GUEST_FEATURES = [
+  { tag: 'timeline',  text: '11 years shipping at scale — including identity systems used by 135M+ people' },
+  { tag: 'ai chat',   text: 'Ask the AI assistant anything about how this site was built' },
+  { tag: 'passkeys',  text: 'Zero-password auth — your device is the credential' },
+];
+
 function GuestView() {
   const { t } = useTheme();
-  const { isMobile } = useResponsive();
   const [loaded, setLoaded] = useState(false);
   useEffect(() => { setTimeout(() => setLoaded(true), 100); }, []);
 
@@ -26,37 +32,52 @@ function GuestView() {
       opacity: loaded ? 1 : 0, transform: loaded ? 'translateY(0)' : 'translateY(20px)',
       transition: 'opacity 0.7s cubic-bezier(0.22,1,0.36,1), transform 0.7s cubic-bezier(0.22,1,0.36,1)',
     }}>
-      <div style={{ width: '100%', maxWidth: 400, textAlign: 'center' }}>
-        {/* Headshot */}
-        <div style={{ width: 120, height: 120, borderRadius: '50%', margin: '0 auto 20px', background: `linear-gradient(135deg, ${t.accent}, ${t.accentDim})`, padding: 2 }}>
-          <img
-            src="/varun.png"
-            alt="Varun Ragunathan"
-            style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
-          />
-        </div>
+      <div style={{ width: '100%', maxWidth: 420 }}>
 
-        <h1 style={{ fontFamily: F, fontWeight: 400, fontSize: 22, color: t.text1, margin: '0 0 4px' }}>
-          Varun Ragunathan
-        </h1>
-        <p style={{ fontFamily: M, fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: t.accentMuted, margin: '0 0 32px' }}>
-          Staff Software Engineer
-        </p>
+        {/* Identity */}
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <div style={{ width: 84, height: 84, borderRadius: '50%', margin: '0 auto 14px', background: `linear-gradient(135deg, ${t.accent}, ${t.accentDim})`, padding: 2 }}>
+            <img src="/varun.png" alt="Varun Ragunathan" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+          </div>
+          <h1 style={{ fontFamily: F, fontWeight: 400, fontSize: 20, color: t.text1, margin: '0 0 4px' }}>
+            Varun Ragunathan
+          </h1>
+          <p style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', color: t.accentMuted, margin: 0 }}>
+            Staff Software Engineer
+          </p>
+        </div>
 
         {/* Sign-in card */}
         <div style={{
           background: t.cardBg, border: `1px solid ${t.border}`,
-          borderRadius: 18, padding: '28px 28px 24px',
-          position: 'relative', overflow: 'hidden',
+          borderRadius: 18, padding: '24px 24px 20px',
+          position: 'relative', overflow: 'hidden', marginBottom: 10,
         }}>
           <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: `radial-gradient(ellipse at 50% 0%, ${t.accentGhost} 0%, transparent 70%)`, pointerEvents: 'none' }} />
           <div style={{ position: 'relative', zIndex: 1 }}>
-            <p style={{ fontFamily: F, fontSize: 15, color: t.text1, fontWeight: 500, margin: '0 0 6px' }}>
-              Sign in to learn more
+            <p style={{ fontFamily: F, fontWeight: 500, fontSize: 16, color: t.text1, margin: '0 0 4px' }}>
+              This portfolio is the product.
             </p>
-            <p style={{ fontFamily: F, fontSize: isMobile ? 18 : 13, color: t.text3, margin: '0 0 22px', lineHeight: 1.6 }}>
-              The work, timeline, and everything else is just one passkey away. No password required.
+            <p style={{ fontFamily: F, fontSize: 13, color: t.text3, margin: '0 0 18px', lineHeight: 1.6 }}>
+              Explore the work, then ask the AI how it was built.
             </p>
+
+            {/* Feature bullets */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginBottom: 20 }}>
+              {GUEST_FEATURES.map(({ tag, text }) => (
+                <div key={tag} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <span style={{
+                    fontFamily: M, fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase',
+                    color: t.accentMuted, background: t.accentDim, border: `1px solid ${t.accentBorder}`,
+                    borderRadius: 4, padding: '2px 6px', flexShrink: 0, marginTop: 1,
+                  }}>
+                    {tag}
+                  </span>
+                  <span style={{ fontFamily: F, fontSize: 13, color: t.text2, lineHeight: 1.5 }}>{text}</span>
+                </div>
+              ))}
+            </div>
+
             <Link
               to="/auth"
               style={{
@@ -67,8 +88,58 @@ function GuestView() {
             >
               Sign in →
             </Link>
+            <p style={{ fontFamily: M, fontSize: 10, color: t.text3, textAlign: 'center', margin: '9px 0 0', letterSpacing: '0.04em' }}>
+              No password · passkey required
+            </p>
           </div>
         </div>
+
+        {/* Mock chat preview */}
+        <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: `1px solid ${t.border}` }}>
+          <div style={{ background: t.cardBg, padding: '14px 14px 32px' }}>
+            <div style={{ fontFamily: M, fontSize: 9, letterSpacing: '0.15em', textTransform: 'uppercase', color: t.text3, marginBottom: 12 }}>
+              ai assistant preview
+            </div>
+            {/* User bubble */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+              <div style={{
+                maxWidth: '80%', padding: '9px 13px', borderRadius: '14px 14px 4px 14px',
+                background: t.accentDim, border: `1px solid ${t.accentBorder}`,
+                fontFamily: F, fontSize: 13, color: t.text1, lineHeight: 1.5,
+              }}>
+                How does passkey auth work here?
+              </div>
+            </div>
+            {/* Assistant bubble */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <div style={{ flexShrink: 0, marginTop: 2 }}>
+                <PixelOwl size={2} state="idle" />
+              </div>
+              <div style={{
+                padding: '9px 13px', borderRadius: '14px 14px 14px 4px',
+                background: t.surface, border: `1px solid ${t.border}`,
+                fontFamily: F, fontSize: 13, color: t.text2, lineHeight: 1.6,
+              }}>
+                The browser generates a key pair bound to this domain — the private key never leaves your device. Sign-in is a signed challenge. No secrets on the server, no passwords at all.
+              </div>
+            </div>
+          </div>
+          {/* Fade + CTA */}
+          <div aria-hidden="true" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 72, background: `linear-gradient(to bottom, transparent, ${t.bg})`, pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center', paddingBottom: 12 }}>
+            <Link
+              to="/auth"
+              style={{
+                fontFamily: M, fontSize: 10, letterSpacing: '0.07em', textDecoration: 'none',
+                color: t.accent, background: t.accentDim, border: `1px solid ${t.accentBorder}`,
+                borderRadius: 20, padding: '5px 14px',
+              }}
+            >
+              Sign in to ask your own questions →
+            </Link>
+          </div>
+        </div>
+
       </div>
     </div>
   );
