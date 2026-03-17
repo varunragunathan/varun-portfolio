@@ -113,6 +113,19 @@ await db.prepare('UPDATE users SET role = ? WHERE id = ?').bind('admin', userId)
 
 Step-up tokens are 2-minute single-use KV entries. See [Chapter 10](./10-step-up-authentication.md).
 
+Users with `role = 'student'` have a "Make Pro" button. Like "Make Admin", it requires step-up authentication before the promotion is applied — the same passkey re-verification flow. The worker validates the step-up token and rejects the request if the target user is not currently a student:
+
+```js
+// worker/admin.js — makeProUser
+const { stepUpToken } = await request.json().catch(() => ({}));
+const valid = await consumeStepUpToken(env.AUTH_KV, stepUpToken, session.userId);
+if (!valid) return json({ error: 'Step-up required' }, 403);
+if (target.role !== 'student') return json({ error: 'User is not a student' }, 400);
+await db.prepare('UPDATE users SET role = ? WHERE id = ?').bind('pro', userId).run();
+```
+
+This allows promoting a student directly to pro without going through the upgrade-request flow. Both buttons ("Make Pro" and "Make Admin") appear in the same row when applicable — they are displayed side by side using `flexDirection: 'row'`.
+
 ---
 
 ## 18.6 Tab: Models
@@ -193,3 +206,4 @@ See [Chapter 20](./20-endpoint-metrics.md) for the full logging middleware docum
 - Personas are stored in KV with no TTL; changes take effect for the next chat request.
 - The Endpoints tab provides request volume observability over the last 7 days, with normalized path grouping and per-endpoint sparklines.
 - Promoting a user to admin requires step-up authentication to prevent session-hijacking escalation.
+- Student users can be promoted directly to pro via a step-up-authenticated 'Make Pro' button, bypassing the upgrade-request flow.

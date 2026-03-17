@@ -2,7 +2,7 @@
 
 ## What You'll Learn
 
-This chapter covers every layer of the React frontend: the routing setup, the theme system, the auth context, the authentication flows and their state machines, the animated logo (including the math behind it), the Identicon avatar with WCAG contrast enforcement, the ParticleField background, the Settings page, and the PWA configuration.
+This chapter covers every layer of the React frontend: the routing setup, the theme system, the auth context, the authentication flows and their state machines, the animated logo (including the math behind it), the Identicon avatar with WCAG contrast enforcement, the ParticleField background, the Settings page, the PWA configuration, the PixelOwl mascot and its four animation states, the FrozenChat typewriter demo for unauthenticated visitors, the ChatGate component that replaces silent redirects on `/chat`, and the anonymous feedback widget with shake-to-open on mobile.
 
 ---
 
@@ -178,9 +178,11 @@ export function AuthProvider({ children }) {
 **Three state values for `user`:**
 - `undefined` — loading (auth check in progress)
 - `null` — not signed in
-- `{ userId, nickname, maskedEmail }` — signed in
+- `{ userId, nickname, maskedEmail, role, trusted }` — signed in
 
 The `loading` property is derived: `user === undefined`.
+
+`trusted` is `true` when the current session has `trusted = 1` in the sessions table. It is used to gate the `useNumMatchApproval` WebSocket — non-trusted sessions never open the subscriber connection.
 
 When `VITE_ENABLE_AUTH` is not `'true'`, `user` starts as `null` (not `undefined`), so loading is never true and the app renders as if auth does not exist. This allows deploying the portfolio without auth functionality.
 
@@ -214,7 +216,14 @@ return (
 );
 ```
 
-**GuestView:** A centered card showing the headshot, name, title, and a "Sign in →" link. No portfolio content is visible.
+**GuestView:** Redesigned to provide a compelling sign-in value proposition. It now shows:
+- A headline section: "11 years shipping software. The work is all here." followed by a paragraph about shipping at scale including identity systems used by 135M+ people.
+- Three feature bullets with monospace tags: `timeline` (career history), `ai-assistant` (RAG-powered chat), `passkeys` (no password required).
+- A `<FrozenChat />` component on the right (or below on mobile) — an animated typewriter demo that cycles through 4 real Q&A pairs showing the AI assistant in action.
+- A prominent "Sign in with passkey →" CTA button.
+- A "No password · passkey required" hint.
+
+A sign-in button also appears in the Nav right slot when the user is unauthenticated.
 
 **Authenticated view:** The full Hero section with the particle field, stats, projects, skills, philosophy, timeline, education, and CTA sections.
 
@@ -454,6 +463,76 @@ VitePWA({
 
 ---
 
+## 11.13 The PixelOwl Mascot
+
+`src/components/PixelOwl.jsx` is a pixel-art SVG owl mascot rendered on a 12×14 grid of `<rect>` elements. It has four states driven by the `state` prop:
+
+| State | Visual | Used when |
+|-------|--------|-----------|
+| `idle` | Floats gently, blinks every 3–5s | Chat empty state, default |
+| `thinking` | Head tilt, pupils shift | Waiting for response (shown between send and first token) |
+| `streaming` | Fast bob | AI is streaming tokens |
+| `done` | Happy squint + small bounce | Response complete |
+
+The `size` prop controls cell size in pixels (default 8). Each pixel is an SVG `<rect>` with `imageRendering: 'pixelated'` on the SVG element.
+
+Auto-blink uses an async loop with an `alive` flag that is cleaned up on unmount or state change. framer-motion `animate`/`transition` props handle per-state motion. The owl appears in:
+- The chat page: size=2 in each AI message bubble, size=8 in the empty state, size=4 in the "thinking" waiting state.
+- `FrozenChat`: size=2 in the animated demo bubble.
+
+---
+
+## 11.14 The FrozenChat Demo Component
+
+`src/components/FrozenChat.jsx` is an animated typewriter demo of the AI assistant, shown to unauthenticated visitors. It cycles through 4 Q&A pairs — real questions with real answers — using a phase state machine:
+
+```
+show-q → (600ms) → typing-a → done → (3200ms fade) → next idx
+```
+
+At 16ms per character, the assistant answer types out like real streaming. A blinking cursor is shown during `typing-a`. The `PixelOwl` shows `streaming` while typing and `done` when complete. Demos cross-fade between each other with a 350ms opacity transition.
+
+The component has a `showCta` prop. When `true` (default, used on Home), a footer bar shows "Sign in to ask your own questions" with a link to `/auth`. When `false` (used in ChatGate), the CTA is hidden.
+
+A browser-style header bar with macOS-style traffic-light dots and pagination dots (one per demo, filled when active) gives it a polished demo-window aesthetic.
+
+---
+
+## 11.15 The ChatGate Component
+
+Before this change, unauthenticated visitors to `/chat` were silently redirected to `/auth` via a `useEffect` + `navigate`. This discarded all context and gave no explanation.
+
+`ChatGate` replaces the redirect. When `!user` on the chat page:
+- The PixelOwl (size=8, idle state) is shown above an "Ask me anything about Varun's work" heading.
+- A `<FrozenChat showCta={false} />` demo fills the main area.
+- A "Sign in to start chatting →" CTA links to `/auth`.
+
+The route structure is unchanged. No redirect. Visitors understand what they're missing before being asked to sign in.
+
+---
+
+## 11.16 The Feedback Widget
+
+`src/components/FeedbackWidget.jsx` exports three things:
+
+**`FeedbackForm`:** An inline anonymous feedback textarea + submit button. Validates 3–1000 characters. Posts to `POST /api/feedback` (no auth required). Shows a ✓ confirmation on success. Displayed prominently in the footer of every page.
+
+**`FeedbackModal`:** The same form in a `position: fixed` overlay, triggered by the shake gesture on mobile.
+
+**`useShake`:** A hook that attaches to `DeviceMotionEvent` and fires a callback when a shake is detected (acceleration delta > 28 m/s², 2-second cooldown). Returns `{ shakeState, requestPermission }`:
+
+| `shakeState` | Meaning |
+|---|---|
+| `'unsupported'` | Desktop or API not available |
+| `'needs-permission'` | iOS 13+ — must call `requestPermission()` from a user gesture |
+| `'active'` | Listening for shakes |
+
+iOS 13+ requires `DeviceMotionEvent.requestPermission()` to be called from a user gesture. The footer renders a "tap to enable shake" button when `shakeState === 'needs-permission'`. Android auto-attaches without a permission prompt.
+
+The feedback is stored in D1 in a `feedback` table (id, message, page, user_agent, created_at) with no user association.
+
+---
+
 ## Key Takeaways
 
 - The app is a lazy-loaded SPA with three pages: Home, Auth, Settings. The `NumMatchApprovalModal` lives at the shell level and appears on any page.
@@ -462,3 +541,7 @@ VitePWA({
 - The logo animation uses `requestAnimationFrame`, golden-ratio cycle timing, a sine bell curve for opacity, a damped sine for Y-axis bounce, and a cosine ease for the settle.
 - The Identicon generates a WCAG-compliant avatar deterministically from an email, using a seeded LCG and a 5×5 symmetric grid.
 - The PWA is configured for autoUpdate, maskable icons, and 1-year font caching.
+- The PixelOwl mascot has four states (idle/thinking/streaming/done) and auto-blinks in idle state.
+- `FrozenChat` provides an animated typewriter demo for guests, cycling through 4 real Q&A pairs.
+- Unauthenticated `/chat` visitors see `ChatGate` — the owl, a live demo, and a CTA — instead of being silently redirected.
+- The feedback widget is anonymous, stores to D1, and supports shake-to-open on mobile.

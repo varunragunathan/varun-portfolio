@@ -121,13 +121,13 @@ The DO's `fetch` handler routes incoming requests by method and path:
 **Worker → DO (internal HTTP):**
 ```text
 POST /broadcast
-Body: { approvalToken, code, userAgent, userId }
+Body: { approvalToken, code, userAgent, userId, deviceNames }
 ```
 The DO stores the pending approval in memory and broadcasts an `approval_request` message to all connected trusted clients.
 
 **DO → trusted device:**
 ```json
-{ "type": "approval_request", "approvalToken": "...", "code": 47, "userAgent": "Mozilla/5.0..." }
+{ "type": "approval_request", "approvalToken": "...", "code": 47, "userAgent": "Mozilla/5.0...", "deviceNames": ["MacBook Pro", "iPhone 15"] }
 ```
 
 **Trusted device → DO:**
@@ -227,13 +227,13 @@ These are distinct because they serve different security functions: `tempToken` 
    - KV: num_match:UUID-A = { userId, email, code: 47 }
    - KV: num_match_pending:TOKEN-B = { code: 47, approvalToken: UUID-A, userId }
    - KV: num_match_for_user:{userId} = { approvalToken: UUID-A, code: 47, userAgent }
-   - HTTP POST to DO: { approvalToken: UUID-A, code: 47, userAgent, userId }
+   - HTTP POST to DO: { approvalToken: UUID-A, code: 47, userAgent, userId, deviceNames }
    - Response to new device: { pendingNumberMatch: true, code: 47, tempToken: TOKEN-B }
 
 2. DO receives POST /broadcast
    - Stores this.pending = { approvalToken: UUID-A, code: 47, userAgent }
    - Broadcasts to all connected 'trusted' clients:
-     { type: 'approval_request', approvalToken: UUID-A, code: 47, userAgent }
+     { type: 'approval_request', approvalToken: UUID-A, code: 47, userAgent, deviceNames }
 
 3. Trusted device receives 'approval_request' via WebSocket
    - Frontend sets approval state
@@ -276,14 +276,14 @@ export function useNumMatchApproval(user) {
   const wsRef = useRef(null);
 
   useEffect(() => {
-    if (!user) { setApproval(null); return; }
+    if (!user || !user.trusted) { setApproval(null); return; }
     // connect WebSocket on mount; reconnect on close
     function connect() {
       ws = new WebSocket(`${protocol}//${host}/api/auth/num-match/subscribe`);
       ws.addEventListener('message', event => {
         const msg = JSON.parse(event.data);
         if (msg.type === 'approval_request') {
-          setApproval({ approvalToken: msg.approvalToken, code: msg.code, userAgent: msg.userAgent });
+          setApproval({ approvalToken: msg.approvalToken, code: msg.code, userAgent: msg.userAgent, deviceNames: msg.deviceNames });
         } else if (msg.type === 'resolved') {
           setApproval(prev => prev?.approvalToken === msg.approvalToken ? null : prev);
         }
@@ -296,12 +296,18 @@ export function useNumMatchApproval(user) {
   }, [user]);
 ```
 
-This hook runs in `App.jsx` for any authenticated user. It holds the WebSocket open for the life of the session. When an `approval_request` arrives, the `approval` state is set, which renders `NumMatchApprovalModal` in the app shell.
+Previously, the hook connected for any authenticated user. Non-trusted sessions caused a 403 on the WebSocket upgrade (`/api/auth/num-match/subscribe` requires a trusted session). That 403 triggered the `close` handler, which scheduled a reconnect in 3 seconds, which immediately 403'd again — an infinite reconnect loop. Every loop iteration registered as an error in endpoint metrics.
 
-The hook auto-reconnects after 3 seconds on disconnect. This handles:
+The fix: `/api/auth/me` now returns a `trusted` boolean, queried from the `sessions` table. The hook guards the connection with `if (!user || !user.trusted)` — non-trusted sessions skip the WebSocket entirely. The WebSocket is only opened for sessions where `trusted = 1` in the sessions table.
+
+The hook auto-reconnects after 3 seconds on disconnect (for trusted sessions only). This handles:
 - Tab going to background (some browsers close WebSockets on backgrounded tabs)
 - DO restart (connection drops; reconnect picks up the KV fallback)
 - Network hiccup
+
+**`NumMatchApprovalModal` — device nickname hints:**
+
+When the `approval_request` message includes a non-empty `deviceNames` array, the modal renders an amber section below the approval prompt. The section reads "check one of your trusted devices" and lists each device name as a pill-style badge. This gives the approving user a visual hint of which physical device to pick up to compare the number. If `approval.deviceNames` is empty or absent, the section is not shown.
 
 **On the new device — `NumberMatchScreen` component:**
 
@@ -355,4 +361,5 @@ The new device reconnects on disconnect with a 5-second delay (slightly longer t
 - One DO instance per user, addressed by userId, acts as a WebSocket pub/sub broker.
 - KV provides a fallback for DO restarts: trusted devices can recover pending approvals from KV on reconnect.
 - Three tokens serve three distinct roles: `approvalToken` (the request), `tempToken` (new device's WebSocket credential), `condToken` (conditional mediation only).
-- The `useNumMatchApproval` hook runs for all authenticated users and keeps a WebSocket open for the lifetime of the session, with 3-second auto-reconnect.
+- The `useNumMatchApproval` hook only connects for trusted sessions — non-trusted sessions skip the WebSocket entirely, avoiding an infinite 403 reconnect loop.
+- The approval modal shows device nicknames so the approving user knows which device to check.

@@ -36,6 +36,7 @@ The documentation is written for a competent developer who may not yet know WebA
 | [18](./chapters/18-admin-dashboard.md) | Admin Dashboard | Six tabs: Metrics, Upgrade Requests, Users, Models, Personas, Endpoints |
 | [19](./chapters/19-whatsapp-auth.md) | WhatsApp Backup Auth | Twilio integration, OTP flow, phone registration, sign-in path |
 | [20](./chapters/20-endpoint-metrics.md) | Endpoint Metrics | Async request logging, path normalization, time-series queries, SVG trend chart |
+| [21](./chapters/21-bugs-fixed.md) | Bugs Fixed | Production bugs discovered, root cause analysis, and fixes |
 
 ### Glossary
 
