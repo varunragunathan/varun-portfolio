@@ -14,6 +14,7 @@ import {
   isUserFrozen,
   logSecurityEvent,
   getTrustedDeviceByHash, updateTrustedDeviceLastUsed,
+  listTrustedDevicesByUserId,
 } from '../db.js';
 import { createPendingSession } from './session.js';
 import { generateDisplayCode } from './crypto.js';
@@ -294,10 +295,14 @@ export async function verifyAuth(request, env) {
       JSON.stringify({ code: displayCode, approvalToken, userId, email: user.email }),
       { expirationTtl: TTL },
     );
+    // Fetch trusted device names so the approving device knows where to look
+    const trustedDevices = await listTrustedDevicesByUserId(db, userId);
+    const deviceNames = trustedDevices.map(d => d.device_name).filter(Boolean);
+
     // Allows any trusted session for this user to discover the pending approval
     await env.AUTH_KV.put(
       `num_match_for_user:${userId}`,
-      JSON.stringify({ approvalToken, code: displayCode, userAgent: ua }),
+      JSON.stringify({ approvalToken, code: displayCode, userAgent: ua, deviceNames }),
       { expirationTtl: TTL },
     );
 
@@ -312,7 +317,7 @@ export async function verifyAuth(request, env) {
       await stub.fetch(new Request('http://do-internal/broadcast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ approvalToken, code: displayCode, userAgent: ua, userId }),
+        body: JSON.stringify({ approvalToken, code: displayCode, userAgent: ua, userId, deviceNames }),
       }));
     } catch { /* non-fatal: KV is the source of truth */ }
 

@@ -223,6 +223,27 @@ export async function makeAdminUser(request, env, userId) {
   return json({ ok: true });
 }
 
+// POST /api/admin/users/:id/make-pro
+// Body: { stepUpToken }  — step-up verification required
+// Only upgrades student → pro (no-ops on other roles).
+export async function makeProUser(request, env, userId) {
+  const session = await getSession(env.AUTH_KV, request);
+  const guard = await requireAdmin(session, env);
+  if (guard) return guard;
+
+  const { stepUpToken } = await request.json().catch(() => ({}));
+  const valid = await consumeStepUpToken(env.AUTH_KV, stepUpToken, session.userId);
+  if (!valid) return json({ error: 'Step-up verification required' }, 403);
+
+  const db     = env.varun_portfolio_auth;
+  const target = await db.prepare('SELECT id, role FROM users WHERE id = ?').bind(userId).first();
+  if (!target) return json({ error: 'User not found' }, 404);
+  if (target.role !== 'student') return json({ error: 'User is not a student' }, 400);
+
+  await db.prepare('UPDATE users SET role = ? WHERE id = ?').bind('pro', userId).run();
+  return json({ ok: true });
+}
+
 // ── Chat personas ─────────────────────────────────────────────────
 
 const PERSONA_ROLES = ['user', 'pro', 'student', 'admin'];

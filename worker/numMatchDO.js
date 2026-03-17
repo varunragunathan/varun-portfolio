@@ -39,11 +39,11 @@ export class NumMatchDO {
 
     // ── Internal: worker broadcasts new approval to connected trusted clients ──
     if (request.method === 'POST' && url.pathname.endsWith('/broadcast')) {
-      const { approvalToken, code, userAgent, userId } = await request.json();
+      const { approvalToken, code, userAgent, userId, deviceNames } = await request.json();
       if (userId) this.userId = userId;
-      this.pending = { approvalToken, code, userAgent };
+      this.pending = { approvalToken, code, userAgent, deviceNames };
 
-      const msg = JSON.stringify({ type: 'approval_request', approvalToken, code, userAgent });
+      const msg = JSON.stringify({ type: 'approval_request', approvalToken, code, userAgent, deviceNames });
       for (const [ws, info] of this.clients) {
         if (info.type === 'trusted') {
           try { ws.send(msg); } catch {}
@@ -73,11 +73,11 @@ export class NumMatchDO {
         // DO may have restarted; fall back to KV
         const raw = await this.env.AUTH_KV.get(`num_match_for_user:${this.userId}`);
         if (raw) {
-          const { approvalToken: at, code, userAgent } = JSON.parse(raw);
+          const { approvalToken: at, code, userAgent, deviceNames } = JSON.parse(raw);
           // Verify it hasn't already been resolved
           const still = await this.env.AUTH_KV.get(`num_match:${at}`);
           if (still) {
-            toSend = { approvalToken: at, code, userAgent };
+            toSend = { approvalToken: at, code, userAgent, deviceNames };
             this.pending = toSend;
           }
         }

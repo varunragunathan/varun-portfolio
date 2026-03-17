@@ -43,9 +43,30 @@ export default function NumMatchApprovalModal({ approval, onRespond }) {
         <h2 style={{ fontFamily: F, fontWeight: 300, fontSize: 22, color: t.text1, margin: '0 0 8px' }}>
           Approve this sign-in?
         </h2>
-        <p style={{ fontFamily: F, fontSize: 14, color: t.text2, lineHeight: 1.6, marginBottom: 28 }}>
+        <p style={{ fontFamily: F, fontSize: 14, color: t.text2, lineHeight: 1.6, marginBottom: approval.deviceNames?.length ? 16 : 28 }}>
           A <strong style={{ color: t.text1, fontWeight: 400 }}>{deviceLabel(approval.userAgent)}</strong> is trying to sign in. Confirm the number below matches what you see on that device.
         </p>
+        {approval.deviceNames?.length > 0 && (
+          <div style={{
+            marginBottom: 28, padding: '10px 14px', borderRadius: 10,
+            background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)',
+          }}>
+            <div style={{ fontFamily: M, fontSize: 9, letterSpacing: '0.15em', color: '#f59e0b', textTransform: 'uppercase', marginBottom: 8 }}>
+              check one of your trusted devices
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {approval.deviceNames.map(name => (
+                <span key={name} style={{
+                  fontFamily: F, fontSize: 13, color: t.text1,
+                  background: t.surfaceAlt, border: `1px solid ${t.border}`,
+                  borderRadius: 6, padding: '3px 10px',
+                }}>
+                  {name}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Number */}
         <div style={{

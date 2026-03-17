@@ -568,6 +568,48 @@ function UsersTab({ t }) {
       .catch(err => { setError(err.message); setLoading(false); });
   }, []);
 
+  const makeProFromStudent = useCallback(async (userId) => {
+    setStepUp({ userId, stage: 'verifying' });
+    try {
+      const optRes = await fetch('/api/auth/step-up/options', {
+        method: 'POST', credentials: 'include',
+      });
+      const { options, error: optErr } = await optRes.json();
+      if (!optRes.ok) throw new Error(optErr || 'Failed to start step-up');
+
+      const authResponse = await startAuthentication({ optionsJSON: options });
+
+      const verRes = await fetch('/api/auth/step-up/verify', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authResponse }),
+      });
+      const verData = await verRes.json();
+      if (!verRes.ok) throw new Error(verData.error || 'Verification failed');
+
+      setStepUp({ userId, stage: 'saving' });
+
+      const res = await fetch(`/api/admin/users/${userId}/make-pro`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stepUpToken: verData.stepUpToken }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Failed to promote to pro');
+      }
+
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: 'pro' } : u));
+      setStepUp(null);
+    } catch (err) {
+      if (err.name === 'NotAllowedError') {
+        setStepUp(null);
+      } else {
+        setStepUp({ userId, stage: 'error', errorMsg: err.message });
+      }
+    }
+  }, []);
+
   const makeAdmin = useCallback(async (userId) => {
     setStepUp({ userId, stage: 'verifying' });
     try {
@@ -678,7 +720,23 @@ function UsersTab({ t }) {
                     </td>
                     <td style={{ padding: '10px 12px', textAlign: 'right' }}>
                       {u.role !== 'admin' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+                          {u.role === 'student' && (
+                            <button
+                              onClick={() => makeProFromStudent(uid)}
+                              disabled={!!stepUp}
+                              style={{
+                                fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
+                                padding: '3px 10px', borderRadius: 6, cursor: stepUp ? 'default' : 'pointer',
+                                border: `1px solid ${t.accentBorder}`,
+                                background: t.accentDim, color: t.accent,
+                                opacity: stepUp && !su ? 0.4 : 1,
+                                transition: 'opacity 0.15s',
+                              }}
+                            >
+                              {su?.stage === 'verifying' ? 'verifying…' : su?.stage === 'saving' ? 'saving…' : 'make pro'}
+                            </button>
+                          )}
                           <button
                             onClick={() => makeAdmin(uid)}
                             disabled={!!stepUp}

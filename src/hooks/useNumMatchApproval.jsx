@@ -30,7 +30,7 @@ export function useNumMatchApproval(user) {
         try {
           const msg = JSON.parse(event.data);
           if (msg.type === 'approval_request') {
-            setApproval({ approvalToken: msg.approvalToken, code: msg.code, userAgent: msg.userAgent });
+            setApproval({ approvalToken: msg.approvalToken, code: msg.code, userAgent: msg.userAgent, deviceNames: msg.deviceNames ?? [] });
           } else if (msg.type === 'resolved') {
             setApproval(prev => prev?.approvalToken === msg.approvalToken ? null : prev);
           }

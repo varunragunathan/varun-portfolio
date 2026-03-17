@@ -13,6 +13,7 @@ import {
   addAdminModel,
   toggleAdminModel,
   makeAdminUser,
+  makeProUser,
   getPersonas,
   updatePersonas,
 } from './admin.js';
@@ -100,12 +101,15 @@ async function handleRequest(request, env) {
       let response;
 
       const makeAdminMatch   = path.match(/^\/api\/admin\/users\/([^/]+)\/make-admin$/);
+      const makeProMatch     = path.match(/^\/api\/admin\/users\/([^/]+)\/make-pro$/);
       const modelToggleMatch = path.match(/^\/api\/admin\/models\/([^/]+)$/);
       const approveMatch     = path.match(/^\/api\/admin\/upgrade-requests\/([^/]+)\/approve$/);
       const rejectMatch      = path.match(/^\/api\/admin\/upgrade-requests\/([^/]+)\/reject$/);
 
       if (makeAdminMatch && method === 'POST') {
         response = await makeAdminUser(request, env, makeAdminMatch[1]);
+      } else if (makeProMatch && method === 'POST') {
+        response = await makeProUser(request, env, makeProMatch[1]);
       } else if (approveMatch && method === 'POST') {
         response = await approveUpgrade(request, env, approveMatch[1]);
       } else if (rejectMatch && method === 'POST') {
