@@ -722,12 +722,14 @@ function DeleteAccount({ onDeleted }) {
 export default function Settings() {
   const { t } = useTheme();
   const { user, loading, enabled, setUser } = useAuth();
-  const navigate = useNavigate();
+  const navigate    = useNavigate();
+  const deletingRef = useRef(false);
   const [tab, setTab] = useState('security');
 
   useEffect(() => {
     if (!enabled) { navigate('/'); return; }
-    if (!loading && !user) navigate('/auth');
+    // Suppress redirect during account deletion — onDeleted handles navigation.
+    if (!loading && !user && !deletingRef.current) navigate('/auth');
   }, [user, loading, enabled]);
 
   if (loading || !user) return null;
@@ -787,7 +789,11 @@ export default function Settings() {
             <SecurityEvents />
           </Section>
 
-          <DeleteAccount onDeleted={() => { setUser(null); navigate('/'); }} />
+          <DeleteAccount onDeleted={() => {
+            deletingRef.current = true;
+            setUser(null);
+            navigate('/');
+          }} />
         </>
       )}
 

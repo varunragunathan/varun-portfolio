@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
 import { startAuthentication } from '@simplewebauthn/browser';
+import pkg from '../../package.json';
 
 const F = "'Outfit', sans-serif";
 const M = "'IBM Plex Mono', monospace";
@@ -1084,11 +1085,9 @@ export default function Admin() {
             <h1 style={{ fontFamily: F, fontSize: 24, fontWeight: 600, color: t.text1, margin: 0 }}>
               Dashboard
             </h1>
-            {import.meta.env.VITE_APP_VERSION && (
-              <span style={{ fontFamily: M, fontSize: 11, color: t.text3, letterSpacing: '0.06em' }}>
-                v{import.meta.env.VITE_APP_VERSION}
-              </span>
-            )}
+            <span style={{ fontFamily: M, fontSize: 11, color: t.text3, letterSpacing: '0.06em' }}>
+              v{pkg.version}
+            </span>
           </div>
         </div>
 
