@@ -9,9 +9,6 @@ on:
       - '**.md'
       - '.husky/**'
 
-permissions:
-  contents: write
-
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -20,9 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.2.2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 2
 
       - uses: actions/setup-node@v4.4.0
         with:
@@ -31,75 +25,16 @@ jobs:
 
       - run: yarn install --frozen-lockfile
 
-      # ── Version bump ──────────────────────────────────────────────
-      - name: Configure git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      # Bot commits (version bumps) skip re-bumping but still deploy.
-      - name: Check commit author
-        id: author
-        run: |
-          AUTHOR=$(git log -1 --pretty=%ae)
-          if [[ "$AUTHOR" == *"github-actions"* ]]; then
-            echo "is_bot=true" >> $GITHUB_OUTPUT
-          else
-            echo "is_bot=false" >> $GITHUB_OUTPUT
-          fi
-
-      # Parse conventional commit prefix to determine bump magnitude.
-      # feat!: / fix!: / BREAKING CHANGE → major (blocked here, see major-version-bump.yml)
-      # feat:                             → minor
-      # everything else                   → patch
-      - name: Determine bump type
-        id: bump
-        if: steps.author.outputs.is_bot == 'false'
-        run: |
-          MSG=$(git log -1 --pretty=%B)
-          if echo "$MSG" | grep -qE '(^feat!|^fix!|^chore!|^refactor!|BREAKING CHANGE)'; then
-            echo "type=major" >> $GITHUB_OUTPUT
-          elif echo "$MSG" | grep -qE '^feat(\(.+\))?:'; then
-            echo "type=minor" >> $GITHUB_OUTPUT
-          else
-            echo "type=patch" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Block major version bump
-        if: steps.author.outputs.is_bot == 'false' && steps.bump.outputs.type == 'major'
-        run: |
-          CURRENT=$(node -p "require('./package.json').version")
-          NEXT=$(node -p "
-            const [M,m,p] = '$CURRENT'.split('.').map(Number);
-            \`\${M+1}.0.0\`
-          ")
-          echo "::error::Major version bump blocked."
-          echo "::notice::Current version: v$CURRENT → proposed: v$NEXT"
-          echo "::notice::Go to Actions → 'Major Version Bump' → Run workflow to approve."
-          exit 1
-
-      - name: Apply patch/minor version bump
-        if: steps.author.outputs.is_bot == 'false'
-        run: |
-          npm version ${{ steps.bump.outputs.type }} --no-git-tag-version
-          VERSION=$(node -p "require('./package.json').version")
-          git add package.json
-          git commit -m "chore: bump version to v$VERSION [skip ci]"
-          git push
-          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
-
-      - name: Read version (bot commit path)
-        if: steps.author.outputs.is_bot == 'true'
+      - name: Read version
         run: echo "APP_VERSION=$(node -p \"require('./package.json').version\")" >> $GITHUB_ENV
 
-      # ── Build & deploy ────────────────────────────────────────────
-      - name: Build (v${{ env.APP_VERSION }})
+      - name: Build
         run: yarn build
         env:
           VITE_ENABLE_AUTH: true
           VITE_APP_VERSION: ${{ env.APP_VERSION }}
 
-      - name: Deploy to Cloudflare (v${{ env.APP_VERSION }})
+      - name: Deploy Worker + Assets
         run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
