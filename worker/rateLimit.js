@@ -1,9 +1,12 @@
 // ── Sliding-window rate limiter using KV ─────────────────────────
 //
-// KV keys:
+// Chat rate limit keys (per userId):
 //   rate:chat:{userId}:w:{tenMinWindow}  TTL 700s   (user short window)
 //   rate:chat:{userId}:d:{dayWindow}     TTL 90000s (daily window)
 //   rate:chat:{userId}:h:{hourWindow}    TTL 7200s  (pro short window)
+//
+// IP rate limit keys:
+//   ip_rate:{bucket}:{ip}:{window}
 //
 // Limits:
 //   user    → 5 per 10 min,  20 per day
@@ -55,5 +58,32 @@ export async function checkRateLimit(kv, userId, role) {
     kv.put(dKey, String(dCount + 1), { expirationTtl: 90000 }),
   ]);
 
+  return { allowed: true };
+}
+
+// ── IP-based rate limiter ─────────────────────────────────────────
+// bucket   — namespaces the key (e.g. 'auth', 'otp', 'feedback')
+// limit    — max requests allowed in the window
+// windowMs — window size in milliseconds
+//
+// Returns { allowed: bool, retryAfter?: number (seconds) }
+// If ip is falsy (local dev, no CF-Connecting-IP) always allows.
+export async function checkIpRateLimit(kv, ip, bucket, limit, windowMs) {
+  if (!ip) return { allowed: true };
+
+  const now    = Date.now();
+  const window = Math.floor(now / windowMs);
+  const key    = `ip_rate:${bucket}:${ip}:${window}`;
+
+  const raw   = await kv.get(key);
+  const count = raw !== null ? parseInt(raw, 10) : 0;
+
+  if (count >= limit) {
+    const retryAfter = Math.ceil(((window + 1) * windowMs - now) / 1000);
+    return { allowed: false, retryAfter };
+  }
+
+  const ttl = Math.ceil(windowMs / 1000) + 60;
+  await kv.put(key, String(count + 1), { expirationTtl: ttl });
   return { allowed: true };
 }

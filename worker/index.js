@@ -19,6 +19,7 @@ import {
 } from './admin.js';
 import { submitUpgradeRequest, getUpgradeRequest } from './userTier.js';
 import { submitFeedbackHandler } from './feedback.js';
+import { checkIpRateLimit } from './rateLimit.js';
 import { getMetrics } from './metrics.js';
 import { logEndpointRequest, getEndpointMetrics } from './endpointMetrics.js';
 export { NumMatchDO } from './numMatchDO.js';
@@ -153,6 +154,14 @@ async function handleRequest(request, env) {
   // ── /api/feedback ─────────────────────────────────────────────
   if (url.pathname === '/api/feedback' && request.method === 'POST') {
     try {
+      const ip = request.headers.get('CF-Connecting-IP');
+      const fbLimit = await checkIpRateLimit(env.AUTH_KV, ip, 'feedback', 5, 3_600_000);
+      if (!fbLimit.allowed) {
+        return withCors(new Response(JSON.stringify({ error: 'Too many requests', retryAfter: fbLimit.retryAfter }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/json', 'Retry-After': String(fbLimit.retryAfter) },
+        }), cors);
+      }
       return withCors(await submitFeedbackHandler(request, env), cors);
     } catch (err) {
       console.error('Feedback error:', err);
