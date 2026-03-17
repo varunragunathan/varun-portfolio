@@ -30,11 +30,11 @@ function getTokenFromRequest(request) {
 // Stored in KV with a 5-minute TTL. Not usable as an auth token.
 // The client receives the raw token and must exchange it via /sessions/finalise.
 
-export async function createPendingSession(kv, { userId, email, recoveryCodes }) {
+export async function createPendingSession(kv, { userId, email, recoveryCodes, method }) {
   const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
   await kv.put(
     `session_pending:${token}`,
-    JSON.stringify({ userId, email, recoveryCodes: recoveryCodes || null }),
+    JSON.stringify({ userId, email, recoveryCodes: recoveryCodes || null, method: method || null }),
     { expirationTtl: 300 },
   );
   return token;
@@ -52,7 +52,7 @@ export async function finaliseSession(request, env) {
   const raw = await env.AUTH_KV.get(`session_pending:${token}`);
   if (!raw) return json({ error: 'Session expired or invalid' }, 400);
 
-  const { userId, email } = JSON.parse(raw);
+  const { userId, email, method } = JSON.parse(raw);
   await env.AUTH_KV.delete(`session_pending:${token}`);
 
   const isTrusted = trusted === true;
@@ -75,6 +75,7 @@ export async function finaliseSession(request, env) {
 
   await logSecurityEvent(env.varun_portfolio_auth, {
     userId, type: 'login', ip, userAgent: ua, deviceName: name,
+    metadata: method ? { method } : undefined,
   });
 
   return json({ ok: true, user: { email } }, 200, {

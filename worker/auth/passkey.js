@@ -304,6 +304,6 @@ export async function verifyAuth(request, env) {
   }
 
   // Known device — issue pending session for trust prompt
-  const pendingToken = await createPendingSession(env.AUTH_KV, { userId, email: user.email });
+  const pendingToken = await createPendingSession(env.AUTH_KV, { userId, email: user.email, method: 'passkey' });
   return json({ ok: true, pendingToken });
 }

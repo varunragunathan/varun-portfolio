@@ -242,6 +242,7 @@ export async function totpSignin(request, env) {
   const pendingToken = await createPendingSession(env.AUTH_KV, {
     userId: user.id,
     email:  user.email,
+    method: 'totp',
   });
 
   await logSecurityEvent(db, {

@@ -117,7 +117,7 @@ export class NumMatchDO {
 
     let pendingToken = null;
     if (approved) {
-      pendingToken = await createPendingSession(this.env.AUTH_KV, { userId, email });
+      pendingToken = await createPendingSession(this.env.AUTH_KV, { userId, email, method: 'passkey+number_match' });
     }
 
     this.pending = null;

@@ -493,6 +493,22 @@ function TotpSection() {
 }
 
 // ── Security events ───────────────────────────────────────────────
+const METHOD_LABELS = {
+  'passkey':              'Passkey',
+  'passkey+number_match': 'Passkey · Number match',
+  'totp':                 'Authenticator app',
+  'whatsapp':             'WhatsApp',
+  'recovery_code':        'Recovery code',
+};
+
+const METHOD_COLORS = {
+  'passkey':              '#6366f1',
+  'passkey+number_match': '#f59e0b',
+  'totp':                 '#818cf8',
+  'whatsapp':             '#25d366',
+  'recovery_code':        '#f87171',
+};
+
 const EVENT_LABELS = {
   login:                    'Signed in',
   logout:                   'Signed out',
@@ -541,21 +557,36 @@ function SecurityEvents() {
 
   return (
     <>
-      {events.map((ev, i) => (
-        <Row key={ev.id} last={i === events.length - 1}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' }}>
-              <span style={{ fontFamily: F, fontSize: 14, color: EVENT_COLORS[ev.type] || t.text1 }}>
-                {EVENT_LABELS[ev.type] || ev.type}
+      {events.map((ev, i) => {
+        const meta = ev.metadata ? (typeof ev.metadata === 'string' ? JSON.parse(ev.metadata) : ev.metadata) : null;
+        const method = ev.type === 'login' && meta?.method;
+        return (
+          <Row key={ev.id} last={i === events.length - 1}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' }}>
+                <span style={{ fontFamily: F, fontSize: 14, color: EVENT_COLORS[ev.type] || t.text1 }}>
+                  {EVENT_LABELS[ev.type] || ev.type}
+                </span>
+                {method && (
+                  <span style={{
+                    fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
+                    padding: '2px 8px', borderRadius: 20,
+                    background: `${METHOD_COLORS[method] ?? '#6366f1'}18`,
+                    border: `1px solid ${METHOD_COLORS[method] ?? '#6366f1'}40`,
+                    color: METHOD_COLORS[method] ?? '#818cf8',
+                  }}>
+                    {METHOD_LABELS[method] ?? method}
+                  </span>
+                )}
+              </div>
+              <span style={{ fontFamily: M, fontSize: 11, color: t.text3, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                {formatDate(ev.created_at)}
+                {ev.ip && ev.ip !== 'unknown' && <><span>·</span><RevealIP ip={ev.ip} /></>}
               </span>
             </div>
-            <span style={{ fontFamily: M, fontSize: 11, color: t.text3, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              {formatDate(ev.created_at)}
-              {ev.ip && ev.ip !== 'unknown' && <><span>·</span><RevealIP ip={ev.ip} /></>}
-            </span>
-          </div>
-        </Row>
-      ))}
+          </Row>
+        );
+      })}
     </>
   );
 }

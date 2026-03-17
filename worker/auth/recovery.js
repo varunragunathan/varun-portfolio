@@ -181,7 +181,7 @@ export async function recoverySignIn(request, env) {
   });
 
   // Issue pending session — passkeys and existing sessions untouched
-  const pendingToken = await createPendingSession(env.AUTH_KV, { userId: user.id, email });
+  const pendingToken = await createPendingSession(env.AUTH_KV, { userId: user.id, email, method: 'recovery_code' });
   return json({ ok: true, pendingToken });
 }
 

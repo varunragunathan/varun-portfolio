@@ -257,6 +257,7 @@ export async function verifySigninOTP(request, env) {
   const pendingToken = await createPendingSession(env.AUTH_KV, {
     userId,
     email: stored.email,
+    method: 'whatsapp',
   });
 
   await logSecurityEvent(env.varun_portfolio_auth, {
