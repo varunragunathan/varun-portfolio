@@ -71,6 +71,8 @@ function ScrollToTop() {
   return null;
 }
 
+const M = "'IBM Plex Mono', monospace";
+
 function Footer() {
   const { t } = useTheme();
   return (
