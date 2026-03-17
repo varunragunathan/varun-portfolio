@@ -1,21 +1,28 @@
 name = "varun-portfolio"
-account_id = "6207c412bd8462c5dac014004d8abdf4"
 compatibility_date = "2025-09-27"
 compatibility_flags = ["nodejs_compat"]
 main = "worker/index.js"
 
+# ── Public vars ───────────────────────────────────────────────────
+# Safe to commit. Override locally via .dev.vars.
 [vars]
 ENABLE_AUTH = "true"
-RP_ID = "varunr.dev"
-ORIGIN = "https://varunr.dev"
-ADMIN_EMAIL = "ragunathanvarun@gmail.com"
+RP_ID = "varunr.dev"         # Change to your domain
+ORIGIN = "https://varunr.dev" # Change to your domain
 
 # ── Twilio WhatsApp Sandbox ───────────────────────────────────────
-# From number only — not a secret. Secrets are set via:
-#   npx wrangler secret put TWILIO_ACCOUNT_SID
-#   npx wrangler secret put TWILIO_AUTH_TOKEN
-# One-time opt-in: text "join <keyword>" to +14155238886 on WhatsApp
-TWILIO_WHATSAPP_FROM  = "whatsapp:+14155238886"
+# From number only — not a secret. Replace with your own sandbox number.
+TWILIO_WHATSAPP_FROM = "whatsapp:+14155238886"
+
+# ── Required secrets (set once, never committed) ──────────────────
+# Run these commands to configure secrets in Cloudflare:
+#
+#   wrangler secret put ADMIN_EMAIL          # email address for the admin account
+#   wrangler secret put RESEND_API_KEY       # from resend.com — used for OTP emails
+#   wrangler secret put TOTP_ENCRYPTION_KEY  # 32-byte hex key, generate with:
+#                                            #   openssl rand -hex 32
+#   wrangler secret put TWILIO_ACCOUNT_SID   # from console.twilio.com
+#   wrangler secret put TWILIO_AUTH_TOKEN    # from console.twilio.com
 
 
 

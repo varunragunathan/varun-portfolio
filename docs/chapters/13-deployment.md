@@ -19,14 +19,13 @@ This chapter covers everything needed to deploy this project: Cloudflare account
 
 ```toml
 name = "varun-portfolio"
-account_id = "6207c412bd8462c5dac014004d8abdf4"
 compatibility_date = "2025-09-27"
 compatibility_flags = ["nodejs_compat"]
 main = "worker/index.js"
 ```
 
 - `name`: The Worker's name in the Cloudflare dashboard. Also used as the default route prefix.
-- `account_id`: Your Cloudflare account ID (find in the dashboard sidebar).
+- `account_id`: Not required — wrangler infers it from your auth token. You may add it explicitly if you manage multiple Cloudflare accounts: `account_id = "<YOUR_CLOUDFLARE_ACCOUNT_ID>"`.
 - `compatibility_date`: The Workers runtime behavior snapshot. Set this to a recent date when creating a new project to get all current features. Do not roll it back — this can introduce breaking changes.
 - `compatibility_flags = ["nodejs_compat"]`: Enables Node.js-compatible APIs needed by the `resend` npm package.
 - `main = "worker/index.js"`: The Worker entry point.
@@ -53,7 +52,7 @@ Serves the Vite build output as static assets. The Worker falls through to this 
 [[d1_databases]]
 binding = "varun_portfolio_auth"
 database_name = "varun-portfolio-auth"
-database_id = "329e850c-713c-49fa-93bc-671ef8ced36d"
+database_id = "<YOUR_D1_DATABASE_ID>"
 ```
 
 - `binding`: How the D1 database is accessed in Worker code: `env.varun_portfolio_auth`.
@@ -63,7 +62,7 @@ database_id = "329e850c-713c-49fa-93bc-671ef8ced36d"
 ```toml
 [[kv_namespaces]]
 binding = "AUTH_KV"
-id = "050acce2056d4c2883fea6f6f3b32ee2"
+id = "<YOUR_KV_NAMESPACE_ID>"
 ```
 
 - `binding`: How KV is accessed: `env.AUTH_KV`.
@@ -140,18 +139,22 @@ Switch to `new_sqlite_classes` in the `[[migrations]]` section.
 
 **Public vars (in `wrangler.toml`):**
 - `ENABLE_AUTH` — feature flag
-- `RP_ID` — WebAuthn RP ID
-- `ORIGIN` — WebAuthn expected origin
+- `RP_ID` — WebAuthn RP ID (your domain)
+- `ORIGIN` — WebAuthn expected origin (your domain)
+- `TWILIO_WHATSAPP_FROM` — WhatsApp sandbox from-number (not a secret)
 
-**Secrets (NOT in `wrangler.toml`, configured via dashboard or CLI):**
+**Secrets (set once via CLI, never committed):**
 ```bash
-npx wrangler secret put RESEND_API_KEY
-# Paste your Resend API key when prompted
+wrangler secret put ADMIN_EMAIL          # admin account email
+wrangler secret put RESEND_API_KEY       # from resend.com
+wrangler secret put TOTP_ENCRYPTION_KEY  # openssl rand -hex 32
+wrangler secret put TWILIO_ACCOUNT_SID   # from console.twilio.com
+wrangler secret put TWILIO_AUTH_TOKEN    # from console.twilio.com
 ```
 
-Secrets are stored encrypted by Cloudflare and available to the Worker as `env.RESEND_API_KEY`. They are never visible in the dashboard or in the Workers source.
+Secrets are stored encrypted by Cloudflare and injected into the Worker as `env.*`. They are never visible in the dashboard, in `wrangler.toml`, or in the repository.
 
-**Do not commit secrets.** The `wrangler.toml` in this repository contains only public vars. The `RESEND_API_KEY` is a secret and must be set separately.
+For local development, copy `.dev.vars.example` to `.dev.vars` and fill in real values. `.dev.vars` is gitignored.
 
 ---
 
@@ -283,6 +286,7 @@ jobs:
 
 - `new_sqlite_classes` (not `new_classes`) is required for Durable Objects on the Cloudflare free plan.
 - `RP_ID` and `ORIGIN` are critical — changing them after users register passkeys invalidates all existing credentials.
-- `RESEND_API_KEY` is a secret, set with `wrangler secret put`, never in `wrangler.toml`.
-- Local dev requires `.dev.vars` to override `RP_ID=localhost` and `ORIGIN=http://localhost:8787`.
+- Five secrets must be set via `wrangler secret put` before the Worker will function: `ADMIN_EMAIL`, `RESEND_API_KEY`, `TOTP_ENCRYPTION_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`.
+- `account_id` is optional in `wrangler.toml` — wrangler infers it from your auth token.
+- Local dev requires `.dev.vars` (copy from `.dev.vars.example`) to override `RP_ID=localhost` and `ORIGIN=http://localhost:8787`.
 - Deployment is two steps: `npm run build` (Vite) then `wrangler deploy` (uploads Worker + assets).
