@@ -17,6 +17,7 @@ import {
   updatePersonas,
 } from './admin.js';
 import { submitUpgradeRequest, getUpgradeRequest } from './userTier.js';
+import { getMetrics } from './metrics.js';
 export { NumMatchDO } from './numMatchDO.js';
 
 const ALLOWED_ORIGINS = ['https://varunr.dev', 'http://localhost:5173'];
@@ -123,6 +124,8 @@ export default {
           response = await listAdminModels(request, env);
         } else if (path === '/api/admin/models' && method === 'POST') {
           response = await addAdminModel(request, env);
+        } else if (path === '/api/admin/metrics' && method === 'GET') {
+          response = await getMetrics(request, env);
         } else if (path === '/api/admin/personas' && method === 'GET') {
           response = await getPersonas(request, env);
         } else if (path === '/api/admin/personas' && method === 'PUT') {

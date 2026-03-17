@@ -64,6 +64,378 @@ function TierBadge({ tier, t }) {
   );
 }
 
+// ── Metrics helpers ───────────────────────────────────────────────
+
+function StatCard({ label, value, sub, delta, deltaLabel, t, accent }) {
+  const color = accent ?? t.accent;
+  let deltaEl = null;
+  if (delta !== undefined && delta !== null) {
+    const isUp   = delta > 0;
+    const isDown = delta < 0;
+    deltaEl = (
+      <span style={{
+        fontFamily: M, fontSize: 10, letterSpacing: '0.05em',
+        color: isUp ? '#34c759' : isDown ? '#ff3b30' : t.text3,
+        marginLeft: 8,
+      }}>
+        {isUp ? '↑' : isDown ? '↓' : '='}{Math.abs(delta)}{deltaLabel ?? ''}
+      </span>
+    );
+  }
+  return (
+    <div style={{
+      padding: '18px 20px', borderRadius: 12,
+      background: t.cardBg, border: `1px solid ${t.border}`,
+      display: 'flex', flexDirection: 'column', gap: 6,
+    }}>
+      <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase' }}>
+        {label}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+        <span style={{ fontFamily: F, fontSize: 28, fontWeight: 700, color, lineHeight: 1 }}>
+          {value ?? '—'}
+        </span>
+        {deltaEl}
+      </div>
+      {sub && (
+        <div style={{ fontFamily: M, fontSize: 10, color: t.text3 }}>{sub}</div>
+      )}
+    </div>
+  );
+}
+
+function MiniBar({ label, value, max, color, t }) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ fontFamily: M, fontSize: 11, color: t.text2, width: 90, flexShrink: 0 }}>{label}</div>
+      <div style={{ flex: 1, height: 6, borderRadius: 3, background: t.surfaceAlt, overflow: 'hidden' }}>
+        <div style={{ width: `${pct}%`, height: '100%', borderRadius: 3, background: color, transition: 'width 0.4s' }} />
+      </div>
+      <div style={{ fontFamily: M, fontSize: 11, color: t.text1, width: 36, textAlign: 'right', flexShrink: 0 }}>{value}</div>
+    </div>
+  );
+}
+
+function PctRing({ pct, label, color, t }) {
+  const r = 26, circ = 2 * Math.PI * r;
+  const filled = circ * (pct / 100);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+      <svg width={64} height={64} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={32} cy={32} r={r} fill="none" stroke={t.surfaceAlt} strokeWidth={5} />
+        <circle
+          cx={32} cy={32} r={r} fill="none"
+          stroke={color} strokeWidth={5}
+          strokeDasharray={`${filled} ${circ}`}
+          strokeLinecap="round"
+        />
+      </svg>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontFamily: F, fontSize: 18, fontWeight: 700, color, lineHeight: 1 }}>{pct}%</div>
+        <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginTop: 4, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{label}</div>
+      </div>
+    </div>
+  );
+}
+
+const EVENT_LABELS = {
+  login:                      'Sign in',
+  totp_signin:                'TOTP sign in',
+  recovery_signin:            'Recovery sign in',
+  recovery_signin_failed:     'Recovery sign in failed',
+  recovery_code_failed:       'Recovery code failed',
+  recovery_code_used:         'Recovery code used',
+  account_frozen:             'Account frozen',
+  account_recovery:           'Account recovery',
+  passkey_added:              'Passkey added',
+  passkey_removed:            'Passkey removed',
+  logout:                     'Logout',
+  new_device:                 'New device',
+  session_revoked:            'Session revoked',
+  sessions_revoked_all:       'All sessions revoked',
+  totp_enabled:               'TOTP enabled',
+  totp_disabled:              'TOTP disabled',
+  recovery_codes_regenerated: 'Recovery codes regenerated',
+};
+
+function timeAgo(ts) {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60)   return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+
+function eventColor(type) {
+  if (type === 'login' || type === 'totp_signin' || type === 'recovery_signin') return '#34c759';
+  if (type?.includes('fail') || type === 'account_frozen') return '#ff3b30';
+  if (type?.includes('removed') || type?.includes('revoked') || type === 'logout') return '#ff9500';
+  return '#6366f1';
+}
+
+// ── Tab: Metrics ──────────────────────────────────────────────────
+function MetricsTab({ t }) {
+  const [data,      setData]      = useState(null);
+  const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState(null);
+  const [updatedAt, setUpdatedAt] = useState(null);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    fetch('/api/admin/metrics', { credentials: 'include' })
+      .then(r => { if (!r.ok) throw new Error('Failed to load metrics'); return r.json(); })
+      .then(d  => { setData(d); setUpdatedAt(Date.now()); setLoading(false); })
+      .catch(e => { setError(e.message); setLoading(false); });
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading && !data) return <TabSpinner t={t} />;
+  if (error)            return <TabError msg={error} t={t} />;
+  if (!data)            return null;
+
+  const { users, auth, chat, upgrades, recent_events: events } = data;
+
+  // Derived
+  const userWeekDelta   = users.this_week - users.prior_week;
+  const passkeyPct      = users.total > 0 ? Math.round((auth.passkey_users / users.total) * 100) : 0;
+  const totpPct         = users.total > 0 ? Math.round((auth.totp_users    / users.total) * 100) : 0;
+  const signinTotal     = auth.signins_week;
+  const tierOrder       = ['user', 'pro', 'student', 'admin'];
+  const tierColors      = { admin: '#f5a623', pro: '#6366f1', student: '#34c759', user: '#888' };
+  const maxTierCount    = Math.max(...tierOrder.map(r => users.by_role[r] ?? 0), 1);
+  const signinMethods   = [
+    { key: 'login',           label: 'Passkey / OTP' },
+    { key: 'totp_signin',     label: 'TOTP' },
+    { key: 'recovery_signin', label: 'Recovery' },
+  ];
+  const maxSignin = Math.max(...signinMethods.map(m => auth.signins_by_method[m.key] ?? 0), 1);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.15em', color: t.text3, textTransform: 'uppercase' }}>
+          {updatedAt ? `Updated ${timeAgo(updatedAt)}` : ''}
+        </div>
+        <button
+          onClick={load}
+          disabled={loading}
+          style={{
+            fontFamily: M, fontSize: 11, letterSpacing: '0.06em',
+            padding: '5px 14px', borderRadius: 8, cursor: loading ? 'default' : 'pointer',
+            background: 'transparent', border: `1px solid ${t.border}`,
+            color: loading ? t.text3 : t.text2, transition: 'all 0.15s',
+          }}
+        >
+          {loading ? '…' : '↻ Refresh'}
+        </button>
+      </div>
+
+      {/* ── Row 1: Key numbers ─────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+        <StatCard label="Total Users"      value={users.total}         delta={userWeekDelta}    deltaLabel=" this wk"  t={t} accent={t.accent} />
+        <StatCard label="Messages / Week"  value={chat.messages_week}  sub={`${chat.messages_today} today`}              t={t} accent="#6366f1"  />
+        <StatCard label="Active This Week" value={auth.active_sessions_week} sub="unique users"                           t={t} accent="#34c759"  />
+        <StatCard label="Pending Upgrades" value={upgrades.pending}    sub="awaiting review"                             t={t} accent={upgrades.pending > 0 ? '#f5a623' : t.text3} />
+      </div>
+
+      {/* ── Row 2: User growth + tier breakdown ──────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+
+        {/* Growth card */}
+        <div style={{ padding: '18px 20px', borderRadius: 12, background: t.cardBg, border: `1px solid ${t.border}` }}>
+          <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase', marginBottom: 16 }}>
+            User Growth
+          </div>
+          <div style={{ display: 'flex', gap: 20, marginBottom: 16 }}>
+            <div>
+              <div style={{ fontFamily: F, fontSize: 22, fontWeight: 700, color: t.text1 }}>{users.this_week}</div>
+              <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginTop: 2 }}>this week</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', color: t.text3, fontSize: 18 }}>vs</div>
+            <div>
+              <div style={{ fontFamily: F, fontSize: 22, fontWeight: 700, color: t.text3 }}>{users.prior_week}</div>
+              <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginTop: 2 }}>prior week</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto' }}>
+              <span style={{
+                fontFamily: M, fontSize: 13, fontWeight: 700,
+                color: userWeekDelta > 0 ? '#34c759' : userWeekDelta < 0 ? '#ff3b30' : t.text3,
+              }}>
+                {userWeekDelta > 0 ? '+' : ''}{userWeekDelta}
+              </span>
+            </div>
+          </div>
+          <div style={{ fontFamily: M, fontSize: 10, color: t.text3 }}>
+            {users.today} new today
+          </div>
+        </div>
+
+        {/* Tier breakdown */}
+        <div style={{ padding: '18px 20px', borderRadius: 12, background: t.cardBg, border: `1px solid ${t.border}` }}>
+          <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase', marginBottom: 16 }}>
+            Users by Tier
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {tierOrder.map(role => (
+              <MiniBar
+                key={role}
+                label={role}
+                value={users.by_role[role] ?? 0}
+                max={maxTierCount}
+                color={tierColors[role]}
+                t={t}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Row 3: Auth health ───────────────────────────────── */}
+      <div style={{ padding: '20px 24px', borderRadius: 12, background: t.cardBg, border: `1px solid ${t.border}` }}>
+        <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase', marginBottom: 20 }}>
+          Auth Health
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto auto 1fr', gap: 32, alignItems: 'center' }}>
+
+          {/* Rings */}
+          <PctRing pct={passkeyPct} label="passkey"  color="#6366f1" t={t} />
+          <PctRing pct={totpPct}    label="totp"     color="#34c759" t={t} />
+
+          {/* Sign-in methods */}
+          <div>
+            <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.1em', color: t.text3, textTransform: 'uppercase', marginBottom: 12 }}>
+              Sign-ins this week — {signinTotal} total
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {signinMethods.map(m => (
+                <MiniBar
+                  key={m.key}
+                  label={m.label}
+                  value={auth.signins_by_method[m.key] ?? 0}
+                  max={maxSignin}
+                  color="#6366f1"
+                  t={t}
+                />
+              ))}
+              {auth.failed_attempts_week > 0 && (
+                <div style={{ fontFamily: M, fontSize: 10, color: '#ff3b30', marginTop: 4 }}>
+                  ⚠ {auth.failed_attempts_week} failed attempt{auth.failed_attempts_week !== 1 ? 's' : ''} this week
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Row 4: Chat stats ────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+        <StatCard label="Conversations"     value={chat.total_conversations} sub={`${chat.total_messages} total messages`} t={t} accent="#6366f1" />
+        <StatCard label="Avg msgs / conv"   value={chat.avg_per_conv}         sub="all time"                                t={t} accent={t.accent} />
+        <StatCard label="Messages Today"    value={chat.messages_today}       sub={`${chat.messages_week} this week`}       t={t} accent="#34c759" />
+      </div>
+
+      {/* ── Row 5: Upgrade funnel ────────────────────────────── */}
+      <div style={{ padding: '20px 24px', borderRadius: 12, background: t.cardBg, border: `1px solid ${t.border}` }}>
+        <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase', marginBottom: 16 }}>
+          Upgrade Funnel
+        </div>
+        <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+
+          {/* Summary numbers */}
+          <div style={{ display: 'flex', gap: 24 }}>
+            {[
+              { label: 'pending',  n: upgrades.pending,  color: '#f5a623' },
+              { label: 'approved', n: upgrades.approved, color: '#34c759' },
+              { label: 'rejected', n: upgrades.rejected, color: '#ff3b30' },
+            ].map(({ label, n, color }) => (
+              <div key={label}>
+                <div style={{ fontFamily: F, fontSize: 24, fontWeight: 700, color }}>{n}</div>
+                <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginTop: 2 }}>{label}</div>
+              </div>
+            ))}
+            {upgrades.approval_rate_pct !== null && (
+              <div style={{ borderLeft: `1px solid ${t.border}`, paddingLeft: 24 }}>
+                <div style={{ fontFamily: F, fontSize: 24, fontWeight: 700, color: '#34c759' }}>
+                  {upgrades.approval_rate_pct}%
+                </div>
+                <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginTop: 2 }}>approval rate</div>
+              </div>
+            )}
+          </div>
+
+          {/* By tier */}
+          {Object.keys(upgrades.by_tier).length > 0 && (
+            <div style={{ borderLeft: `1px solid ${t.border}`, paddingLeft: 32 }}>
+              <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginBottom: 10, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                by tier
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {Object.entries(upgrades.by_tier).map(([tier, counts]) => (
+                  <div key={tier} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{
+                      fontFamily: M, fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                      background: tier === 'student' ? 'rgba(52,199,89,0.1)' : t.accentDim,
+                      color:      tier === 'student' ? '#34c759'              : t.accent,
+                      border:     tier === 'student' ? '1px solid rgba(52,199,89,0.3)' : `1px solid ${t.accentBorder}`,
+                    }}>{tier}</span>
+                    <span style={{ fontFamily: M, fontSize: 11, color: t.text3 }}>
+                      {counts.pending ?? 0}p · {counts.approved ?? 0}a · {counts.rejected ?? 0}r
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Row 6: Recent activity ───────────────────────────── */}
+      <div style={{ padding: '20px 24px', borderRadius: 12, background: t.cardBg, border: `1px solid ${t.border}` }}>
+        <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase', marginBottom: 16 }}>
+          Recent Activity
+        </div>
+        {events.length === 0 ? (
+          <div style={{ fontFamily: M, fontSize: 11, color: t.text3 }}>no events yet</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {events.map((ev, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '9px 0',
+                borderBottom: i < events.length - 1 ? `1px solid ${t.border}` : 'none',
+              }}>
+                <div style={{
+                  width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                  background: eventColor(ev.type),
+                }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontFamily: M, fontSize: 11, color: t.text1 }}>
+                    {EVENT_LABELS[ev.type] ?? ev.type}
+                  </span>
+                  {ev.email && (
+                    <span style={{ fontFamily: M, fontSize: 11, color: t.text3, marginLeft: 8 }}>
+                      {ev.email}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontFamily: M, fontSize: 10, color: t.text3, flexShrink: 0 }}>
+                  {timeAgo(ev.created_at)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+    </div>
+  );
+}
+
 // ── Tab: Upgrade Requests ─────────────────────────────────────────
 function UpgradeRequestsTab({ t }) {
   const [requests, setRequests] = useState([]);
@@ -660,7 +1032,7 @@ function TabError({ msg, t }) {
 }
 
 // ── Admin page ────────────────────────────────────────────────────
-const TABS = ['Upgrade Requests', 'Users', 'Models', 'Personas'];
+const TABS = ['Metrics', 'Upgrade Requests', 'Users', 'Models', 'Personas'];
 
 export default function Admin() {
   const { t }       = useTheme();
@@ -738,10 +1110,11 @@ export default function Admin() {
         </div>
 
         {/* Tab content */}
-        {tab === 0 && <UpgradeRequestsTab t={t} />}
-        {tab === 1 && <UsersTab t={t} />}
-        {tab === 2 && <ModelsTab t={t} />}
-        {tab === 3 && <PersonasTab t={t} />}
+        {tab === 0 && <MetricsTab t={t} />}
+        {tab === 1 && <UpgradeRequestsTab t={t} />}
+        {tab === 2 && <UsersTab t={t} />}
+        {tab === 3 && <ModelsTab t={t} />}
+        {tab === 4 && <PersonasTab t={t} />}
       </div>
     </div>
   );
