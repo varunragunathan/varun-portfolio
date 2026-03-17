@@ -10,11 +10,13 @@ RP_ID = "varunr.dev"
 ORIGIN = "https://varunr.dev"
 ADMIN_EMAIL = "ragunathanvarun@gmail.com"
 
-# ── WhatsApp Business API (Meta Cloud API) ────────────────────────
-# Fill in after Meta app approval. Template must be AUTHENTICATION category.
-WHATSAPP_PHONE_NUMBER_ID = ""
-WHATSAPP_ACCESS_TOKEN    = ""
-WHATSAPP_TEMPLATE_NAME   = "authentication_otp"
+# ── Twilio WhatsApp Sandbox ───────────────────────────────────────
+# Get these from console.twilio.com → Account Info
+# From number: use the sandbox number whatsapp:+14155238886 (default)
+# One-time opt-in: text "join <keyword>" to +14155238886 on WhatsApp
+TWILIO_ACCOUNT_SID    = ""
+TWILIO_AUTH_TOKEN     = ""
+TWILIO_WHATSAPP_FROM  = "whatsapp:+14155238886"
 
 
 

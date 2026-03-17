@@ -1,7 +1,10 @@
-// ── WhatsApp Business API backup auth ────────────────────────────
+// ── Twilio WhatsApp backup auth ───────────────────────────────────
 // Adds a verified phone number to an account (settings only).
 // When passkey fails at sign-in, user can receive a WhatsApp OTP
 // on their registered phone and exchange it for a pending session.
+//
+// Uses Twilio WhatsApp Sandbox — free, no template approval needed.
+// One-time opt-in: user texts "join <keyword>" to +14155238886 once.
 //
 // OTPs stored in KV (10-min TTL, single-use):
 //   wa_otp:{userId}    — phone verification during settings setup
@@ -53,55 +56,37 @@ async function checkRate(kv, userId) {
   return true;
 }
 
-// ── Meta WhatsApp Cloud API ───────────────────────────────────────
+// ── Twilio WhatsApp API ───────────────────────────────────────────
 async function sendWhatsAppOTP(phone, code, env) {
-  const phoneNumberId = env.WHATSAPP_PHONE_NUMBER_ID;
-  const accessToken   = env.WHATSAPP_ACCESS_TOKEN;
-  const templateName  = env.WHATSAPP_TEMPLATE_NAME || 'authentication_otp';
+  const accountSid = env.TWILIO_ACCOUNT_SID;
+  const authToken  = env.TWILIO_AUTH_TOKEN;
+  const from       = env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886';
 
-  if (!phoneNumberId || !accessToken) {
-    throw new Error('WhatsApp credentials not configured');
+  if (!accountSid || !authToken) {
+    throw new Error('Twilio credentials not configured');
   }
 
-  // Meta authentication template format — one body parameter (the code),
-  // plus a URL button parameter for the "Copy code" button if the template has one.
-  const body = {
-    messaging_product: 'whatsapp',
-    to: phone,
-    type: 'template',
-    template: {
-      name: templateName,
-      language: { code: 'en_US' },
-      components: [
-        {
-          type: 'body',
-          parameters: [{ type: 'text', text: code }],
-        },
-        {
-          type: 'button',
-          sub_type: 'url',
-          index: '0',
-          parameters: [{ type: 'text', text: code }],
-        },
-      ],
-    },
-  };
+  const body = new URLSearchParams({
+    From: from,
+    To:   `whatsapp:${phone}`,
+    Body: `Your varunr.dev verification code is ${code}. Valid for 10 minutes. Do not share this code.`,
+  });
 
   const res = await fetch(
-    `https://graph.facebook.com/v20.0/${phoneNumberId}/messages`,
+    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
     {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
+        Authorization: `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: JSON.stringify(body),
+      body: body.toString(),
     }
   );
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.error?.message || `WhatsApp API error ${res.status}`);
+    throw new Error(data.message || `Twilio error ${res.status}`);
   }
 
   return res.json();
