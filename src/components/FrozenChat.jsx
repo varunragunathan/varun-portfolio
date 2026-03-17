@@ -108,7 +108,8 @@ export default function FrozenChat({ showCta = true }) {
       {/* Messages */}
       <div style={{
         padding: '14px 14px',
-        minHeight: 160,
+        height: 240,
+        overflow: 'hidden',
         opacity: visible ? 1 : 0,
         transition: 'opacity 0.35s ease',
         position: 'relative',
