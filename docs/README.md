@@ -31,6 +31,11 @@ The documentation is written for a competent developer who may not yet know WebA
 | [13](./chapters/13-deployment.md) | Deployment | wrangler.toml walkthrough, D1/KV/DO setup, local dev |
 | [14](./chapters/14-what-could-be-done.md) | What Could Be Done | Future work with rationale |
 | [15](./chapters/15-rag-system.md) | RAG Chat System | Ingestion pipeline, Vectorize, streaming chat, multi-turn conversations, frontend |
+| [16](./chapters/16-totp.md) | TOTP | Zero-dependency RFC 6238 implementation, AES-256-GCM secret encryption, setup/disable/sign-in flows |
+| [17](./chapters/17-user-tiers.md) | User Tiers | Four roles, upgrade request flow, allowed_models table, chat rate limiting, personas |
+| [18](./chapters/18-admin-dashboard.md) | Admin Dashboard | Six tabs: Metrics, Upgrade Requests, Users, Models, Personas, Endpoints |
+| [19](./chapters/19-whatsapp-auth.md) | WhatsApp Backup Auth | Twilio integration, OTP flow, phone registration, sign-in path |
+| [20](./chapters/20-endpoint-metrics.md) | Endpoint Metrics | Async request logging, path normalization, time-series queries, SVG trend chart |
 
 ### Glossary
 

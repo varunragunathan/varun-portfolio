@@ -73,6 +73,8 @@ The following is a complete list of implemented features:
 **Authentication**
 - Passkey registration with OTP-verified email gate
 - Passkey authentication (standard and conditional mediation / browser autofill)
+- TOTP (Time-Based One-Time Password) as a backup sign-in method; secret encrypted at rest with AES-256-GCM
+- WhatsApp OTP backup sign-in via Twilio (registered phone number, 6-digit code, 10-minute TTL)
 - Recovery-code backup sign-in (uses one code, does not wipe passkeys)
 - Full account recovery flow (recovery code + OTP + re-register passkey, wipes existing credentials)
 
@@ -90,7 +92,7 @@ The following is a complete list of implemented features:
 - Approval and denial flow with real-time result delivery
 
 **Step-Up Authentication**
-- Passkey re-authentication before account deletion
+- Passkey re-authentication before account deletion, TOTP disable, and admin user promotion
 - Short-lived stepUpToken (2-minute KV TTL)
 - Email address confirmation as second factor of deletion
 
@@ -100,8 +102,31 @@ The following is a complete list of implemented features:
 - Session listing with current-session highlight and IP reveal
 - Recovery code status (8 codes, used/unused per position)
 - Recovery code regeneration
+- TOTP setup (QR code + manual entry) and disable (requires step-up)
+- WhatsApp phone registration and removal
 - Security event log (last 20 events)
 - Account deletion with step-up and email confirmation
+
+**User Tiers and Access Control**
+- Four roles: `user` (default), `pro`, `student`, `admin`
+- Tier upgrade request flow: user submits request → admin approves/rejects
+- Role-based chat rate limits: user (5/10min, 20/day), pro/student (30/hr, 200/day), admin (unlimited)
+- Dynamic model management: AI models added/toggled from admin dashboard without code changes
+- Per-role chat personas (system prompts) configurable from admin dashboard
+
+**Admin Dashboard**
+- Metrics tab: platform-wide health snapshot (users, auth adoption, chat usage, upgrade requests, recent security events)
+- Upgrade Requests tab: review and approve/reject tier requests
+- Users tab: list all users, promote to admin (requires step-up)
+- Models tab: add AI models, toggle enabled/disabled
+- Personas tab: edit system prompts per role
+- Endpoints tab: request volume trend chart + per-endpoint breakdown with sparklines
+
+**Observability**
+- Endpoint request logging: every API call and SPA page navigation logged to D1 asynchronously
+- Path normalization: UUID/ID segments replaced with `:id` for meaningful aggregation
+- 24h hourly and 7d daily trend charts with error-rate overlay
+- Per-endpoint error rates, last-seen timestamps, and 7-day sparklines
 
 **Frontend**
 - React 18 SPA with React Router v6
@@ -111,6 +136,7 @@ The following is a complete list of implemented features:
 - Deterministic Identicon avatar from email (GitHub-style, WCAG AA contrast)
 - ParticleField background animation with mouse repulsion
 - PWA: Web App Manifest, Workbox service worker, offline caching
+- Mobile-responsive across all pages: collapsible chat sidebar, iOS zoom prevention, safe-area-inset padding
 
 **Portfolio Content (authenticated users only)**
 - Hero with animated typewriter effect

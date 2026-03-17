@@ -41,7 +41,12 @@ CREATE TABLE IF NOT EXISTS users (
   created_at                INTEGER NOT NULL,
   nickname                  TEXT,
   frozen_until              INTEGER,
-  recovery_rate_limit_until INTEGER
+  recovery_rate_limit_until INTEGER,
+  totp_secret               TEXT,
+  totp_enabled              INTEGER NOT NULL DEFAULT 0,
+  role                      TEXT NOT NULL DEFAULT 'user',
+  phone_number              TEXT,
+  phone_verified            INTEGER NOT NULL DEFAULT 0
 );
 ```
 
@@ -53,8 +58,15 @@ CREATE TABLE IF NOT EXISTS users (
 | `nickname` | TEXT | Auto-generated on account creation (`swift-fox-42` format). User can edit from the nav avatar menu. |
 | `frozen_until` | INTEGER | Unix timestamp in milliseconds. When set and in the future, all auth attempts for this user are rejected with 403. Set when all recovery codes are exhausted through failed attempts. |
 | `recovery_rate_limit_until` | INTEGER | Currently unused in code but reserved for rate limiting recovery attempts at the account level. |
+| `totp_secret` | TEXT | AES-256-GCM encrypted TOTP secret, stored as `{iv_base64url}.{ciphertext_base64url}`. NULL when TOTP is not enrolled. See [Chapter 16](./16-totp.md). |
+| `totp_enabled` | INTEGER (0/1) | Whether TOTP is active for this account. |
+| `role` | TEXT | User's access tier: `'user'` (default), `'pro'`, `'student'`, or `'admin'`. Controls chat rate limits and model access. See [Chapter 17](./17-user-tiers.md). |
+| `phone_number` | TEXT | E.164 normalized phone number (e.g., `+14155550100`). NULL until a number is verified. |
+| `phone_verified` | INTEGER (0/1) | Whether the phone number has been verified via WhatsApp OTP. See [Chapter 19](./19-whatsapp-auth.md). |
 
 **Why a `frozen_until` field instead of a `frozen` boolean?** A boolean requires a manual unfreeze operation. A timestamp automatically expires: the `isUserFrozen` check in `worker/db.js` is simply `Date.now() < user.frozen_until`. A 1-hour freeze resolves itself without operator intervention.
+
+**Why is `totp_secret` encrypted in the database?** If D1 were exfiltrated, a plaintext TOTP secret would allow an attacker to generate valid codes for that user indefinitely. AES-256-GCM encryption with a Wrangler secret key (`env.TOTP_ENCRYPTION_KEY`) means the database value is useless without the key. See [Chapter 16, Section 16.3](./16-totp.md) for the encryption implementation.
 
 ---
 
@@ -230,6 +242,13 @@ All KV keys follow a `prefix:identifier` naming convention. The following table 
 | `recovery_rate:{email}` | `recoveryStart` | `{ count, first }` JSON | 600s (10 min) | Rate limit for full recovery flow |
 | `recovery_signin_rate:{email}` | `recoverySignIn` | `{ count }` JSON | 600s (10 min) | Rate limit for backup sign-in flow |
 | `recovery_gate:{recoveryToken}` | `recoveryVerify` | `{ userId, email }` JSON | 300s (5 min) | Gate: identity verified, new passkey registration allowed |
+| `totp_pending:{userId}` | `totpSetup` | Base32 secret string | 600s (10 min) | Pending TOTP secret awaiting first-code confirmation |
+| `wa_otp:{userId}` | `sendVerifyOTP` | `{ code, phone, used }` JSON | 600s (10 min) | WhatsApp phone verification OTP (settings flow) |
+| `wa_signin:{userId}` | `sendSigninOTP` | `{ code, phone, email, used }` JSON | 600s (10 min) | WhatsApp sign-in OTP |
+| `wa_rate:{userId}` | `checkRate` | Count string (`"1"`, `"2"`, `"3"`) | 600s (10 min) | WhatsApp OTP send rate limit (max 3 per window) |
+| `rate:chat:{userId}:w:{winWindow}` | `checkRateLimit` | Count string | 700s–7200s | Chat short-window rate limit counter (per user, per 10-min or 1-hr window) |
+| `rate:chat:{userId}:d:{dayWindow}` | `checkRateLimit` | Count string | 90000s (~25h) | Chat daily rate limit counter (per user, resets at UTC midnight) |
+| `persona:{role}` | `updatePersonas` | `{ systemPrompt }` JSON | No TTL | Chat system prompt for a given role (`user`, `pro`, `student`, `admin`) |
 
 **Design notes:**
 
@@ -244,7 +263,88 @@ The `cond_challenge:` keys use a short-lived UUID (`condToken`) as the suffix ra
 
 ---
 
-## 3.5 D1 Schema — Chat Tables
+## 3.5 D1 Schema — Tier and Model Tables
+
+### Table: `upgrade_requests`
+
+```sql
+CREATE TABLE IF NOT EXISTS upgrade_requests (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL REFERENCES users(id),
+  status      TEXT NOT NULL DEFAULT 'pending',
+  note        TEXT,
+  created_at  INTEGER NOT NULL,
+  reviewed_at INTEGER,
+  reviewed_by TEXT,
+  tier        TEXT NOT NULL DEFAULT 'pro'
+);
+```
+
+| Column | Purpose |
+|--------|---------|
+| `id` | UUID primary key. |
+| `user_id` | Foreign key to `users.id`. |
+| `status` | `'pending'`, `'approved'`, or `'rejected'`. |
+| `note` | Optional message from the user explaining why they want access. |
+| `reviewed_at` | Timestamp when an admin acted on the request. |
+| `reviewed_by` | Email of the admin who approved or rejected the request. |
+| `tier` | The requested tier: `'pro'` or `'student'`. Defaults to `'pro'` for backward compatibility. |
+
+Upgrade requests are immutable after creation — only the `status`, `reviewed_at`, and `reviewed_by` columns are updated. A user can have multiple requests over time (e.g., one rejected, one approved later), but only one is acted on at a time.
+
+---
+
+### Table: `allowed_models`
+
+```sql
+CREATE TABLE IF NOT EXISTS allowed_models (
+  id       TEXT PRIMARY KEY,
+  model_id TEXT NOT NULL UNIQUE,
+  label    TEXT NOT NULL,
+  tier     TEXT NOT NULL DEFAULT 'pro',
+  enabled  INTEGER NOT NULL DEFAULT 1,
+  added_at INTEGER NOT NULL
+);
+```
+
+| Column | Purpose |
+|--------|---------|
+| `id` | Fixed string identifier (e.g., `'model-llama-70b'`). Used as the path parameter in toggle requests. |
+| `model_id` | The technical model identifier passed to Workers AI or the Anthropic API (e.g., `@cf/meta/llama-3.3-70b-instruct-fp8-fast`). |
+| `label` | Human-readable name shown in the chat UI model picker. |
+| `tier` | Minimum role needed to use this model (`'pro'` = pro, student, admin). |
+| `enabled` | `0` hides the model from all users. Toggled from the Admin → Models tab without code changes. |
+| `added_at` | Unix timestamp when the model was added. |
+
+---
+
+## 3.6 D1 Schema — Endpoint Logs
+
+### Table: `endpoint_logs`
+
+```sql
+CREATE TABLE IF NOT EXISTS endpoint_logs (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  method     TEXT    NOT NULL,
+  path       TEXT    NOT NULL,
+  status     INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+```
+
+| Column | Purpose |
+|--------|---------|
+| `id` | Auto-increment integer — faster to insert than UUID for a high-write log table. |
+| `method` | HTTP method (`GET`, `POST`, `DELETE`, `PATCH`). |
+| `path` | Normalized path — UUID and long opaque segments replaced with `:id`. |
+| `status` | HTTP response status code. |
+| `created_at` | Unix timestamp in milliseconds. |
+
+Every API request and SPA page navigation is written here asynchronously via `ctx.waitUntil`. Static assets (`.js`, `.css`, `.png`) and WebSocket upgrades are excluded. See [Chapter 20](./20-endpoint-metrics.md) for the full logging design.
+
+---
+
+## 3.7 D1 Schema — Chat Tables
 
 The RAG chat system (see [Chapter 15](./15-rag-system.md)) adds two tables to `worker/schema.sql`.
 
@@ -311,7 +411,7 @@ return result.results.reverse();
 
 ---
 
-## 3.6 Schema Deletion Order
+## 3.8 Schema Deletion Order
 
 Because the schema uses foreign key references but no `ON DELETE CASCADE`, the `deleteUser` function in `worker/db.js` deletes child rows first, then the user:
 

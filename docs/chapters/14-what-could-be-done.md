@@ -8,19 +8,11 @@ This chapter describes future improvements with technical rationale for each. It
 
 ---
 
-## 14.1 TOTP as a Second Backup Method
+## 14.1 ~~TOTP as a Second Backup Method~~ — Implemented
 
-**The gap:** The sign-in page already shows a greyed-out "Use authenticator app (TOTP) — Coming soon" button. Recovery relies on either a passkey or a recovery code + email OTP. If a user has no passkeys, no recovery codes, and their email is compromised, the account is unrecoverable.
-
-**The design:** [TOTP](../glossary/README.md#totp) (Time-Based One-Time Password, RFC 6238) would let users register an authenticator app (Google Authenticator, Authy, 1Password TOTP) as a backup method. TOTP is device-independent (the secret is stored in the app, which can be backed up) and email-independent.
-
-**The tradeoff:** TOTP introduces a new secret to store (the TOTP seed) and a new surface to attack. The seed must be protected in the database with strong encryption. TOTP also has a UX cost — users must set it up and remember to use it.
-
-**Implementation notes:**
-- Store the TOTP secret encrypted at rest in D1
-- Use a library like `otplib` for generation/validation
-- Implement a 30-second window tolerance for clock skew
-- Store backup codes alongside TOTP (standard practice)
+> **Implemented in v0.2.x.** TOTP is fully implemented. See [Chapter 16](./16-totp.md) for complete documentation.
+>
+> The implementation uses a zero-dependency RFC 4226/6238 HOTP/TOTP algorithm built on Web Crypto API (HMAC-SHA-1). The TOTP secret is encrypted at rest with AES-256-GCM before storage in D1. Setup uses a two-step flow (generate → QR code scan → verify first code → save encrypted). Disabling requires step-up authentication. Sign-in returns a pending session, following the same trust-device flow as passkey sign-in.
 
 ---
 
@@ -52,18 +44,11 @@ This chapter describes future improvements with technical rationale for each. It
 
 ---
 
-## 14.4 Admin Dashboard
+## 14.4 ~~Admin Dashboard~~ — Implemented
 
-**The gap:** Account management requires direct database access. If an account is frozen (all recovery codes exhausted), there is no UI to unfreeze it. If a user needs their account wiped for a legitimate support reason, there is no endpoint for it.
-
-**The design:** A separate admin area, protected by a Cloudflare Access policy (not the application's own auth), with endpoints to:
-- List users
-- View any user's security events
-- Freeze / unfreeze accounts
-- Force-revoke all sessions for a user
-- Delete a user account
-
-**Security note:** Admin endpoints must be separate from the application auth system. Using Cloudflare Access (IP allowlist + email authentication) to gate admin routes is the appropriate pattern.
+> **Implemented in v0.2.x.** The admin dashboard is fully built and lives at `/admin`. See [Chapter 18](./18-admin-dashboard.md) for complete documentation.
+>
+> The dashboard has six tabs: Metrics (platform-wide health snapshot), Upgrade Requests (approve/reject tier requests), Users (list all users, promote to admin with step-up), Models (add/toggle AI models), Personas (edit system prompts per role), and Endpoints (request volume trends and per-endpoint breakdown). Access is protected by the application's own auth system (admin role check on every API call) rather than Cloudflare Access.
 
 ---
 
