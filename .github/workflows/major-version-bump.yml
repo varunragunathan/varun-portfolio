@@ -1,0 +1,52 @@
+name: Major Version Bump
+
+# Triggered manually from the GitHub Actions UI.
+# Varun must type "MAJOR" to confirm before the bump is applied.
+# After bumping package.json and pushing, the deploy workflow runs automatically.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type MAJOR to confirm the major version bump'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    # Hard gate — workflow does nothing unless the user typed exactly "MAJOR"
+    if: ${{ inputs.confirm == 'MAJOR' }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: 22
+          cache: yarn
+
+      - run: yarn install --frozen-lockfile
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Apply major version bump
+        run: |
+          BEFORE=$(node -p "require('./package.json').version")
+          npm version major --no-git-tag-version
+          AFTER=$(node -p "require('./package.json').version")
+          git add package.json
+          git commit -m "chore: bump version to v$AFTER (major)"
+          git push
+          echo "::notice::✅ Version bumped: v$BEFORE → v$AFTER"
+          echo "::notice::🚀 Deploy workflow will trigger automatically."

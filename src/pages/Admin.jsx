@@ -1080,9 +1080,16 @@ export default function Admin() {
           <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.2em', color: t.accentMuted, marginBottom: 8, textTransform: 'uppercase' }}>
             admin
           </div>
-          <h1 style={{ fontFamily: F, fontSize: 24, fontWeight: 600, color: t.text1, margin: 0 }}>
-            Dashboard
-          </h1>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}>
+            <h1 style={{ fontFamily: F, fontSize: 24, fontWeight: 600, color: t.text1, margin: 0 }}>
+              Dashboard
+            </h1>
+            {import.meta.env.VITE_APP_VERSION && (
+              <span style={{ fontFamily: M, fontSize: 11, color: t.text3, letterSpacing: '0.06em' }}>
+                v{import.meta.env.VITE_APP_VERSION}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Tab nav */}
