@@ -39,11 +39,11 @@ npm run build   # outputs to dist/
 ## Roadmap
 
 - [x] Phase 1: Landing page + PWA + deploy
-- [ ] Phase 2: Passkey + TOTP auth demo
-- [ ] Phase 3: RAG AI chatbot
+- [x] Phase 2: Passkey + TOTP auth demo
+- [x] Phase 3: RAG AI chatbot
 - [ ] Phase 4: Math visualizations + games
-- [ ] Phase 5: Metrics pipeline
-- [ ] Phase 6: Playwright E2E + CI/CD
+- [x] Phase 5: Metrics pipeline
+- [x] Phase 6: Playwright E2E + CI/CD
 
 ## Author
 
