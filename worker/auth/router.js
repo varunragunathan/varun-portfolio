@@ -4,6 +4,7 @@ import { getMe, logout, finaliseSession } from './session.js';
 import { numMatchSubscribe, numMatchWait } from './numMatch.js';
 import { stepUpOptions, stepUpVerify } from './stepUp.js';
 import { recoveryStart, recoveryVerify, recoverySignIn } from './recovery.js';
+import { totpStatus, totpSetup, totpEnable, totpDisable, totpSignin } from './totp.js';
 import {
   listSessions, revokeSession, revokeOtherSessions, renameSession,
   listPasskeys, revokePasskey, renamePasskey,
@@ -89,6 +90,13 @@ export async function handleAuth(request, env, url) {
   if (method === 'POST' && path === '/recovery/start')              return recoveryStart(request, env);
   if (method === 'POST' && path === '/recovery/verify')             return recoveryVerify(request, env);
   if (method === 'POST' && path === '/recovery/signin')             return recoverySignIn(request, env);
+
+  // ── TOTP ─────────────────────────────────────────────────────────
+  if (method === 'GET'  && path === '/totp/status')                 return totpStatus(request, env);
+  if (method === 'POST' && path === '/totp/setup')                  return totpSetup(request, env);
+  if (method === 'POST' && path === '/totp/enable')                 return totpEnable(request, env);
+  if (method === 'POST' && path === '/totp/disable')                return totpDisable(request, env);
+  if (method === 'POST' && path === '/totp/signin')                 return totpSignin(request, env);
 
   return json({ error: 'Not found' }, 404);
 }

@@ -88,6 +88,10 @@ CREATE INDEX IF NOT EXISTS idx_security_events_created  ON security_events(creat
 CREATE INDEX IF NOT EXISTS idx_conversations_user_id    ON conversations(user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_conv_id    ON chat_messages(conversation_id);
 
+-- ── TOTP ──────────────────────────────────────────────────────────
+ALTER TABLE users ADD COLUMN totp_secret  TEXT;
+ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0;
+
 -- ── User tiers ────────────────────────────────────────────────────
 ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user';
 

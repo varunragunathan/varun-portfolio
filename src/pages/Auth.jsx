@@ -521,13 +521,15 @@ function RegisterFlow({ onSuccess }) {
 // Full account recovery (wipes passkeys) lives in the separate "Recover" tab.
 function SignInFlow({ onSuccess }) {
   const { t } = useTheme();
-  // view: 'email' | 'passkey' | 'recovery'
+  // view: 'email' | 'passkey' | 'recovery' | 'totp'
   const [view, setView]               = useState('email');
   const [email, setEmail]             = useState('');
   const [userId, setUserId]           = useState('');
   const [busy, setBusy]               = useState(false);
   const [error, setError]             = useState(null);
-  const [passkeyFailed, setPasskeyFailed] = useState(false);
+  const [passkeyFailed, setPasskeyFailed]       = useState(false);
+  const [passkeySupported, setPasskeySupported] = useState(true);
+  const [totpCode, setTotpCode]                 = useState('');
 
   // Recovery code sign-in
   const [recoveryCode, setRecoveryCode] = useState('');
@@ -593,6 +595,38 @@ function SignInFlow({ onSuccess }) {
       }
     } catch {
       setPasskeyFailed(true);
+      setError('Network error. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Detect passkey support on mount
+  useEffect(() => {
+    if (typeof PublicKeyCredential === 'undefined' ||
+        !PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) {
+      setPasskeySupported(false);
+      return;
+    }
+    PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+      .then(ok => setPasskeySupported(ok))
+      .catch(() => setPasskeySupported(false));
+  }, []);
+
+  async function handleTotpSignin(e) {
+    e.preventDefault();
+    setBusy(true); setError(null);
+    try {
+      const res  = await fetch('/api/auth/totp/signin', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code: totpCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Invalid code'); return; }
+      setPendingToken(data.pendingToken);
+      setShowTrust(true);
+    } catch {
       setError('Network error. Please try again.');
     } finally {
       setBusy(false);
@@ -724,8 +758,8 @@ function SignInFlow({ onSuccess }) {
 
           {error && <Message text={error} type="error" />}
 
-          {/* Backup methods — shown after first passkey failure */}
-          {passkeyFailed && (
+          {/* Backup methods — shown after first passkey failure or if passkeys unsupported */}
+          {(passkeyFailed || !passkeySupported) && (
             <div style={{ marginTop: 24 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
                 <div style={{ flex: 1, height: 1, background: t.border }} />
@@ -755,22 +789,23 @@ function SignInFlow({ onSuccess }) {
                 </div>
               </button>
 
-              {/* TOTP — future */}
+              {/* TOTP */}
               <button
-                disabled
-                title="Coming soon"
+                onClick={() => { setView('totp'); setError(null); setTotpCode(''); }}
                 style={{
                   width: '100%', padding: '11px 14px', borderRadius: 10, marginTop: 8,
                   background: 'none', border: `1px solid ${t.border}`,
-                  fontFamily: F, fontSize: 13, color: t.text3, cursor: 'not-allowed',
+                  fontFamily: F, fontSize: 13, color: t.text2, cursor: 'pointer',
                   textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10,
-                  opacity: 0.45,
+                  transition: 'border-color 0.2s',
                 }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = t.accentBorder)}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = t.border)}
               >
                 <span style={{ fontSize: 16 }}>🔐</span>
                 <div>
-                  <div style={{ fontWeight: 500, marginBottom: 2 }}>Use authenticator app (TOTP)</div>
-                  <div style={{ fontSize: 11, color: t.text3 }}>Coming soon</div>
+                  <div style={{ fontWeight: 500, marginBottom: 2 }}>Use authenticator app</div>
+                  <div style={{ fontSize: 11, color: t.text3 }}>6-digit code from your authenticator app</div>
                 </div>
               </button>
             </div>
@@ -781,6 +816,31 @@ function SignInFlow({ onSuccess }) {
             ← Different email
           </button>
         </div>
+      )}
+
+      {view === 'totp' && (
+        <form onSubmit={handleTotpSignin}>
+          <p style={{ fontFamily: F, fontSize: 14, color: t.text2, lineHeight: 1.6, marginBottom: 20 }}>
+            Enter the 6-digit code from your authenticator app for{' '}
+            <strong style={{ color: t.text1 }}>{email}</strong>.
+          </p>
+          <Input
+            label="Authenticator code"
+            type="text"
+            value={totpCode}
+            onChange={e => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            required autoFocus
+            placeholder="000000"
+            inputMode="numeric"
+            spellCheck={false}
+          />
+          <PrimaryBtn loading={busy} type="submit">Sign in →</PrimaryBtn>
+          {error && <Message text={error} type="error" />}
+          <button type="button" onClick={() => { setView('passkey'); setError(null); }}
+            style={{ width: '100%', marginTop: 10, padding: '10px', background: 'none', border: 'none', fontFamily: F, fontSize: 13, color: t.text3, cursor: 'pointer' }}>
+            ← Back to passkey
+          </button>
+        </form>
       )}
 
       {view === 'recovery' && (

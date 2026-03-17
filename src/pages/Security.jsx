@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { startAuthentication } from '@simplewebauthn/browser';
+import { QRCodeSVG } from 'qrcode.react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth.jsx';
@@ -313,6 +314,183 @@ function RecoveryCodes() {
   );
 }
 
+// ── TOTP ──────────────────────────────────────────────────────────
+function TotpSection() {
+  const { t } = useTheme();
+  // 'idle' | 'setup' | 'confirm' | 'disabling'
+  const [stage,    setStage]    = useState('idle');
+  const [enabled,  setEnabled]  = useState(null); // null = loading
+  const [uri,      setUri]      = useState('');
+  const [secret,   setSecret]   = useState('');
+  const [code,     setCode]     = useState('');
+  const [busy,     setBusy]     = useState(false);
+  const [error,    setError]    = useState(null);
+
+  useEffect(() => {
+    fetch('/api/auth/totp/status', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setEnabled(!!(d?.enabled)))
+      .catch(() => setEnabled(false));
+  }, []);
+
+  async function startSetup() {
+    setBusy(true); setError(null);
+    try {
+      const res  = await fetch('/api/auth/totp/setup', { method: 'POST', credentials: 'include' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Setup failed');
+      setUri(data.uri);
+      setSecret(data.secret);
+      setStage('setup');
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+
+  async function confirmCode(e) {
+    e.preventDefault();
+    setBusy(true); setError(null);
+    try {
+      const res  = await fetch('/api/auth/totp/enable', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Verification failed');
+      setEnabled(true);
+      setStage('idle');
+      setCode('');
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+
+  async function disable() {
+    setError(null); setBusy(true);
+    try {
+      // Step-up
+      const optRes = await fetch('/api/auth/step-up/options', { method: 'POST', credentials: 'include' });
+      const { options, error: optErr } = await optRes.json();
+      if (!optRes.ok) throw new Error(optErr || 'Step-up failed');
+
+      const authResponse = await startAuthentication({ optionsJSON: options });
+
+      const verRes  = await fetch('/api/auth/step-up/verify', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authResponse }),
+      });
+      const verData = await verRes.json();
+      if (!verRes.ok) throw new Error(verData.error || 'Verification failed');
+
+      const disRes  = await fetch('/api/auth/totp/disable', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stepUpToken: verData.stepUpToken }),
+      });
+      const disData = await disRes.json();
+      if (!disRes.ok) throw new Error(disData.error || 'Failed to disable');
+      setEnabled(false);
+    } catch (e) {
+      if (e.name !== 'NotAllowedError') setError(e.message);
+    }
+    finally { setBusy(false); }
+  }
+
+  if (enabled === null) {
+    return <Row last><span style={{ fontFamily: F, fontSize: 14, color: t.text3 }}>Loading…</span></Row>;
+  }
+
+  if (stage === 'setup') {
+    return (
+      <>
+        <Row>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: F, fontSize: 14, color: t.text1, marginBottom: 6 }}>
+              Scan with your authenticator app
+            </div>
+            <div style={{ fontFamily: M, fontSize: 11, color: t.text3, marginBottom: 16 }}>
+              Google Authenticator, Authy, 1Password, etc.
+            </div>
+            <div style={{ display: 'inline-block', padding: 12, background: '#fff', borderRadius: 10 }}>
+              <QRCodeSVG value={uri} size={160} />
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <span style={{ fontFamily: M, fontSize: 10, color: t.text3 }}>Manual entry: </span>
+              <span style={{ fontFamily: M, fontSize: 11, color: t.text2, letterSpacing: '0.1em' }}>{secret}</span>
+            </div>
+          </div>
+        </Row>
+        <Row last>
+          <form onSubmit={confirmCode} style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
+            <div style={{ fontFamily: F, fontSize: 13, color: t.text2 }}>
+              Enter the 6-digit code from your app to confirm:
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                value={code}
+                onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                maxLength={6}
+                autoFocus
+                inputMode="numeric"
+                style={{
+                  width: 120, padding: '9px 14px', borderRadius: 8,
+                  fontFamily: M, fontSize: 18, letterSpacing: '0.2em',
+                  color: t.text1, background: t.surfaceAlt, border: `1px solid ${t.border}`,
+                  outline: 'none', textAlign: 'center',
+                }}
+              />
+              <button
+                type="submit"
+                disabled={code.length < 6 || busy}
+                style={{
+                  padding: '9px 20px', borderRadius: 8, cursor: 'pointer',
+                  fontFamily: F, fontSize: 13, fontWeight: 500,
+                  background: code.length === 6 && !busy ? t.accentDim : 'transparent',
+                  border: `1px solid ${code.length === 6 && !busy ? t.accentBorder : t.border}`,
+                  color: code.length === 6 && !busy ? t.accent : t.text3,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {busy ? 'Verifying…' : 'Confirm'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setStage('idle'); setError(null); setCode(''); }}
+                style={{ background: 'none', border: 'none', fontFamily: F, fontSize: 13, color: t.text3, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+            </div>
+            {error && <span style={{ fontFamily: M, fontSize: 11, color: '#ef4444' }}>{error}</span>}
+          </form>
+        </Row>
+      </>
+    );
+  }
+
+  return (
+    <Row last>
+      <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <span style={{ fontFamily: F, fontSize: 14, color: t.text1 }}>Authenticator app (TOTP)</span>
+          <Badge color={enabled ? '#22c55e' : '#6b7280'}>{enabled ? 'Enabled' : 'Not set up'}</Badge>
+        </div>
+        <span style={{ fontFamily: M, fontSize: 11, color: t.text3 }}>
+          {enabled
+            ? 'Use your authenticator app as a backup sign-in method'
+            : 'Add an authenticator app as a backup if your passkey is unavailable'}
+        </span>
+        {error && <div style={{ fontFamily: M, fontSize: 11, color: '#ef4444', marginTop: 6 }}>{error}</div>}
+      </div>
+      {enabled
+        ? <DangerBtn onClick={disable} loading={busy}>Remove</DangerBtn>
+        : <GhostBtn onClick={startSetup} loading={busy}>Set up</GhostBtn>
+      }
+    </Row>
+  );
+}
+
 // ── Security events ───────────────────────────────────────────────
 const EVENT_LABELS = {
   login:                    'Signed in',
@@ -327,6 +505,9 @@ const EVENT_LABELS = {
   account_recovery:         'Account recovered',
   account_frozen:           'Account frozen',
   recovery_codes_regenerated: 'Recovery codes regenerated',
+  totp_enabled:  'Authenticator app enabled',
+  totp_disabled: 'Authenticator app removed',
+  totp_signin:   'Signed in with authenticator app',
 };
 
 const EVENT_COLORS = {
@@ -596,6 +777,10 @@ export default function Settings() {
 
           <Section title="Recovery codes" subtitle="One-time codes for account recovery if you lose your passkey">
             <RecoveryCodes />
+          </Section>
+
+          <Section title="Two-factor authentication" subtitle="Backup sign-in method when your passkey is unavailable">
+            <TotpSection />
           </Section>
 
           <Section title="Recent activity" subtitle="Last 20 security events on your account">
