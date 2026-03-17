@@ -8,15 +8,31 @@ import { useAuth } from '../hooks/useAuth';
 const F = "'Outfit', sans-serif";
 const M = "'IBM Plex Mono', monospace";
 
-const BENEFITS = [
-  'Higher message rate limits',
-  'Access to additional AI models',
-  'Priority response processing',
-];
+const TIER_CONFIG = {
+  pro: {
+    label:    'Upgrade to Pro',
+    subtitle: 'Pro users get higher rate limits and access to additional AI models.',
+    benefits: [
+      'Higher message rate limits',
+      'Access to additional AI models',
+      'Priority response processing',
+    ],
+  },
+  student: {
+    label:    'Request Student Access',
+    subtitle: 'Student access unlocks mentor-mode AI, source-level code walkthroughs, and pro-tier rate limits.',
+    benefits: [
+      'Mentor-mode AI with source references',
+      'Pro-tier rate limits (30/hr, 200/day)',
+      'Deep code walkthroughs on request',
+    ],
+  },
+};
 
-export default function UpgradeModal({ onClose, onSuccess }) {
-  const { t }            = useTheme();
-  const { setUser }      = useAuth();
+export default function UpgradeModal({ onClose, onSuccess, tier = 'pro' }) {
+  const { t }        = useTheme();
+  const { setUser }  = useAuth();
+  const config       = TIER_CONFIG[tier] ?? TIER_CONFIG.pro;
   const [note,    setNote]    = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -36,7 +52,7 @@ export default function UpgradeModal({ onClose, onSuccess }) {
       const res = await fetch('/api/user/upgrade-request', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ note: note.trim() }),
+        body: JSON.stringify({ note: note.trim(), tier }),
       });
 
       if (res.status === 409) {
@@ -45,7 +61,7 @@ export default function UpgradeModal({ onClose, onSuccess }) {
         return;
       }
       if (res.status === 400) {
-        setError('You already have pro access.');
+        setError(`You already have ${tier} access.`);
         setLoading(false);
         return;
       }
@@ -130,19 +146,19 @@ export default function UpgradeModal({ onClose, onSuccess }) {
             {/* Header */}
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.2em', color: t.accentMuted, marginBottom: 8, textTransform: 'uppercase' }}>
-                tier upgrade
+                {tier} access
               </div>
               <h2 style={{ fontFamily: F, fontSize: 20, fontWeight: 700, color: t.text1, margin: '0 0 8px' }}>
-                Upgrade to Pro
+                {config.label}
               </h2>
               <p style={{ fontFamily: F, fontSize: 14, color: t.text2, margin: 0, lineHeight: 1.6 }}>
-                Pro users get higher rate limits and access to additional AI models.
+                {config.subtitle}
               </p>
             </div>
 
             {/* Benefits */}
             <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 22px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {BENEFITS.map(b => (
+              {config.benefits.map(b => (
                 <li key={b} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ color: t.accent, fontFamily: M, fontSize: 14 }}>✓</span>
                   <span style={{ fontFamily: F, fontSize: 14, color: t.text2 }}>{b}</span>
@@ -196,7 +212,7 @@ export default function UpgradeModal({ onClose, onSuccess }) {
                 transition: 'all 0.15s',
               }}
             >
-              {loading ? 'Submitting…' : 'Request Upgrade'}
+              {loading ? 'Submitting…' : config.label}
             </button>
           </>
         )}

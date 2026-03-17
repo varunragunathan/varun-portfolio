@@ -50,9 +50,10 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
-  const loading  = user === undefined;
-  const isPro    = user?.role === 'pro'   || user?.role === 'admin';
-  const isAdmin  = user?.role === 'admin';
+  const loading   = user === undefined;
+  const isPro     = user?.role === 'pro' || user?.role === 'student' || user?.role === 'admin';
+  const isStudent = user?.role === 'student';
+  const isAdmin   = user?.role === 'admin';
 
   return (
     <AuthContext.Provider value={{
@@ -61,6 +62,7 @@ export function AuthProvider({ children }) {
       logout,
       enabled: ENABLED,
       isPro,
+      isStudent,
       isAdmin,
     }}>
       {children}

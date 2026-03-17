@@ -117,6 +117,9 @@ CREATE TABLE IF NOT EXISTS allowed_models (
 CREATE INDEX IF NOT EXISTS idx_upgrade_requests_user_id ON upgrade_requests(user_id);
 CREATE INDEX IF NOT EXISTS idx_upgrade_requests_status  ON upgrade_requests(status);
 
+-- ── Student tier ───────────────────────────────────────────────────
+ALTER TABLE upgrade_requests ADD COLUMN tier TEXT NOT NULL DEFAULT 'pro';
+
 -- Seed default models
 INSERT OR IGNORE INTO allowed_models (id, model_id, label, tier, enabled, added_at) VALUES
   ('model-llama-70b', '@cf/meta/llama-3.3-70b-instruct-fp8-fast', 'Llama 3.3 70B Fast', 'pro', 1, 0),

@@ -45,19 +45,20 @@ export async function submitUpgradeRequest(request, env) {
   const db   = env.varun_portfolio_auth;
   const body = await request.json().catch(() => ({}));
   const note = body.note ?? null;
+  const tier = ['pro', 'student'].includes(body.tier) ? body.tier : 'pro';
 
-  // Check if user is already pro
+  // Check if user already has the requested tier or higher
   const role = await getUserRole(db, session.userId);
-  if (role === 'pro') {
-    return json({ error: 'Already pro' }, 400);
+  if (role === tier || role === 'admin') {
+    return json({ error: `Already ${tier}` }, 400);
   }
 
-  // Check for existing pending or approved request
+  // Check for existing pending or approved request for this tier
   const existing = await db
     .prepare(
-      "SELECT id, status FROM upgrade_requests WHERE user_id = ? AND status IN ('pending', 'approved') LIMIT 1"
+      "SELECT id, status FROM upgrade_requests WHERE user_id = ? AND tier = ? AND status IN ('pending', 'approved') LIMIT 1"
     )
-    .bind(session.userId)
+    .bind(session.userId, tier)
     .first();
 
   if (existing) {
@@ -69,9 +70,9 @@ export async function submitUpgradeRequest(request, env) {
 
   await db
     .prepare(
-      'INSERT INTO upgrade_requests (id, user_id, status, note, created_at) VALUES (?, ?, ?, ?, ?)'
+      'INSERT INTO upgrade_requests (id, user_id, status, note, tier, created_at) VALUES (?, ?, ?, ?, ?, ?)'
     )
-    .bind(id, session.userId, 'pending', note, now)
+    .bind(id, session.userId, 'pending', note, tier, now)
     .run();
 
   return json({ ok: true, id });

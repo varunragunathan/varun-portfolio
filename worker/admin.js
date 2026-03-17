@@ -96,11 +96,13 @@ export async function approveUpgrade(request, env, id) {
     .first();
   if (!existing) return json({ error: 'Not found' }, 404);
 
+  const grantRole = ['pro', 'student'].includes(existing.tier) ? existing.tier : 'pro';
+
   await db.batch([
     db.prepare(
       'UPDATE upgrade_requests SET status = ?, reviewed_at = ?, reviewed_by = ? WHERE id = ?'
     ).bind('approved', now, session.email, id),
-    db.prepare('UPDATE users SET role = ? WHERE id = ?').bind('pro', existing.user_id),
+    db.prepare('UPDATE users SET role = ? WHERE id = ?').bind(grantRole, existing.user_id),
   ]);
 
   return json({ ok: true });
@@ -218,6 +220,40 @@ export async function makeAdminUser(request, env, userId) {
   if (target.role === 'admin') return json({ ok: true });
 
   await db.prepare('UPDATE users SET role = ? WHERE id = ?').bind('admin', userId).run();
+  return json({ ok: true });
+}
+
+// ── Chat personas ─────────────────────────────────────────────────
+
+const PERSONA_ROLES = ['user', 'pro', 'student', 'admin'];
+
+// GET /api/admin/personas
+export async function getPersonas(request, env) {
+  const session = await getSession(env.AUTH_KV, request);
+  const guard = await requireAdmin(session, env);
+  if (guard) return guard;
+
+  const entries = await Promise.all(
+    PERSONA_ROLES.map(async role => [role, await env.AUTH_KV.get(`persona:${role}`)])
+  );
+  return json(Object.fromEntries(entries));
+}
+
+// PUT /api/admin/personas
+// Body: { user?: string, pro?: string, student?: string, admin?: string }
+export async function updatePersonas(request, env) {
+  const session = await getSession(env.AUTH_KV, request);
+  const guard = await requireAdmin(session, env);
+  if (guard) return guard;
+
+  const body = await request.json().catch(() => ({}));
+
+  await Promise.all(
+    PERSONA_ROLES
+      .filter(role => typeof body[role] === 'string' && body[role].trim())
+      .map(role => env.AUTH_KV.put(`persona:${role}`, body[role].trim()))
+  );
+
   return json({ ok: true });
 }
 

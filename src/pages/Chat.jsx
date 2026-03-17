@@ -208,6 +208,7 @@ function ChatArea({ t, onNewConversation }) {
   const [selectedModel,  setSelectedModel]  = useState(null);
   const [models,         setModels]         = useState([]);
   const [showUpgrade,    setShowUpgrade]    = useState(false);
+  const [upgradeTier,    setUpgradeTier]    = useState('pro');
   const bottomRef     = useRef(null);
   const prevConvIdRef = useRef(null);
   const firstMsgRef   = useRef('');
@@ -321,12 +322,12 @@ function ChatArea({ t, onNewConversation }) {
                     background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.3)',
                     color: '#f5a623',
                   }}>
-                    <span>⏳</span> Pro request under review
+                    <span>⏳</span> Request under review
                   </div>
                 ) : upgradeStatus !== 'approved' && (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                     <button
-                      onClick={() => setShowUpgrade(true)}
+                      onClick={() => { setUpgradeTier('pro'); setShowUpgrade(true); }}
                       style={{
                         fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
                         padding: '6px 16px', borderRadius: 20, cursor: 'pointer',
@@ -339,6 +340,18 @@ function ChatArea({ t, onNewConversation }) {
                     <span style={{ fontFamily: F, fontSize: 12, color: t.text3 }}>
                       More models · higher rate limits
                     </span>
+                    <button
+                      onClick={() => { setUpgradeTier('student'); setShowUpgrade(true); }}
+                      style={{
+                        fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
+                        padding: '4px 14px', borderRadius: 20, cursor: 'pointer',
+                        background: 'transparent',
+                        border: '1px solid rgba(52,199,89,0.3)',
+                        color: '#34c759',
+                      }}
+                    >
+                      Student access
+                    </button>
                   </div>
                 )}
               </div>
@@ -419,7 +432,7 @@ function ChatArea({ t, onNewConversation }) {
       </div>
 
       {showUpgrade && (
-        <UpgradeModal onClose={() => setShowUpgrade(false)} onSuccess={() => setShowUpgrade(false)} />
+        <UpgradeModal tier={upgradeTier} onClose={() => setShowUpgrade(false)} onSuccess={() => setShowUpgrade(false)} />
       )}
     </div>
   );

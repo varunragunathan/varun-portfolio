@@ -13,6 +13,8 @@ import {
   addAdminModel,
   toggleAdminModel,
   makeAdminUser,
+  getPersonas,
+  updatePersonas,
 } from './admin.js';
 import { submitUpgradeRequest, getUpgradeRequest } from './userTier.js';
 export { NumMatchDO } from './numMatchDO.js';
@@ -121,6 +123,10 @@ export default {
           response = await listAdminModels(request, env);
         } else if (path === '/api/admin/models' && method === 'POST') {
           response = await addAdminModel(request, env);
+        } else if (path === '/api/admin/personas' && method === 'GET') {
+          response = await getPersonas(request, env);
+        } else if (path === '/api/admin/personas' && method === 'PUT') {
+          response = await updatePersonas(request, env);
         } else {
           response = new Response(JSON.stringify({ error: 'Not found' }), {
             status: 404,

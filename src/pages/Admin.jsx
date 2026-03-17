@@ -32,9 +32,10 @@ function StatusBadge({ status, t }) {
 
 function RoleBadge({ role, t }) {
   const map = {
-    admin: { bg: 'rgba(245,166,35,0.15)', color: '#f5a623', border: 'rgba(245,166,35,0.35)' },
-    pro:   { bg: t.accentDim,             color: t.accent,  border: t.accentBorder          },
-    user:  { bg: t.surfaceAlt,            color: t.text3,   border: t.border                },
+    admin:   { bg: 'rgba(245,166,35,0.15)',  color: '#f5a623', border: 'rgba(245,166,35,0.35)'  },
+    pro:     { bg: t.accentDim,              color: t.accent,  border: t.accentBorder            },
+    student: { bg: 'rgba(52,199,89,0.10)',   color: '#34c759', border: 'rgba(52,199,89,0.35)'   },
+    user:    { bg: t.surfaceAlt,             color: t.text3,   border: t.border                  },
   };
   const s = map[role] || map.user;
   return (
@@ -44,6 +45,21 @@ function RoleBadge({ role, t }) {
       background: s.bg, color: s.color, border: `1px solid ${s.border}`,
     }}>
       {role}
+    </span>
+  );
+}
+
+function TierBadge({ tier, t }) {
+  const isStudent = tier === 'student';
+  return (
+    <span style={{
+      fontFamily: M, fontSize: 10, letterSpacing: '0.08em',
+      padding: '2px 8px', borderRadius: 4,
+      background: isStudent ? 'rgba(52,199,89,0.10)' : t.accentDim,
+      color:      isStudent ? '#34c759'               : t.accent,
+      border:     isStudent ? '1px solid rgba(52,199,89,0.35)' : `1px solid ${t.accentBorder}`,
+    }}>
+      {tier ?? 'pro'}
     </span>
   );
 }
@@ -132,6 +148,7 @@ function UpgradeRequestsTab({ t }) {
                   {req.created_at ? new Date(req.created_at).toLocaleDateString() : ''}
                 </div>
               </div>
+              <TierBadge tier={req.tier} t={t} />
               <StatusBadge status={req.status} t={t} />
               {req.status === 'pending' && (
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -518,6 +535,114 @@ function ModelsTab({ t }) {
   );
 }
 
+// ── Tab: Personas ─────────────────────────────────────────────────
+const PERSONA_LABELS = { user: 'Regular', pro: 'Pro', student: 'Student', admin: 'Admin' };
+const PERSONA_ROLES  = ['user', 'pro', 'student', 'admin'];
+
+function PersonasTab({ t }) {
+  const [personas, setPersonas] = useState({ user: '', pro: '', student: '', admin: '' });
+  const [loading,  setLoading]  = useState(true);
+  const [saving,   setSaving]   = useState(false);
+  const [saved,    setSaved]    = useState(false);
+  const [error,    setError]    = useState(null);
+
+  useEffect(() => {
+    fetch('/api/admin/personas', { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => { setPersonas(p => ({ ...p, ...data })); setLoading(false); })
+      .catch(err => { setError(err.message); setLoading(false); });
+  }, []);
+
+  const save = useCallback(async () => {
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const res = await fetch('/api/admin/personas', {
+        method: 'PUT', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(personas),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error ?? 'Save failed');
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }, [personas]);
+
+  if (loading) return <TabSpinner t={t} />;
+
+  return (
+    <div>
+      <div style={{ fontFamily: F, fontSize: 13, color: t.text3, marginBottom: 24, lineHeight: 1.6 }}>
+        Each persona is the system prompt for that tier. Edits take effect immediately — no deploy needed.
+        Leave a field blank to use the hardcoded default.
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+        {PERSONA_ROLES.map(role => (
+          <div key={role}>
+            <label style={{
+              fontFamily: M, fontSize: 11, letterSpacing: '0.1em',
+              color: t.text3, textTransform: 'uppercase', display: 'block', marginBottom: 8,
+            }}>
+              {PERSONA_LABELS[role]}
+            </label>
+            <textarea
+              value={personas[role] ?? ''}
+              onChange={e => setPersonas(p => ({ ...p, [role]: e.target.value }))}
+              rows={12}
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                fontFamily: M, fontSize: 11, lineHeight: 1.7,
+                color: t.text1, background: t.surfaceAlt,
+                border: `1px solid ${t.border}`, borderRadius: 8,
+                padding: '12px 14px', outline: 'none', resize: 'vertical',
+              }}
+            />
+          </div>
+        ))}
+      </div>
+
+      {error && (
+        <div style={{
+          fontFamily: M, fontSize: 11, color: '#ff3b30', marginTop: 16,
+          padding: '8px 12px', borderRadius: 6,
+          background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.25)',
+        }}>
+          {error}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 20 }}>
+        <button
+          onClick={save}
+          disabled={saving}
+          style={{
+            fontFamily: M, fontSize: 12, letterSpacing: '0.06em',
+            padding: '10px 28px', borderRadius: 8, cursor: saving ? 'default' : 'pointer',
+            background: saving ? 'transparent' : t.accentDim,
+            border: `1px solid ${saving ? t.border : t.accentBorder}`,
+            color: saving ? t.text3 : t.accent,
+            transition: 'all 0.15s',
+          }}
+        >
+          {saving ? 'saving…' : 'save all'}
+        </button>
+        {saved && (
+          <span style={{ fontFamily: M, fontSize: 11, color: '#34c759' }}>saved ✓</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Shared tab loading/error states ──────────────────────────────
 function TabSpinner({ t }) {
   return (
@@ -535,7 +660,7 @@ function TabError({ msg, t }) {
 }
 
 // ── Admin page ────────────────────────────────────────────────────
-const TABS = ['Upgrade Requests', 'Users', 'Models'];
+const TABS = ['Upgrade Requests', 'Users', 'Models', 'Personas'];
 
 export default function Admin() {
   const { t }       = useTheme();
@@ -616,6 +741,7 @@ export default function Admin() {
         {tab === 0 && <UpgradeRequestsTab t={t} />}
         {tab === 1 && <UsersTab t={t} />}
         {tab === 2 && <ModelsTab t={t} />}
+        {tab === 3 && <PersonasTab t={t} />}
       </div>
     </div>
   );

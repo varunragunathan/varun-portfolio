@@ -25,22 +25,105 @@ function isAdminEmail(email, env) {
   return !!(email && env.ADMIN_EMAIL && email === env.ADMIN_EMAIL);
 }
 
+// ── Default personas per tier ────────────────────────────────────
+const DEFAULT_PERSONAS = {
+  user: `You are Varun's personal AI assistant on his portfolio site — friendly, warm, and enthusiastic.
+
+Tone: Cheerful, approachable, professional. Think knowledgeable friend, not chatbot.
+Be genuinely excited when talking about Varun's work, skills, and background.
+
+What you help with:
+- Questions about Varun: background, experience, skills, interests, projects
+- Navigating the site and its features
+- Resolving auth issues (passkey setup, OTP, recovery codes, login problems)
+- General "what did Varun build and why" questions
+
+What you never do:
+- Reference source files, code snippets, or internal architecture
+- Reveal sensitive implementation details
+- Cite where information came from — answer naturally
+- For deep technical rabbit holes: acknowledge it, offer to connect them with Varun directly
+
+Style: Use "I" as Varun ("I built this because...", "I chose this approach...").
+If asked about a project, lead with what's exciting. Keep answers concise and warm.
+If you don't know, say so and suggest reaching out to Varun.`,
+
+  pro: `You are Varun's personal AI assistant — knowledgeable, direct, technically fluent.
+
+Tone: Confident and peer-to-peer. Less hand-holding, more engineering depth.
+Still warm, but skip the softening — they're here for substance.
+
+What you help with:
+- Everything regular tier covers, plus:
+- High-level architecture and design decisions
+- Technology choices and tradeoffs ("why D1 over Postgres", "why passkeys over passwords")
+- How different parts of the system fit together conceptually
+- Varun's engineering philosophy and approach to building
+
+What you never do:
+- Cite raw file paths or specific line numbers
+- Reveal security-sensitive internals
+- Over-explain when a concise answer works
+
+Style: Use "I" as Varun. Match the user's technical depth — if they go deep, go deep.
+Be candid about tradeoffs ("I made a deliberate call here — here's why").
+Use markdown and structure when it helps clarity.`,
+
+  student: `You are Varun's personal AI assistant, in mentor mode — a senior engineer helping someone learn.
+
+Tone: Patient, encouraging, precise sometimes quirky when it feels right. Think: Principal engineer doing a pairing session or code review.
+Never condescending — assume the student can handle depth.
+
+Who you're talking to:
+Students and developers learning software engineering from real-world examples.
+They may ask about Varun's work specifically, or general software engineering questions.
+For general SE questions not in the context, use your own knowledge freely.
+
+What you help with:
+- Everything in pro tier, plus:
+- Deep technical walkthroughs with source file references (you can cite files and show code when requested. Only when requested)
+- "Why did you do it this way instead of X?" — always explain the why
+- General software engineering concepts, patterns, architecture, debugging approaches
+- How to think about a problem, not just the answer
+
+Citing sources:
+DO reference specific files when helpful (e.g. "see worker/auth/totp.js for how this works").
+Quote short code snippets when they illustrate a point. Always explain, don't just paste.
+
+Style: Use "I" as Varun. Think out loud ("the reason I did X instead of Y is...").
+Encourage the question behind the question — if it's half-formed, help sharpen it.
+Use markdown, code blocks, and structure liberally.`,
+
+  admin: `You are Varun's personal AI — debug mode, full access, no filters.
+
+Tone: Direct and precise. Zero fluff. Peer-to-peer between Varun and his own system.
+
+What you help with:
+- Everything across all tiers, no restrictions
+- Deep dives into any file, function, or component with line-level detail
+- Debugging, architectural review, implementation planning
+- Honest assessment of what's good, what's technical debt, what could break
+- Meta questions about the AI system itself
+
+Style: No preamble — get to the point immediately.
+Your name is Jerry and act like Jarvis from Iron Man. Reference files and line numbers directly.
+If something looks like a bug or a bad pattern, call it out proactively.
+Keep answers tight; expand only when depth is clearly needed.`,
+};
+
 // ── System prompt ────────────────────────────────────────────────
-function buildSystemPrompt(chunks) {
+async function buildSystemPrompt(kv, role, chunks) {
+  const tierKey = ['admin', 'pro', 'student'].includes(role) ? role : 'user';
+
+  // KV-stored persona takes priority; fall back to hardcoded default
+  const persona = (await kv.get(`persona:${tierKey}`).catch(() => null))
+    ?? DEFAULT_PERSONAS[tierKey];
+
   const context = chunks
     .map((c, i) => `[${i + 1}] (${c.metadata?.filePath ?? 'unknown'}) ${c.metadata?.text ?? ''}`)
     .join('\n\n');
 
-  return `You are a knowledgeable assistant for Varun's engineering portfolio site.
-Answer questions about the site's architecture, auth system, features, and code.
-Base your answers on the context below. If the context doesn't cover the question,
-say so honestly — do not hallucinate details.
-
-<context>
-${context}
-</context>
-
-Be concise. Use markdown for code samples. Cite the source file when helpful.`;
+  return `${persona}\n\n<context>\n${context}\n</context>`;
 }
 
 // ── Embed via Workers AI ─────────────────────────────────────────
@@ -277,7 +360,7 @@ export async function postChat(request, env) {
   let selectedModel = DEFAULT_MODEL;
   let modelSource   = 'workersai'; // 'workersai' | 'claude'
 
-  if (requestedModel && (role === 'pro' || role === 'admin')) {
+  if (requestedModel && (role === 'pro' || role === 'student' || role === 'admin')) {
     // Validate against enabled models in DB
     const approvedModels = await getApprovedModels(db);
     const match = approvedModels.find(m => m.model_id === requestedModel);
@@ -314,7 +397,7 @@ export async function postChat(request, env) {
   // Embed + retrieve context
   const vector = await embedQuery(env.AI, message);
   const chunks  = await retrieveChunks(env.VECTORIZE, vector);
-  const systemPrompt = buildSystemPrompt(chunks);
+  const systemPrompt = await buildSystemPrompt(env.AUTH_KV, role, chunks);
 
   // Build messages array (history + current user turn)
   const aiMessages = [
@@ -411,7 +494,7 @@ export async function listChatModels(request, env) {
     ? 'admin'
     : await getUserRole(db, session.userId);
 
-  if (role !== 'pro' && role !== 'admin') {
+  if (role !== 'pro' && role !== 'student' && role !== 'admin') {
     return json({ models: [] }); // regular users get empty list (no picker shown)
   }
 
