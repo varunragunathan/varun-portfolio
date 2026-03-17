@@ -9,6 +9,7 @@ import VersionBadge from './components/VersionBadge.jsx';
 import { useNumMatchApproval } from './hooks/useNumMatchApproval.jsx';
 import NumMatchApprovalModal from './components/NumMatchApprovalModal.jsx';
 import { FeedbackForm, FeedbackModal, useShake } from './components/FeedbackWidget.jsx';
+import UpdatePrompt from './components/UpdatePrompt.jsx';
 
 // ── Error boundary ────────────────────────────────────────────────
 class ErrorBoundary extends Component {
@@ -170,6 +171,7 @@ function Shell() {
       {user && <ChatWidget />}
       {approval && <NumMatchApprovalModal approval={approval} onRespond={respond} />}
       {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
+      <UpdatePrompt />
     </div>
   );
 }
