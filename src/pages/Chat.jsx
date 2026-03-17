@@ -106,7 +106,7 @@ function OwlWaiting({ t }) {
 }
 
 // ── Message bubble ────────────────────────────────────────────────
-function MessageBubble({ message, t, isStreaming }) {
+function MessageBubble({ message, t, isStreaming, showAvatar }) {
   const isUser = message.role === 'user';
   return (
     <div style={{
@@ -115,8 +115,8 @@ function MessageBubble({ message, t, isStreaming }) {
       marginBottom:   16,
     }}>
       {!isUser && (
-        <div style={{ flexShrink: 0, marginRight: 10, marginTop: 2 }}>
-          <PixelOwl size={2} state={isStreaming ? 'streaming' : 'idle'} />
+        <div style={{ flexShrink: 0, marginRight: 10, marginTop: 2, width: 16 }}>
+          {showAvatar && <PixelOwl size={2} state={isStreaming ? 'streaming' : 'idle'} />}
         </div>
       )}
       <div style={{
@@ -480,12 +480,13 @@ function ChatArea({ t, onNewConversation, onOpenSidebar, isMobile, initialConver
           </div>
         )}
         {messages.map((m, i) => {
-          const isLast     = i === messages.length - 1;
-          const isWaiting  = streaming && isLast && m.role === 'assistant' && !m.content;
-          const isStreaming = streaming && isLast && m.role === 'assistant' && !!m.content;
+          const isLast      = i === messages.length - 1;
+          const isWaiting   = streaming && isLast && m.role === 'assistant' && !m.content;
+          const isStreaming  = streaming && isLast && m.role === 'assistant' && !!m.content;
+          const showAvatar  = m.role === 'assistant' && messages[i - 1]?.role !== 'assistant';
           return isWaiting
             ? <OwlWaiting key={m.id} t={t} />
-            : <MessageBubble key={m.id} message={m} t={t} isStreaming={isStreaming} />;
+            : <MessageBubble key={m.id} message={m} t={t} isStreaming={isStreaming} showAvatar={showAvatar} />;
         })}
         {error && (
           <div style={{
