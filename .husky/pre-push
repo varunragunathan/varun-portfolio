@@ -1,4 +1,6 @@
 #!/bin/sh
+# Ensure nvm-managed node/yarn are on PATH (needed when run from GUI git clients)
+export PATH="$HOME/.nvm/versions/node/v24.14.0/bin:$PATH"
 echo "▶ Running smoke tests before push…"
 yarn test
 if [ $? -ne 0 ]; then
