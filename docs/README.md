@@ -37,6 +37,7 @@ The documentation is written for a competent developer who may not yet know WebA
 | [19](./chapters/19-whatsapp-auth.md) | WhatsApp Backup Auth | Twilio integration, OTP flow, phone registration, sign-in path |
 | [20](./chapters/20-endpoint-metrics.md) | Endpoint Metrics | Async request logging, path normalization, time-series queries, SVG trend chart |
 | [21](./chapters/21-bugs-fixed.md) | Bugs Fixed | Production bugs discovered, root cause analysis, and fixes |
+| [22](./chapters/22-database-migrations.md) | Database Migrations | Migration file conventions, history, how to apply to prod, how to write new migrations |
 
 ### Glossary
 

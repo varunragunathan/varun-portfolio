@@ -99,7 +99,7 @@ npx wrangler d1 execute varun-portfolio-auth --remote --file=worker/schema.sql
 npx wrangler d1 execute varun-portfolio-auth --local --file=worker/schema.sql
 ```
 
-The schema file is `worker/schema.sql`. It uses `CREATE TABLE IF NOT EXISTS` throughout, so re-running it is safe.
+The schema file is `worker/schema.sql`. It uses `CREATE TABLE IF NOT EXISTS` throughout, so re-running it is safe **on a fresh database only**. To apply schema changes to an existing production database, use the migration files in `worker/migrations/`. See [Chapter 22 — Database Migrations](./22-database-migrations.md) for the full migration history and instructions.
 
 ---
 
