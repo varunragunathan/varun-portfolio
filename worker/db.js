@@ -182,6 +182,8 @@ export async function deleteAllSessionsByUserId(db, kv, userId) {
     .all();
   await Promise.all(results.map(s => kv.delete(`session:${s.token_hash}`)));
   await db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId).run();
+  // Also wipe device trust — full account recovery means re-establishing trust from scratch.
+  await db.prepare('DELETE FROM trusted_devices WHERE user_id = ?').bind(userId).run();
 }
 
 export async function deleteUser(db, userId) {
@@ -190,7 +192,41 @@ export async function deleteUser(db, userId) {
   await db.prepare('DELETE FROM security_events WHERE user_id = ?').bind(userId).run();
   await db.prepare('DELETE FROM passkey_creds WHERE user_id = ?').bind(userId).run();
   await db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId).run();
+  await db.prepare('DELETE FROM trusted_devices WHERE user_id = ?').bind(userId).run();
   await db.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
+}
+
+// ── Trusted devices ────────────────────────────────────────────────
+
+export async function createTrustedDevice(db, { id, userId, tokenHash, deviceName, userAgent, fingerprint }) {
+  await db
+    .prepare('INSERT INTO trusted_devices (id, user_id, token_hash, device_name, user_agent, fingerprint, created_at, last_used_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, userId, tokenHash, deviceName || null, userAgent || null, fingerprint || null, Date.now(), Date.now())
+    .run();
+}
+
+export async function getTrustedDeviceByHash(db, tokenHash) {
+  return db.prepare('SELECT * FROM trusted_devices WHERE token_hash = ?').bind(tokenHash).first();
+}
+
+export async function updateTrustedDeviceLastUsed(db, id) {
+  await db.prepare('UPDATE trusted_devices SET last_used_at = ? WHERE id = ?').bind(Date.now(), id).run();
+}
+
+export async function listTrustedDevicesByUserId(db, userId) {
+  const { results } = await db
+    .prepare('SELECT id, device_name, user_agent, created_at, last_used_at FROM trusted_devices WHERE user_id = ? ORDER BY last_used_at DESC')
+    .bind(userId)
+    .all();
+  return results;
+}
+
+export async function deleteTrustedDevice(db, id, userId) {
+  await db.prepare('DELETE FROM trusted_devices WHERE id = ? AND user_id = ?').bind(id, userId).run();
+}
+
+export async function deleteTrustedDevicesByUserId(db, userId) {
+  await db.prepare('DELETE FROM trusted_devices WHERE user_id = ?').bind(userId).run();
 }
 
 export async function deleteAllSessionsByUserIdExcept(db, userId, exceptSessionId) {

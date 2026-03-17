@@ -18,6 +18,8 @@ import {
   deleteUser,
   updateUserNickname,
   getUserById,
+  listTrustedDevicesByUserId,
+  deleteTrustedDevice,
 } from '../db.js';
 import { sha256Hex as sha256 } from '../utils.js';
 
@@ -229,6 +231,28 @@ export async function updateNickname(request, env) {
 
   await updateUserNickname(env.varun_portfolio_auth, session.userId, nickname);
   return json({ ok: true, nickname });
+}
+
+// GET /api/auth/trusted-devices
+export async function listTrustedDevicesHandler(request, env) {
+  const { session, error } = await requireSession(request, env);
+  if (error) return error;
+  const devices = await listTrustedDevicesByUserId(env.varun_portfolio_auth, session.userId);
+  return json(devices.map(d => ({
+    id: d.id,
+    deviceName: d.device_name,
+    userAgent: d.user_agent,
+    createdAt: d.created_at,
+    lastUsedAt: d.last_used_at,
+  })));
+}
+
+// DELETE /api/auth/trusted-devices/:id
+export async function revokeTrustedDeviceHandler(request, env, deviceId) {
+  const { session, error } = await requireSession(request, env);
+  if (error) return error;
+  await deleteTrustedDevice(env.varun_portfolio_auth, deviceId, session.userId);
+  return json({ ok: true });
 }
 
 // DELETE /api/auth/account  { stepUpToken, email }

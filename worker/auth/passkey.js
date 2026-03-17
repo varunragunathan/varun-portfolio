@@ -13,10 +13,11 @@ import {
   generateAndStoreRecoveryCodes,
   isUserFrozen,
   logSecurityEvent,
+  getTrustedDeviceByHash, updateTrustedDeviceLastUsed,
 } from '../db.js';
 import { createPendingSession } from './session.js';
 import { generateDisplayCode } from './crypto.js';
-import { getClientIP } from '../utils.js';
+import { getClientIP, sha256Hex } from '../utils.js';
 
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
@@ -256,6 +257,21 @@ export async function verifyAuth(request, env) {
   const user = await getUserById(db, userId);
   const ua = request.headers.get('User-Agent') || '';
   const ip = getClientIP(request);
+
+  // ── Persistent device trust ────────────────────────────────────
+  // If a valid device_trust cookie is present and matches this user + UA,
+  // skip number matching entirely and auto-finalise as trusted.
+  const cookieHeader = request.headers.get('Cookie') || '';
+  const trustTokenMatch = cookieHeader.match(/(?:^|;\s*)device_trust=([^;]+)/);
+  if (trustTokenMatch) {
+    const trustHash = await sha256Hex(trustTokenMatch[1]);
+    const trustRecord = await getTrustedDeviceByHash(db, trustHash);
+    if (trustRecord && trustRecord.user_id === userId && trustRecord.user_agent === ua) {
+      await updateTrustedDeviceLastUsed(db, trustRecord.id);
+      const pendingToken = await createPendingSession(env.AUTH_KV, { userId, email: user.email, method: 'passkey' });
+      return json({ ok: true, pendingToken, preTrusted: true, trustedDeviceName: trustRecord.device_name });
+    }
+  }
 
   // ── Number matching: detect new device ───────────────────────────
   const knownDevice = await isKnownDevice(db, userId, ua);

@@ -12,6 +12,7 @@ import {
   recoveryCodesStatus, regenerateRecoveryCodes,
   deleteAccount,
   updateNickname,
+  listTrustedDevicesHandler, revokeTrustedDeviceHandler,
 } from './account.js';
 import {
   getWhatsAppStatus, sendVerifyOTP, confirmPhone, removePhone,
@@ -86,6 +87,11 @@ export async function handleAuth(request, env, url) {
   // ── Step-up authentication ──────────────────────────────────────
   if (method === 'POST' && path === '/step-up/options')             return stepUpOptions(request, env);
   if (method === 'POST' && path === '/step-up/verify')              return stepUpVerify(request, env);
+
+  // ── Trusted devices ─────────────────────────────────────────────
+  if (method === 'GET' && path === '/trusted-devices')              return listTrustedDevicesHandler(request, env);
+  const trustedDeviceMatch = path.match(/^\/trusted-devices\/([^/]+)$/);
+  if (trustedDeviceMatch && method === 'DELETE')                    return revokeTrustedDeviceHandler(request, env, trustedDeviceMatch[1]);
 
   // ── Account deletion ────────────────────────────────────────────
   if (method === 'DELETE' && path === '/account')                   return deleteAccount(request, env);

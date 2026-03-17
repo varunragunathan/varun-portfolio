@@ -7,7 +7,7 @@
 // the user has explicitly chosen their trust level and device name.
 
 import { sha256Hex, inferDeviceName, getClientIP, maskEmail } from '../utils.js';
-import { createSessionRecord, updateSessionLastActive, getSessionByTokenHash, logSecurityEvent, getUserById, updateUserNickname } from '../db.js';
+import { createSessionRecord, updateSessionLastActive, getSessionByTokenHash, logSecurityEvent, getUserById, updateUserNickname, createTrustedDevice } from '../db.js';
 
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
@@ -18,6 +18,10 @@ function json(data, status = 200, headers = {}) {
 
 export function sessionCookie(token, maxAge = 86400) {
   return `session=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${maxAge}`;
+}
+
+export function deviceTrustCookie(token) {
+  return `device_trust=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${365 * 86400}`;
 }
 
 function getTokenFromRequest(request) {
@@ -46,7 +50,7 @@ export async function createPendingSession(kv, { userId, email, recoveryCodes, m
 
 export async function finaliseSession(request, env) {
   const body = await request.json().catch(() => ({}));
-  const { token, trusted, deviceName } = body;
+  const { token, trusted, deviceName, preTrusted, fingerprint } = body;
   if (!token) return json({ error: 'Missing token' }, 400);
 
   const raw = await env.AUTH_KV.get(`session_pending:${token}`);
@@ -78,9 +82,29 @@ export async function finaliseSession(request, env) {
     metadata: method ? { method } : undefined,
   });
 
-  return json({ ok: true, user: { email } }, 200, {
-    'Set-Cookie': sessionCookie(token, TTL),
-  });
+  // ── Device trust ──────────────────────────────────────────────────
+  // Create a persistent device trust record so future sign-ins from this
+  // browser/device skip the number matching prompt automatically.
+  // preTrusted=true means the device was already trusted — existing record
+  // was already updated in verifyAuth, so no new record is needed.
+  const responseHeaders = new Headers({ 'Content-Type': 'application/json' });
+  responseHeaders.append('Set-Cookie', sessionCookie(token, TTL));
+
+  if (isTrusted && !preTrusted) {
+    const trustToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+    const trustHash = await sha256Hex(trustToken);
+    await createTrustedDevice(env.varun_portfolio_auth, {
+      id: crypto.randomUUID(),
+      userId,
+      tokenHash: trustHash,
+      deviceName: name,
+      userAgent: ua,
+      fingerprint: fingerprint || null,
+    });
+    responseHeaders.append('Set-Cookie', deviceTrustCookie(trustToken));
+  }
+
+  return new Response(JSON.stringify({ ok: true, user: { email } }), { status: 200, headers: responseHeaders });
 }
 
 // ── Active session helpers ────────────────────────────────────────

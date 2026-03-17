@@ -349,11 +349,11 @@ function NumberMatchScreen({ code, tempToken, onApproved, onDenied }) {
 }
 
 // ── Finalise session helper ───────────────────────────────────────
-async function finaliseSession(pendingToken, trusted, deviceName) {
+async function finaliseSession(pendingToken, trusted, deviceName, preTrusted = false) {
   const res = await fetch('/api/auth/sessions/finalise', {
     method: 'POST', credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: pendingToken, trusted, deviceName }),
+    body: JSON.stringify({ token: pendingToken, trusted, deviceName, preTrusted }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -598,6 +598,10 @@ function SignInFlow({ onSuccess }) {
       if (data.pendingNumberMatch) {
         setNumMatchCode(data.code);
         setNumMatchTemp(data.tempToken);
+      } else if (data.preTrusted) {
+        // Device already trusted — skip the modal and auto-finalise
+        await finaliseSession(data.pendingToken, true, data.trustedDeviceName, true);
+        onSuccess();
       } else {
         setPendingToken(data.pendingToken);
         setShowTrust(true);

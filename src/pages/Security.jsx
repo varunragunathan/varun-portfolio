@@ -492,6 +492,51 @@ function TotpSection() {
   );
 }
 
+// ── Trusted devices ───────────────────────────────────────────────
+function TrustedDevices() {
+  const { t } = useTheme();
+  const [devices, setDevices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [revoking, setRevoking] = useState(null);
+
+  async function load() {
+    const res = await fetch('/api/auth/trusted-devices', { credentials: 'include' });
+    if (res.ok) setDevices(await res.json());
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function revoke(id) {
+    setRevoking(id);
+    await fetch(`/api/auth/trusted-devices/${id}`, { method: 'DELETE', credentials: 'include' });
+    await load();
+    setRevoking(null);
+  }
+
+  if (loading) return <Row last><span style={{ fontFamily: F, fontSize: 14, color: t.text3 }}>Loading…</span></Row>;
+  if (!devices.length) return <Row last><span style={{ fontFamily: F, fontSize: 14, color: t.text3 }}>No trusted devices.</span></Row>;
+
+  return (
+    <>
+      {devices.map((d, i) => (
+        <Row key={d.id} last={i === devices.length - 1}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: F, fontSize: 14, color: t.text1 }}>{d.deviceName || 'Unknown device'}</span>
+              <Badge color="#22c55e">Trusted</Badge>
+            </div>
+            <span style={{ fontFamily: M, fontSize: 11, color: t.text3 }}>
+              Last used {formatRelative(d.lastUsedAt)} · Added {formatDate(d.createdAt)}
+            </span>
+          </div>
+          <DangerBtn onClick={() => revoke(d.id)} loading={revoking === d.id}>Remove trust</DangerBtn>
+        </Row>
+      ))}
+    </>
+  );
+}
+
 // ── Security events ───────────────────────────────────────────────
 const METHOD_LABELS = {
   'passkey':              'Passkey',
@@ -1034,6 +1079,10 @@ export default function Settings() {
 
           <Section title="WhatsApp backup" subtitle="Receive a one-time code via WhatsApp when your passkey is unavailable">
             <WhatsAppSection />
+          </Section>
+
+          <Section title="Trusted devices" subtitle="Browsers that skip the sign-in verification prompt">
+            <TrustedDevices />
           </Section>
 
           <Section title="Recent activity" subtitle="Last 20 security events on your account">

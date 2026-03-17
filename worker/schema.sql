@@ -136,6 +136,24 @@ CREATE TABLE IF NOT EXISTS endpoint_logs (
 CREATE INDEX IF NOT EXISTS idx_endpoint_logs_created_at ON endpoint_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_endpoint_logs_path       ON endpoint_logs(path, method);
 
+-- ── Trusted devices ──────────────────────────────────────────────
+-- Persistent device trust: set when user chooses "Trust this device".
+-- A valid trust record lets the user skip the trust prompt on subsequent
+-- sign-ins from the same browser/device.
+CREATE TABLE IF NOT EXISTS trusted_devices (
+  id           TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL REFERENCES users(id),
+  token_hash   TEXT UNIQUE NOT NULL,
+  device_name  TEXT,
+  user_agent   TEXT,
+  fingerprint  TEXT,
+  created_at   INTEGER NOT NULL,
+  last_used_at INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_trusted_devices_user_id    ON trusted_devices(user_id);
+CREATE INDEX IF NOT EXISTS idx_trusted_devices_token_hash ON trusted_devices(token_hash);
+
 -- Seed default models
 INSERT OR IGNORE INTO allowed_models (id, model_id, label, tier, enabled, added_at) VALUES
   ('model-llama-70b', '@cf/meta/llama-3.3-70b-instruct-fp8-fast', 'Llama 3.3 70B Fast', 'pro', 1, 0),
