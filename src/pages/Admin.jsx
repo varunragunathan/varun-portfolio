@@ -1032,8 +1032,353 @@ function TabError({ msg, t }) {
   );
 }
 
+// ── Shared chart helpers ──────────────────────────────────────────
+
+function fmt(n) {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000)     return (n / 1_000).toFixed(1) + 'k';
+  return String(n);
+}
+
+// SVG polyline chart — renders total (accent) and errors (red) lines.
+// data: [{ bucket, total, errors }], buckets are epoch-ms timestamps
+function LineChart({ data, t, height = 130, formatX }) {
+  if (!data || data.length === 0) {
+    return (
+      <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: t.text3 }}>No data yet</span>
+      </div>
+    );
+  }
+
+  const W = 800, H = height;
+  const padL = 36, padR = 8, padT = 8, padB = 28;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  const maxTotal = Math.max(...data.map(d => d.total), 1);
+
+  const xs = data.map((_, i) => padL + (i / (data.length - 1 || 1)) * plotW);
+  const yT = d => padT + (1 - d.total / maxTotal) * plotH;
+  const yE = d => padT + (1 - d.errors / maxTotal) * plotH;
+
+  const pts  = data.map((d, i) => `${xs[i]},${yT(d)}`).join(' ');
+  const epts = data.map((d, i) => `${xs[i]},${yE(d)}`).join(' ');
+
+  // Y gridlines
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => ({
+    y: padT + (1 - f) * plotH,
+    label: fmt(Math.round(f * maxTotal)),
+  }));
+
+  // X labels — show up to 6 evenly spaced
+  const step = Math.max(1, Math.ceil(data.length / 6));
+  const xLabels = data
+    .map((d, i) => ({ i, label: formatX ? formatX(d.bucket) : '' }))
+    .filter(({ i }) => i % step === 0 || i === data.length - 1);
+
+  const M = "'IBM Plex Mono', monospace";
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height, display: 'block' }}>
+      {/* Grid */}
+      {yTicks.map(({ y, label }) => (
+        <g key={y}>
+          <line x1={padL} y1={y} x2={W - padR} y2={y} stroke={t.border} strokeWidth={0.5} />
+          <text x={padL - 4} y={y + 3} textAnchor="end" fill={t.text3} fontFamily={M} fontSize={9}>{label}</text>
+        </g>
+      ))}
+      {/* X labels */}
+      {xLabels.map(({ i, label }) => (
+        <text key={i} x={xs[i]} y={H - 4} textAnchor="middle" fill={t.text3} fontFamily={M} fontSize={9}>{label}</text>
+      ))}
+      {/* Total line */}
+      {data.length > 1 && <polyline points={pts} fill="none" stroke={t.accent} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />}
+      {data.length === 1 && <circle cx={xs[0]} cy={yT(data[0])} r={3} fill={t.accent} />}
+      {/* Error line */}
+      {data.length > 1 && <polyline points={epts} fill="none" stroke="#ff3b30" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" strokeDasharray="4 2" />}
+      {data.length === 1 && <circle cx={xs[0]} cy={yE(data[0])} r={2} fill="#ff3b30" />}
+      {/* Dots on total */}
+      {data.map((d, i) => (
+        <circle key={i} cx={xs[i]} cy={yT(d)} r={2.5} fill={t.accent} />
+      ))}
+    </svg>
+  );
+}
+
+// Mini 7-bar sparkline for per-endpoint rows
+function Sparkline({ sparkline, d7Buckets, t }) {
+  const vals = d7Buckets.map(b => sparkline[b] ?? 0);
+  const max  = Math.max(...vals, 1);
+  const barW = 8, gap = 2;
+  const W = d7Buckets.length * (barW + gap) - gap;
+  const H = 24;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: W, height: H, display: 'block' }}>
+      {vals.map((v, i) => {
+        const h = Math.max(2, Math.round((v / max) * H));
+        return (
+          <rect
+            key={i}
+            x={i * (barW + gap)} y={H - h}
+            width={barW} height={h}
+            rx={1}
+            fill={v > 0 ? t.accent : t.surfaceAlt}
+            opacity={v > 0 ? 0.8 : 0.3}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+function MethodBadge({ method }) {
+  const colors = {
+    GET:    { bg: 'rgba(52,199,89,0.12)',  color: '#34c759', border: 'rgba(52,199,89,0.3)'  },
+    POST:   { bg: 'rgba(99,102,241,0.12)', color: '#6366f1', border: 'rgba(99,102,241,0.3)' },
+    DELETE: { bg: 'rgba(255,59,48,0.12)',  color: '#ff3b30', border: 'rgba(255,59,48,0.3)'  },
+    PATCH:  { bg: 'rgba(245,166,35,0.12)', color: '#f5a623', border: 'rgba(245,166,35,0.3)' },
+  };
+  const s = colors[method] || { bg: 'rgba(128,128,128,0.12)', color: '#888', border: 'rgba(128,128,128,0.3)' };
+  return (
+    <span style={{
+      fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, letterSpacing: '0.08em',
+      padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap',
+      background: s.bg, color: s.color, border: `1px solid ${s.border}`,
+    }}>{method}</span>
+  );
+}
+
+// ── Tab: Endpoints ────────────────────────────────────────────────
+const ENDPOINT_GROUPS = [
+  { key: 'auth',  label: 'Auth',  prefix: '/api/auth/',  color: '#6366f1' },
+  { key: 'chat',  label: 'Chat',  prefix: '/api/chat',   color: '#34c759' },
+  { key: 'admin', label: 'Admin', prefix: '/api/admin/', color: '#f5a623' },
+  { key: 'user',  label: 'User',  prefix: '/api/user/',  color: '#ff9500' },
+];
+
+function EndpointsTab({ t }) {
+  const M = "'IBM Plex Mono', monospace";
+  const F = "'Outfit', sans-serif";
+
+  const [data,    setData]    = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(null);
+  const [view,    setView]    = useState('24h'); // '24h' | '7d'
+
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    fetch('/api/admin/endpoint-metrics', { credentials: 'include' })
+      .then(r => { if (!r.ok) throw new Error('Failed to load endpoint metrics'); return r.json(); })
+      .then(d => { setData(d); setLoading(false); })
+      .catch(e => { setError(e.message); setLoading(false); });
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading && !data) return <TabSpinner t={t} />;
+  if (error)            return <TabError msg={error} t={t} />;
+  if (!data)            return null;
+
+  const chartData = view === '24h' ? data.hourly : data.daily;
+
+  // Build last-7-days daily bucket list for sparklines
+  const now    = data.generated_at;
+  const d7Base = Math.floor((now - 7 * 86_400_000) / 86_400_000) * 86_400_000;
+  const d7Buckets = Array.from({ length: 7 }, (_, i) => d7Base + i * 86_400_000);
+
+  // Hour and day formatters
+  const fmtHour = ts => {
+    const d = new Date(ts);
+    return `${String(d.getHours()).padStart(2, '0')}:00`;
+  };
+  const fmtDay = ts => {
+    const d = new Date(ts);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  };
+
+  // Aggregate groups
+  const groups = ENDPOINT_GROUPS.map(g => {
+    const rows = data.endpoints.filter(e => e.path.startsWith(g.prefix));
+    const total  = rows.reduce((s, r) => s + r.total, 0);
+    const errors = rows.reduce((s, r) => s + r.errors, 0);
+    return { ...g, total, errors, endpoints: rows.length };
+  });
+
+  const totalAll  = data.total_7d;
+  const errorsAll = data.endpoints.reduce((s, e) => s + e.errors, 0);
+  const errRatePct = totalAll > 0 ? Math.round((errorsAll / totalAll) * 100) : 0;
+  const topEndpoint = data.endpoints[0];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+
+      {/* Top stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+        <StatCard label="Total requests" value={fmt(totalAll)} sub="last 7 days" t={t} />
+        <StatCard label="Error rate" value={`${errRatePct}%`} sub={`${errorsAll} errors`} t={t} accent={errRatePct > 5 ? '#ff3b30' : '#34c759'} />
+        <StatCard label="Unique endpoints" value={data.endpoints.length} sub="last 7 days" t={t} />
+        {topEndpoint && (
+          <StatCard
+            label="Top endpoint"
+            value={fmt(topEndpoint.total)}
+            sub={`${topEndpoint.method} ${topEndpoint.path}`}
+            t={t}
+          />
+        )}
+      </div>
+
+      {/* Aggregate trend chart */}
+      <div style={{ padding: '20px 20px 16px', borderRadius: 12, background: t.cardBg, border: `1px solid ${t.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div>
+            <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase', marginBottom: 4 }}>
+              All endpoints — request volume
+            </div>
+            <div style={{ display: 'flex', gap: 16 }}>
+              <span style={{ fontFamily: M, fontSize: 10, color: t.accent }}>── total</span>
+              <span style={{ fontFamily: M, fontSize: 10, color: '#ff3b30' }}>╌╌ errors</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {['24h', '7d'].map(v => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                style={{
+                  fontFamily: M, fontSize: 10, letterSpacing: '0.08em',
+                  padding: '4px 10px', borderRadius: 6,
+                  background: view === v ? t.accent : 'none',
+                  color: view === v ? '#fff' : t.text3,
+                  border: `1px solid ${view === v ? t.accent : t.border}`,
+                  cursor: 'pointer',
+                }}
+              >{v}</button>
+            ))}
+            <button
+              onClick={load}
+              style={{
+                fontFamily: M, fontSize: 10, letterSpacing: '0.08em',
+                padding: '4px 10px', borderRadius: 6,
+                background: 'none', color: t.text3,
+                border: `1px solid ${t.border}`, cursor: 'pointer', marginLeft: 4,
+              }}
+            >↺</button>
+          </div>
+        </div>
+        <LineChart
+          data={chartData}
+          t={t}
+          height={130}
+          formatX={view === '24h' ? fmtHour : fmtDay}
+        />
+      </div>
+
+      {/* Group breakdown */}
+      <div>
+        <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase', marginBottom: 12 }}>
+          By group — last 7 days
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
+          {groups.map(g => {
+            const errPct = g.total > 0 ? Math.round((g.errors / g.total) * 100) : 0;
+            return (
+              <div
+                key={g.key}
+                style={{
+                  padding: '14px 16px', borderRadius: 10,
+                  background: t.cardBg, border: `1px solid ${t.border}`,
+                  borderLeft: `3px solid ${g.color}`,
+                }}
+              >
+                <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: g.color, textTransform: 'uppercase', marginBottom: 8 }}>
+                  {g.label}
+                </div>
+                <div style={{ fontFamily: F, fontSize: 24, fontWeight: 700, color: t.text1, lineHeight: 1, marginBottom: 4 }}>
+                  {fmt(g.total)}
+                </div>
+                <div style={{ fontFamily: M, fontSize: 10, color: t.text3 }}>
+                  {g.endpoints} endpoint{g.endpoints !== 1 ? 's' : ''} · {errPct}% errors
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Per-endpoint table */}
+      <div>
+        <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase', marginBottom: 12 }}>
+          All endpoints — last 7 days
+        </div>
+        <div style={{
+          borderRadius: 12, border: `1px solid ${t.border}`,
+          background: t.cardBg, overflow: 'hidden',
+        }}>
+          {/* Header */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '72px 1fr 64px 64px 70px 80px',
+            gap: 8, padding: '8px 16px',
+            borderBottom: `1px solid ${t.border}`,
+          }}>
+            {['Method', 'Path', 'Total', 'Errors', '7d trend', 'Last seen'].map(h => (
+              <div key={h} style={{ fontFamily: M, fontSize: 9, letterSpacing: '0.1em', color: t.text3, textTransform: 'uppercase' }}>
+                {h}
+              </div>
+            ))}
+          </div>
+
+          {data.endpoints.length === 0 && (
+            <div style={{ padding: '32px 16px', textAlign: 'center', fontFamily: M, fontSize: 11, color: t.text3 }}>
+              No requests logged yet — data appears after the first API call.
+            </div>
+          )}
+
+          {data.endpoints.map((ep, i) => {
+            const errPct = ep.total > 0 ? Math.round((ep.errors / ep.total) * 100) : 0;
+            const errColor = errPct > 10 ? '#ff3b30' : errPct > 0 ? '#ff9500' : '#34c759';
+            const group = ENDPOINT_GROUPS.find(g => ep.path.startsWith(g.prefix));
+            return (
+              <div
+                key={`${ep.method}-${ep.path}`}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '72px 1fr 64px 64px 70px 80px',
+                  gap: 8, padding: '10px 16px',
+                  borderBottom: i < data.endpoints.length - 1 ? `1px solid ${t.border}` : 'none',
+                  alignItems: 'center',
+                  borderLeft: group ? `3px solid ${group.color}` : `3px solid transparent`,
+                }}
+              >
+                <div><MethodBadge method={ep.method} /></div>
+                <div style={{ fontFamily: M, fontSize: 11, color: t.text1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {ep.path}
+                </div>
+                <div style={{ fontFamily: M, fontSize: 12, color: t.text1, fontWeight: 600 }}>
+                  {fmt(ep.total)}
+                </div>
+                <div style={{ fontFamily: M, fontSize: 11, color: errColor }}>
+                  {errPct}%
+                </div>
+                <div>
+                  <Sparkline sparkline={ep.sparkline} d7Buckets={d7Buckets} t={t} />
+                </div>
+                <div style={{ fontFamily: M, fontSize: 10, color: t.text3 }}>
+                  {timeAgo(ep.last_seen)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Admin page ────────────────────────────────────────────────────
-const TABS = ['Metrics', 'Upgrade Requests', 'Users', 'Models', 'Personas'];
+const TABS = ['Metrics', 'Upgrade Requests', 'Users', 'Models', 'Personas', 'Endpoints'];
 
 export default function Admin() {
   const { t }       = useTheme();
@@ -1119,6 +1464,7 @@ export default function Admin() {
         {tab === 2 && <UsersTab t={t} />}
         {tab === 3 && <ModelsTab t={t} />}
         {tab === 4 && <PersonasTab t={t} />}
+        {tab === 5 && <EndpointsTab t={t} />}
       </div>
     </div>
   );

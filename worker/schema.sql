@@ -124,6 +124,18 @@ ALTER TABLE upgrade_requests ADD COLUMN tier TEXT NOT NULL DEFAULT 'pro';
 ALTER TABLE users ADD COLUMN phone_number   TEXT;
 ALTER TABLE users ADD COLUMN phone_verified INTEGER NOT NULL DEFAULT 0;
 
+-- ── Endpoint request log ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS endpoint_logs (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  method     TEXT    NOT NULL,
+  path       TEXT    NOT NULL,
+  status     INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_endpoint_logs_created_at ON endpoint_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_endpoint_logs_path       ON endpoint_logs(path, method);
+
 -- Seed default models
 INSERT OR IGNORE INTO allowed_models (id, model_id, label, tier, enabled, added_at) VALUES
   ('model-llama-70b', '@cf/meta/llama-3.3-70b-instruct-fp8-fast', 'Llama 3.3 70B Fast', 'pro', 1, 0),
