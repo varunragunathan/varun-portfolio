@@ -1308,7 +1308,7 @@ function EndpointsTab({ t }) {
                   fontFamily: M, fontSize: 10, letterSpacing: '0.08em',
                   padding: '4px 10px', borderRadius: 6,
                   background: view === v ? t.accent : 'none',
-                  color: view === v ? '#fff' : t.text3,
+                  color: view === v ? t.textInverse : t.text2,
                   border: `1px solid ${view === v ? t.accent : t.border}`,
                   cursor: 'pointer',
                 }}
