@@ -107,7 +107,9 @@ export async function recoveryStart(request, env) {
   }
 
   // Send OTP via Resend (second factor of 2-of-2 recovery — always sent as fallback)
-  const otp = String(Math.floor(100000 + Math.random() * 900000));
+  const arr = new Uint32Array(1);
+  crypto.getRandomValues(arr);
+  const otp = String(100000 + (arr[0] % 900000));
   await env.AUTH_KV.put(`recovery_otp:${email}`, otp, { expirationTtl: 600 });
 
   const { Resend } = await import('resend');
@@ -218,7 +220,7 @@ export async function recoveryVerifyTOTP(request, env) {
   await env.AUTH_KV.delete(`recovery_totp_pending:${email}`);
 
   await deleteAllPasskeyCredsByUserId(db, userId);
-  await deleteAllSessionsByUserId(db, userId);
+  await deleteAllSessionsByUserId(db, env.AUTH_KV, userId);
 
   await logSecurityEvent(db, {
     userId, type: 'account_recovery',
@@ -256,7 +258,7 @@ export async function recoveryVerify(request, env) {
 
   // Wipe all existing passkeys and sessions — clean slate for re-registration
   await deleteAllPasskeyCredsByUserId(db, user.id);
-  await deleteAllSessionsByUserId(db, user.id);
+  await deleteAllSessionsByUserId(db, env.AUTH_KV, user.id);
 
   await logSecurityEvent(db, {
     userId: user.id, type: 'account_recovery',

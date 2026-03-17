@@ -76,7 +76,7 @@ export async function encryptTotpSecret(plaintext, keyStr) {
   return `${toB64url(iv)}.${toB64url(new Uint8Array(enc))}`;
 }
 
-async function decryptTotpSecret(stored, keyStr) {
+export async function decryptTotpSecret(stored, keyStr) {
   const [ivB64, encB64] = stored.split('.');
   const key = await deriveKey(keyStr);
   const dec = await crypto.subtle.decrypt(

@@ -173,7 +173,14 @@ export async function deleteSessionById(db, sessionId, userId) {
     .run();
 }
 
-export async function deleteAllSessionsByUserId(db, userId) {
+export async function deleteAllSessionsByUserId(db, kv, userId) {
+  // Delete KV session entries first so revoked sessions cannot be used during the window
+  // between D1 deletion and KV TTL expiry (up to 30 days for trusted sessions).
+  const { results } = await db
+    .prepare('SELECT token_hash FROM sessions WHERE user_id = ?')
+    .bind(userId)
+    .all();
+  await Promise.all(results.map(s => kv.delete(`session:${s.token_hash}`)));
   await db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId).run();
 }
 
