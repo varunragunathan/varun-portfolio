@@ -6,7 +6,7 @@ import { useTypewriter, useCounter } from '../hooks/useAnimations';
 import { Fade, SectionHeader, Btn } from '../components/UI';
 import ParticleField from '../components/ParticleField';
 import { PERSONAL, STATS, PROJECTS, SKILLS, PRINCIPLES, TIMELINE, EDUCATION } from '../data/portfolio';
-import PixelOwl from '../components/PixelOwl';
+import FrozenChat from '../components/FrozenChat';
 import { useState, useEffect } from 'react';
 import { useResponsive } from '../hooks/useResponsive';
 
@@ -94,51 +94,8 @@ function GuestView() {
           </div>
         </div>
 
-        {/* Mock chat preview */}
-        <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: `1px solid ${t.border}` }}>
-          <div style={{ background: t.cardBg, padding: '14px 14px 32px' }}>
-            <div style={{ fontFamily: M, fontSize: 9, letterSpacing: '0.15em', textTransform: 'uppercase', color: t.text3, marginBottom: 12 }}>
-              ai assistant preview
-            </div>
-            {/* User bubble */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
-              <div style={{
-                maxWidth: '80%', padding: '9px 13px', borderRadius: '14px 14px 4px 14px',
-                background: t.accentDim, border: `1px solid ${t.accentBorder}`,
-                fontFamily: F, fontSize: 13, color: t.text1, lineHeight: 1.5,
-              }}>
-                How does passkey auth work here?
-              </div>
-            </div>
-            {/* Assistant bubble */}
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-              <div style={{ flexShrink: 0, marginTop: 2 }}>
-                <PixelOwl size={2} state="idle" />
-              </div>
-              <div style={{
-                padding: '9px 13px', borderRadius: '14px 14px 14px 4px',
-                background: t.surface, border: `1px solid ${t.border}`,
-                fontFamily: F, fontSize: 13, color: t.text2, lineHeight: 1.6,
-              }}>
-                The browser generates a key pair bound to this domain — the private key never leaves your device. Sign-in is a signed challenge. No secrets on the server, no passwords at all.
-              </div>
-            </div>
-          </div>
-          {/* Fade + CTA */}
-          <div aria-hidden="true" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 72, background: `linear-gradient(to bottom, transparent, ${t.bg})`, pointerEvents: 'none' }} />
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center', paddingBottom: 12 }}>
-            <Link
-              to="/auth"
-              style={{
-                fontFamily: M, fontSize: 10, letterSpacing: '0.07em', textDecoration: 'none',
-                color: t.accent, background: t.accentDim, border: `1px solid ${t.accentBorder}`,
-                borderRadius: 20, padding: '5px 14px',
-              }}
-            >
-              Sign in to ask your own questions →
-            </Link>
-          </div>
-        </div>
+        {/* Live demo chat */}
+        <FrozenChat />
 
       </div>
     </div>

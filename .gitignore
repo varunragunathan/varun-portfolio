@@ -8,3 +8,4 @@ package-lock.json
 /private
 /docs/export
 test-results/.last-run.json
+/test-results

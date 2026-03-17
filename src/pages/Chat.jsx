@@ -9,6 +9,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useChat } from '../hooks/useChat';
 import { useResponsive } from '../hooks/useResponsive';
 import PixelOwl from '../components/PixelOwl';
+import FrozenChat from '../components/FrozenChat';
 import ModelPicker from '../components/ModelPicker';
 import UpgradeModal from '../components/UpgradeModal';
 
@@ -586,23 +587,8 @@ function ChatGate() {
           </p>
         </div>
 
-        {/* Mock Q&A */}
-        <div style={{ width: '100%', background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 14, padding: '16px 16px 32px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ fontFamily: M, fontSize: 9, letterSpacing: '0.15em', textTransform: 'uppercase', color: t.text3, marginBottom: 12 }}>
-            example
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
-            <div style={{ maxWidth: '80%', padding: '9px 13px', borderRadius: '14px 14px 4px 14px', background: t.accentDim, border: `1px solid ${t.accentBorder}`, fontFamily: F, fontSize: 13, color: t.text1, lineHeight: 1.5 }}>
-              What's the RAG pipeline?
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-            <div style={{ flexShrink: 0, marginTop: 2 }}><PixelOwl size={2} state="idle" /></div>
-            <div style={{ padding: '9px 13px', borderRadius: '14px 14px 14px 4px', background: t.surface, border: `1px solid ${t.border}`, fontFamily: F, fontSize: 13, color: t.text2, lineHeight: 1.6 }}>
-              Docs are chunked, embedded via Cloudflare AI, and stored in Vectorize. Your question is embedded at query time, top chunks are cosine-matched and injected into llama-3.3-70b as context.
-            </div>
-          </div>
-          <div aria-hidden="true" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, background: `linear-gradient(to bottom, transparent, ${t.cardBg})`, pointerEvents: 'none' }} />
+        <div style={{ width: '100%' }}>
+          <FrozenChat showCta={false} />
         </div>
 
         <Link
