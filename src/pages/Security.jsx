@@ -706,7 +706,7 @@ function DeleteAccount({ onDeleted }) {
                   cursor: !email.trim() ? 'not-allowed' : 'pointer',
                   background: 'rgba(239,68,68,0.15)', color: '#f87171',
                   border: '1px solid rgba(239,68,68,0.3)',
-                  opacity: confirm !== userEmail ? 0.5 : 1,
+                  opacity: !email.trim() ? 0.5 : 1,
                   transition: 'opacity 0.2s',
                 }}
               >
