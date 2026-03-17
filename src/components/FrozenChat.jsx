@@ -24,11 +24,7 @@ const DEMOS = [
   {
     q: 'How are sessions managed?',
     a: 'Auth is two-phase: a pending token is created after passkey verification, then finalised into a 7-day HttpOnly session cookie. Trusted devices skip number-matching on return visits.',
-  },
-  {
-    q: 'What does the admin dashboard do?',
-    a: 'Admins can manage users, approve tier upgrades, configure chat models and personas, and view endpoint metrics — all gated behind passkey step-up re-verification.',
-  },
+  }
 ];
 
 const CHAR_SPEED_MS = 16;   // ms per character while typing
@@ -41,7 +37,8 @@ export default function FrozenChat({ showCta = true }) {
   const [typedA, setTypedA] = useState('');
   const [phase, setPhase]   = useState('show-q'); // show-q | typing-a | done
   const [visible, setVisible] = useState(true);
-  const timerRef = useRef(null);
+  const idxTimerRef  = useRef(null);
+  const doneTimerRef = useRef(null);
 
   const demo = DEMOS[idx];
 
@@ -50,8 +47,8 @@ export default function FrozenChat({ showCta = true }) {
     setTypedA('');
     setPhase('show-q');
     setVisible(true);
-    timerRef.current = setTimeout(() => setPhase('typing-a'), Q_DELAY_MS);
-    return () => clearTimeout(timerRef.current);
+    idxTimerRef.current = setTimeout(() => setPhase('typing-a'), Q_DELAY_MS);
+    return () => clearTimeout(idxTimerRef.current);
   }, [idx]);
 
   // Character-by-character typing
@@ -70,13 +67,13 @@ export default function FrozenChat({ showCta = true }) {
   // Pause then cycle to next demo
   useEffect(() => {
     if (phase !== 'done') return;
-    timerRef.current = setTimeout(() => {
+    doneTimerRef.current = setTimeout(() => {
       setVisible(false);
-      timerRef.current = setTimeout(() => {
+      doneTimerRef.current = setTimeout(() => {
         setIdx(i => (i + 1) % DEMOS.length);
       }, 350);
     }, PAUSE_AFTER_MS);
-    return () => clearTimeout(timerRef.current);
+    return () => clearTimeout(doneTimerRef.current);
   }, [phase]);
 
   return (
