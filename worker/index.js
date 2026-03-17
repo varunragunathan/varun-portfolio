@@ -203,15 +203,21 @@ export default {
   async fetch(request, env, ctx) {
     const response = await handleRequest(request, env);
 
-    // Log all API requests asynchronously — skip OPTIONS, streaming, WebSocket,
-    // and the endpoint-metrics endpoint itself to avoid self-referential noise.
+    // Log requests asynchronously. Rules:
+    //  - Skip OPTIONS and WebSocket upgrades (101)
+    //  - Skip the endpoint-metrics endpoint itself (self-referential noise)
+    //  - For non-API paths: only log page navigations — i.e. GET requests with
+    //    no file extension in the last segment (filters out .js/.css/.png chunks)
     const url = new URL(request.url);
+    const isApi  = url.pathname.startsWith('/api/');
+    const isPage = !isApi &&
+                   request.method === 'GET' &&
+                   !/\.[a-z0-9]+$/i.test(url.pathname); // no file extension → SPA route
     if (
       request.method !== 'OPTIONS' &&
-      url.pathname.startsWith('/api/') &&
       response.status !== 101 &&
-      !response.headers.get('Content-Type')?.startsWith('text/event-stream') &&
-      url.pathname !== '/api/admin/endpoint-metrics'
+      url.pathname !== '/api/admin/endpoint-metrics' &&
+      (isApi || isPage)
     ) {
       ctx.waitUntil(logEndpointRequest(env.varun_portfolio_auth, request, response));
     }
