@@ -148,12 +148,20 @@ export async function getMe(request, env) {
     ? 'admin'
     : (dbUser?.role ?? 'user');
 
+  const tokenHash = await sha256Hex(session.token);
+  const sessionRecord = await db
+    .prepare('SELECT trusted FROM sessions WHERE token_hash = ? LIMIT 1')
+    .bind(tokenHash)
+    .first();
+  const trusted = sessionRecord?.trusted === 1;
+
   return json({
     user: {
       userId: session.userId,
       nickname,
       maskedEmail: maskEmail(session.email),
       role,
+      trusted,
     },
   });
 }

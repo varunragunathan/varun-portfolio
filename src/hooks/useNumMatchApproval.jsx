@@ -9,7 +9,7 @@ export function useNumMatchApproval(user) {
   const wsRef = useRef(null);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !user.trusted) {
       setApproval(null);
       return;
     }
