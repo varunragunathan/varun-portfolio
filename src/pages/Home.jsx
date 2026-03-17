@@ -7,6 +7,7 @@ import { Fade, SectionHeader, Btn } from '../components/UI';
 import ParticleField from '../components/ParticleField';
 import { PERSONAL, STATS, PROJECTS, SKILLS, PRINCIPLES, TIMELINE, EDUCATION } from '../data/portfolio';
 import { useState, useEffect } from 'react';
+import { useResponsive } from '../hooks/useResponsive';
 
 const F = "'Outfit', sans-serif";
 const M = "'IBM Plex Mono', monospace";
@@ -14,6 +15,7 @@ const M = "'IBM Plex Mono', monospace";
 // ─── Guest view (unauthenticated) ─────────────────────────────────
 function GuestView() {
   const { t } = useTheme();
+  const { isMobile } = useResponsive();
   const [loaded, setLoaded] = useState(false);
   useEffect(() => { setTimeout(() => setLoaded(true), 100); }, []);
 
@@ -52,7 +54,7 @@ function GuestView() {
             <p style={{ fontFamily: F, fontSize: 15, color: t.text1, fontWeight: 500, margin: '0 0 6px' }}>
               Sign in to learn more
             </p>
-            <p style={{ fontFamily: F, fontSize: 13, color: t.text3, margin: '0 0 22px', lineHeight: 1.6 }}>
+            <p style={{ fontFamily: F, fontSize: isMobile ? 18 : 13, color: t.text3, margin: '0 0 22px', lineHeight: 1.6 }}>
               The work, timeline, and everything else is just one passkey away. No password required.
             </p>
             <Link
@@ -159,6 +161,7 @@ function StatsBar() {
 // ─── Projects ─────────────────────────────────────────────────────
 function ProjectCard({ role, title, description, metrics, tags, featured, delay }) {
   const { t } = useTheme();
+  const { isMobile } = useResponsive();
   const [hover, setHover] = useState(false);
   return (
     <Fade delay={delay}>
@@ -177,7 +180,7 @@ function ProjectCard({ role, title, description, metrics, tags, featured, delay 
         <div aria-hidden="true" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: `linear-gradient(90deg, transparent, ${hover ? t.accentBorder : 'transparent'}, transparent)`, transition: 'all 0.4s' }} />
         <div style={{ fontFamily: M, fontSize: 10, fontWeight: 400, letterSpacing: '0.14em', textTransform: 'uppercase', color: t.accentMuted, marginBottom: 5 }}>{role}</div>
         <h3 style={{ fontFamily: F, fontSize: 17, fontWeight: 500, color: t.text1, marginBottom: 7, lineHeight: 1.3 }}>{title}</h3>
-        <p style={{ fontFamily: F, fontSize: 14, fontWeight: 400, color: t.text2, lineHeight: 1.6, marginBottom: 12 }}>{description}</p>
+        <p style={{ fontFamily: F, fontSize: isMobile ? 18 : 14, fontWeight: 400, color: t.text2, lineHeight: 1.6, marginBottom: 12 }}>{description}</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
           {metrics.map((m, i) => <span key={i} style={{ fontFamily: M, fontSize: 11, color: t.accentMuted }}>{m}</span>)}
         </div>
@@ -213,6 +216,7 @@ function ProjectsSection() {
 // ─── Skills ───────────────────────────────────────────────────────
 function SkillsSection() {
   const { t } = useTheme();
+  const { isMobile } = useResponsive();
   const sec = { maxWidth: 920, margin: '0 auto', padding: '80px 24px', background: t.surfaceAlt };
   return (
     <section aria-label="Technical expertise" style={sec}>
@@ -224,7 +228,7 @@ function SkillsSection() {
               <div style={{ fontFamily: M, fontSize: 10, fontWeight: 400, letterSpacing: '0.18em', textTransform: 'uppercase', color: t.text3, marginBottom: 10 }}>{sg.group}</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {sg.items.map(s => (
-                  <span key={s} style={{ fontFamily: F, fontSize: 13, fontWeight: 400, padding: '6px 13px', borderRadius: 10, background: t.cardBg, border: `1px solid ${t.border}`, color: t.text1 }}>{s}</span>
+                  <span key={s} style={{ fontFamily: F, fontSize: isMobile ? 16 : 13, fontWeight: 400, padding: '6px 13px', borderRadius: 10, background: t.cardBg, border: `1px solid ${t.border}`, color: t.text1 }}>{s}</span>
                 ))}
               </div>
             </div>
@@ -238,6 +242,7 @@ function SkillsSection() {
 // ─── Philosophy ───────────────────────────────────────────────────
 function PhilosophySection() {
   const { t } = useTheme();
+  const { isMobile } = useResponsive();
   const sec = { maxWidth: 920, margin: '0 auto', padding: '80px 24px' };
   return (
     <section aria-label="Engineering philosophy" style={sec}>
@@ -248,7 +253,7 @@ function PhilosophySection() {
             <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 16, padding: '22px 22px 18px' }}>
               <div aria-hidden="true" style={{ fontSize: 20, marginBottom: 10, color: t.text3 }}>{p.icon}</div>
               <h4 style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: t.text1, marginBottom: 5, lineHeight: 1.35 }}>{p.title}</h4>
-              <p style={{ fontFamily: F, fontSize: 13, fontWeight: 400, color: t.text2, lineHeight: 1.6 }}>{p.body}</p>
+              <p style={{ fontFamily: F, fontSize: isMobile ? 18 : 13, fontWeight: 400, color: t.text2, lineHeight: 1.6 }}>{p.body}</p>
             </div>
           </Fade>
         ))}

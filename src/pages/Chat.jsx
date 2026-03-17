@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
 import { useChat } from '../hooks/useChat';
+import { useResponsive } from '../hooks/useResponsive';
 import StreamingStatus from '../components/StreamingStatus';
 import ModelPicker from '../components/ModelPicker';
 import UpgradeModal from '../components/UpgradeModal';
@@ -90,7 +91,7 @@ function MessageBubble({ message, t }) {
         </div>
       )}
       <div style={{
-        maxWidth:     isUser ? '72%' : '80%',
+        maxWidth:     isUser ? '88%' : '88%',
         padding:      '12px 16px',
         borderRadius: isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
         background:   isUser ? t.accentDim : t.surface,
@@ -152,56 +153,85 @@ function ConvItem({ conv, active, onClick, onDelete, t }) {
 }
 
 // ── Sidebar ───────────────────────────────────────────────────────
-function Sidebar({ conversations, activeId, onSelect, onDelete, onNew, t }) {
+function Sidebar({ conversations, activeId, onSelect, onDelete, onNew, open, onClose, t, isMobile }) {
+  if (isMobile && !open) return null;
+
   return (
-    <div style={{
-      width:          260,
-      flexShrink:     0,
-      borderRight:    `1px solid ${t.border}`,
-      display:        'flex',
-      flexDirection:  'column',
-      height:         '100%',
-      overflow:       'hidden',
-    }}>
-      <div style={{ padding: '20px 16px 12px', flexShrink: 0 }}>
-        <div style={{ fontFamily: M, fontSize: 11, letterSpacing: '0.15em', color: t.text3, textTransform: 'uppercase', marginBottom: 12 }}>
-          Conversations
-        </div>
-        <button
-          onClick={onNew}
+    <>
+      {/* Mobile overlay backdrop */}
+      {isMobile && (
+        <div
+          onClick={onClose}
           style={{
-            width: '100%', padding: '9px 14px', borderRadius: 10,
-            background: t.accentDim, border: `1px solid ${t.accentBorder}`,
-            cursor: 'pointer', fontFamily: F, fontSize: 13, color: t.accent,
-            textAlign: 'left',
+            position: 'fixed', inset: 0, zIndex: 10,
+            background: 'rgba(0,0,0,0.5)',
           }}
-        >
-          + New conversation
-        </button>
-      </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px 16px' }}>
-        {conversations.length === 0 && (
-          <div style={{ fontFamily: F, fontSize: 13, color: t.text3, textAlign: 'center', marginTop: 40 }}>
-            No conversations yet
+        />
+      )}
+      <div style={{
+        width:          260,
+        flexShrink:     0,
+        borderRight:    `1px solid ${t.border}`,
+        display:        'flex',
+        flexDirection:  'column',
+        height:         '100%',
+        overflow:       'hidden',
+        ...(isMobile ? {
+          position: 'absolute', left: 0, top: 0, bottom: 0, zIndex: 11,
+          background: t.bg,
+        } : {}),
+      }}>
+        <div style={{ padding: '20px 16px 12px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontFamily: M, fontSize: 11, letterSpacing: '0.15em', color: t.text3, textTransform: 'uppercase' }}>
+              Conversations
+            </div>
+            {isMobile && (
+              <button
+                onClick={onClose}
+                aria-label="Close sidebar"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.text3, fontSize: 20, lineHeight: 1, padding: 4 }}
+              >
+                ×
+              </button>
+            )}
           </div>
-        )}
-        {conversations.map(conv => (
-          <ConvItem
-            key={conv.id}
-            conv={conv}
-            active={conv.id === activeId}
-            onClick={() => onSelect(conv.id)}
-            onDelete={onDelete}
-            t={t}
-          />
-        ))}
+          <button
+            onClick={onNew}
+            style={{
+              width: '100%', padding: '9px 14px', borderRadius: 10,
+              background: t.accentDim, border: `1px solid ${t.accentBorder}`,
+              cursor: 'pointer', fontFamily: F, fontSize: 13, color: t.accent,
+              textAlign: 'left',
+            }}
+          >
+            + New conversation
+          </button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px 16px' }}>
+          {conversations.length === 0 && (
+            <div style={{ fontFamily: F, fontSize: 13, color: t.text3, textAlign: 'center', marginTop: 40 }}>
+              No conversations yet
+            </div>
+          )}
+          {conversations.map(conv => (
+            <ConvItem
+              key={conv.id}
+              conv={conv}
+              active={conv.id === activeId}
+              onClick={() => { onSelect(conv.id); if (isMobile) onClose(); }}
+              onDelete={onDelete}
+              t={t}
+            />
+          ))}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
 // ── Main chat area ────────────────────────────────────────────────
-function ChatArea({ t, onNewConversation }) {
+function ChatArea({ t, onNewConversation, onOpenSidebar, isMobile }) {
   const { messages, streaming, error, send, conversationId } = useChat();
   const { isPro, isAdmin, user }             = useAuth();
   const [input,          setInput]          = useState('');
@@ -262,21 +292,38 @@ function ChatArea({ t, onNewConversation }) {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* Model picker bar (pro/admin only) */}
-      {canPickModel && models.length > 0 && (
+      {/* Top bar: mobile menu toggle + optional model picker */}
+      {(isMobile || (canPickModel && models.length > 0)) && (
         <div style={{
-          padding: '8px 24px',
+          padding: '8px 16px',
           borderBottom: `1px solid ${t.border}`,
           display: 'flex', alignItems: 'center', gap: 8,
           flexShrink: 0,
         }}>
-          <span style={{ fontFamily: M, fontSize: 10, color: t.text3, letterSpacing: '0.06em' }}>model</span>
-          <ModelPicker selectedModel={selectedModel} onSelect={setSelectedModel} models={models} t={t} />
+          {isMobile && (
+            <button
+              onClick={onOpenSidebar}
+              aria-label="Open conversations"
+              style={{
+                background: 'none', border: `1px solid ${t.border}`, borderRadius: 8,
+                cursor: 'pointer', color: t.text2, padding: '5px 10px',
+                fontFamily: M, fontSize: 14, lineHeight: 1,
+              }}
+            >
+              ☰
+            </button>
+          )}
+          {canPickModel && models.length > 0 && (
+            <>
+              <span style={{ fontFamily: M, fontSize: 10, color: t.text3, letterSpacing: '0.06em' }}>model</span>
+              <ModelPicker selectedModel={selectedModel} onSelect={setSelectedModel} models={models} t={t} />
+            </>
+          )}
         </div>
       )}
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px 12px' : '24px 28px' }}>
         {messages.length === 0 && (
           <div style={{ textAlign: 'center', marginTop: 80 }}>
             <div style={{ fontFamily: M, fontSize: 12, letterSpacing: '0.15em', color: t.accentMuted, textTransform: 'uppercase' }}>
@@ -378,12 +425,13 @@ function ChatArea({ t, onNewConversation }) {
 
       {/* Input bar */}
       <div style={{
-        padding:    '16px 24px',
+        padding:    isMobile ? '12px' : '16px 24px',
         borderTop:  `1px solid ${t.border}`,
         display:    'flex',
-        gap:        10,
+        gap:        8,
         alignItems: 'flex-end',
         flexShrink: 0,
+        paddingBottom: isMobile ? 'max(12px, env(safe-area-inset-bottom))' : 16,
       }}>
         <textarea
           value={input}
@@ -443,9 +491,11 @@ export default function ChatPage() {
   const { t }           = useTheme();
   const { user, loading } = useAuth();
   const navigate        = useNavigate();
+  const { isMobile }    = useResponsive();
 
-  const [conversations, setConversations] = useState([]);
-  const [activeConvId,  setActiveConvId]  = useState(null);
+  const [conversations,  setConversations]  = useState([]);
+  const [activeConvId,   setActiveConvId]   = useState(null);
+  const [sidebarOpen,    setSidebarOpen]    = useState(false);
 
   // Redirect if not signed in
   useEffect(() => {
@@ -481,6 +531,7 @@ export default function ChatPage() {
       marginTop:  53,
       overflow:   'hidden',
       background: t.bg,
+      position:   'relative',
     }}>
       <Sidebar
         conversations={conversations}
@@ -488,9 +539,18 @@ export default function ChatPage() {
         onSelect={setActiveConvId}
         onDelete={handleDelete}
         onNew={() => setActiveConvId(null)}
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        isMobile={isMobile}
         t={t}
       />
-      <ChatArea key={activeConvId ?? 'new'} t={t} onNewConversation={handleNewConversation} />
+      <ChatArea
+        key={activeConvId ?? 'new'}
+        t={t}
+        onNewConversation={handleNewConversation}
+        onOpenSidebar={() => setSidebarOpen(true)}
+        isMobile={isMobile}
+      />
     </div>
   );
 }

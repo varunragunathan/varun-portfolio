@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { ThemeToggle } from '../components/UI';
+import { useResponsive } from '../hooks/useResponsive';
 
 const F = "'Outfit', sans-serif";
 const M = "'IBM Plex Mono', monospace";
@@ -15,7 +16,7 @@ function Section({ title, subtitle, children }) {
     <div style={{ marginBottom: 40 }}>
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ fontFamily: F, fontWeight: 400, fontSize: 18, color: t.text1, margin: 0 }}>{title}</h2>
-        {subtitle && <p style={{ fontFamily: F, fontSize: 13, color: t.text3, margin: '4px 0 0' }}>{subtitle}</p>}
+        {subtitle && <p style={{ fontFamily: F, fontSize: 14, color: t.text3, margin: '4px 0 0', lineHeight: 1.5 }}>{subtitle}</p>}
       </div>
       <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 14 }}>
         {children}
@@ -30,7 +31,7 @@ function Row({ children, last, highlight }) {
     <div style={{
       padding: '16px 20px',
       borderBottom: last ? 'none' : `1px solid ${t.border}`,
-      display: 'flex', alignItems: 'center', gap: 12,
+      display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
       background: highlight ? 'rgba(99,102,241,0.06)' : 'transparent',
     }}>
       {children}
@@ -722,6 +723,7 @@ function DeleteAccount({ onDeleted }) {
 export default function Settings() {
   const { t } = useTheme();
   const { user, loading, enabled, setUser } = useAuth();
+  const { isMobile } = useResponsive();
   const navigate    = useNavigate();
   const deletingRef = useRef(false);
   const [tab, setTab] = useState('security');
@@ -735,15 +737,15 @@ export default function Settings() {
   if (loading || !user) return null;
 
   return (
-    <main style={{ minHeight: '100vh', padding: '96px 24px 60px', maxWidth: 700, margin: '0 auto' }}>
+    <main style={{ minHeight: '100vh', padding: isMobile ? '80px 16px 48px' : '96px 24px 60px', maxWidth: 700, margin: '0 auto' }}>
       <div style={{ marginBottom: 32 }}>
-        <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.accentMuted, marginBottom: 10 }}>
+        <div style={{ fontFamily: M, fontSize: isMobile ? 12 : 10, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.accentMuted, marginBottom: 10 }}>
           Settings
         </div>
-        <h1 style={{ fontFamily: F, fontWeight: 300, fontSize: 32, color: t.text1, margin: '0 0 4px' }}>
+        <h1 style={{ fontFamily: F, fontWeight: 300, fontSize: isMobile ? 26 : 32, color: t.text1, margin: '0 0 4px' }}>
           {user.nickname || 'Settings'}
         </h1>
-        <p style={{ fontFamily: M, fontSize: 11, color: t.text3, margin: 0 }}>
+        <p style={{ fontFamily: M, fontSize: isMobile ? 13 : 11, color: t.text3, margin: 0 }}>
           {user.maskedEmail}
         </p>
       </div>
@@ -751,12 +753,14 @@ export default function Settings() {
       {/* Tab bar */}
       <div style={{
         display: 'flex', background: t.cardBg, borderRadius: 11, padding: 4,
-        marginBottom: 32, border: `1px solid ${t.border}`, width: 'fit-content',
+        marginBottom: 32, border: `1px solid ${t.border}`,
+        width: isMobile ? '100%' : 'fit-content',
       }}>
         {[{ id: 'security', label: 'Security' }, { id: 'account', label: 'Account' }].map(({ id, label }) => (
           <button key={id} onClick={() => setTab(id)} style={{
-            padding: '8px 22px', borderRadius: 8, border: 'none', cursor: 'pointer',
-            fontFamily: F, fontSize: 13, fontWeight: 500,
+            flex: isMobile ? 1 : undefined,
+            padding: isMobile ? '12px 22px' : '8px 22px', borderRadius: 8, border: 'none', cursor: 'pointer',
+            fontFamily: F, fontSize: isMobile ? 16 : 13, fontWeight: 500,
             background: tab === id ? t.accentDim : 'transparent',
             color: tab === id ? t.accent : t.text2,
             transition: 'all 0.2s',

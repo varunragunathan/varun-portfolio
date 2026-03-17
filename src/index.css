@@ -15,3 +15,15 @@
   *::-webkit-scrollbar-track { background: transparent; }
   *::-webkit-scrollbar-thumb { background: rgba(100, 255, 218, 0.12); border-radius: 3px; }
 }
+
+/* ── Mobile baseline ─────────────────────────────────────────────
+   1. Prevent iOS from zooming on input focus (requires font-size ≥ 16px)
+   2. Keep tap targets comfortable
+   ───────────────────────────────────────────────────────────────── */
+@media (max-width: 639px) {
+  input, textarea, select, button {
+    font-size: max(16px, 1em) !important;
+  }
+  /* Prevent horizontal overflow caused by fixed-width children */
+  body { overflow-x: hidden; }
+}

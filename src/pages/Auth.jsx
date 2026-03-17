@@ -6,6 +6,7 @@ import {
 } from '@simplewebauthn/browser';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth.jsx';
+import { useResponsive } from '../hooks/useResponsive';
 
 const F = "'Outfit', sans-serif";
 const M = "'IBM Plex Mono', monospace";
@@ -17,14 +18,16 @@ const RECOVER_STEPS  = ['Email', 'Code', 'OTP', 'Passkey'];
 
 function Steps({ steps, current }) {
   const { t } = useTheme();
+  const { isMobile } = useResponsive();
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 36 }}>
       {steps.map((label, i) => (
         <React.Fragment key={label}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
             <div style={{
-              width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: M, fontSize: 11,
+              width: isMobile ? 32 : 28, height: isMobile ? 32 : 28,
+              borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: M, fontSize: isMobile ? 13 : 11,
               background: i < current ? t.accent : i === current ? t.accentDim : t.cardBg,
               color: i < current ? t.bg : i === current ? t.accent : t.text3,
               border: `1px solid ${i <= current ? t.accentBorder : t.border}`,
@@ -32,7 +35,7 @@ function Steps({ steps, current }) {
             }}>
               {i < current ? '✓' : i + 1}
             </div>
-            <span style={{ fontFamily: M, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: i === current ? t.accent : t.text3 }}>
+            <span style={{ fontFamily: M, fontSize: isMobile ? 11 : 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: i === current ? t.accent : t.text3 }}>
               {label}
             </span>
           </div>
@@ -49,14 +52,14 @@ function Input({ label, ...props }) {
   const { t } = useTheme();
   return (
     <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', fontFamily: M, fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', color: t.text3, marginBottom: 7 }}>
+      <label style={{ display: 'block', fontFamily: M, fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: t.text3, marginBottom: 7 }}>
         {label}
       </label>
       <input
         style={{
           width: '100%', boxSizing: 'border-box',
-          padding: '11px 14px', borderRadius: 10,
-          fontFamily: F, fontSize: 15, color: t.text1,
+          padding: '13px 14px', borderRadius: 10,
+          fontFamily: F, fontSize: 16, color: t.text1,
           background: t.cardBg, border: `1px solid ${t.border}`,
           outline: 'none', transition: 'border-color 0.2s',
         }}
@@ -74,8 +77,8 @@ function PrimaryBtn({ children, loading, disabled, ...props }) {
     <button
       disabled={disabled || loading}
       style={{
-        width: '100%', padding: '12px', borderRadius: 11,
-        fontFamily: F, fontSize: 15, fontWeight: 500, cursor: disabled || loading ? 'not-allowed' : 'pointer',
+        width: '100%', padding: '14px 12px', borderRadius: 11,
+        fontFamily: F, fontSize: 16, fontWeight: 500, cursor: disabled || loading ? 'not-allowed' : 'pointer',
         background: t.accentDim, color: t.accent, border: `1px solid ${t.accentBorder}`,
         opacity: disabled || loading ? 0.6 : 1, transition: 'opacity 0.2s',
       }}
@@ -1045,6 +1048,7 @@ function RecoverFlow({ onSuccess }) {
 export default function Auth() {
   const { t } = useTheme();
   const { user, setUser, loading, enabled } = useAuth();
+  const { isMobile } = useResponsive();
   const navigate = useNavigate();
   const [tab, setTab] = useState('signin');
 
@@ -1074,16 +1078,16 @@ export default function Auth() {
   };
 
   return (
-    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 24px 40px' }}>
+    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '72px 16px 32px' : '80px 24px 40px' }}>
       <div style={{ width: '100%', maxWidth: 420 }}>
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <div style={{ fontFamily: M, fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.accentMuted, marginBottom: 10 }}>
+          <div style={{ fontFamily: M, fontSize: isMobile ? 13 : 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.accentMuted, marginBottom: 10 }}>
             varunr.dev
           </div>
-          <h1 style={{ fontFamily: F, fontWeight: 300, fontSize: 28, color: t.text1, marginBottom: 8 }}>
+          <h1 style={{ fontFamily: F, fontWeight: 300, fontSize: isMobile ? 26 : 28, color: t.text1, marginBottom: 8 }}>
             {titles[tab]}
           </h1>
-          <p style={{ fontFamily: F, fontSize: 14, color: t.text2 }}>
+          <p style={{ fontFamily: F, fontSize: isMobile ? 16 : 14, color: t.text2 }}>
             Passwordless. Secured by your device.
           </p>
         </div>
@@ -1091,8 +1095,8 @@ export default function Auth() {
         <div style={{ display: 'flex', background: t.cardBg, borderRadius: 11, padding: 4, marginBottom: 32, border: `1px solid ${t.border}` }}>
           {tabs.map(({ id, label }) => (
             <button key={id} onClick={() => setTab(id)} style={{
-              flex: 1, padding: '9px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              fontFamily: F, fontSize: 13, fontWeight: 500,
+              flex: 1, padding: isMobile ? '12px 9px' : '9px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              fontFamily: F, fontSize: isMobile ? 16 : 13, fontWeight: 500,
               background: tab === id ? t.accentDim : 'transparent',
               color: tab === id ? t.accent : t.text2,
               transition: 'all 0.2s',
@@ -1102,13 +1106,13 @@ export default function Auth() {
           ))}
         </div>
 
-        <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 16, padding: '28px 28px 24px' }}>
+        <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 16, padding: isMobile ? '24px 16px 20px' : '28px 28px 24px' }}>
           {tab === 'signin'   && <SignInFlow   key="signin"   onSuccess={onSuccess} />}
           {tab === 'register' && <RegisterFlow key="register" onSuccess={onSuccess} />}
           {tab === 'recover'  && <RecoverFlow  key="recover"  onSuccess={onSuccess} />}
         </div>
 
-        <p style={{ textAlign: 'center', fontFamily: M, fontSize: 10, color: t.text3, marginTop: 24, letterSpacing: '0.1em' }}>
+        <p style={{ textAlign: 'center', fontFamily: M, fontSize: isMobile ? 12 : 10, color: t.text3, marginTop: 24, letterSpacing: '0.1em' }}>
           No passwords. Your device is your key.
         </p>
       </div>

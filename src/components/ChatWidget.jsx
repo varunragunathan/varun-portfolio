@@ -100,9 +100,9 @@ function ChatPanel({ onClose, t }) {
     <>
       <div style={{
         position:      'fixed',
-        bottom:        80,
-        right:         24,
-        width:         'min(420px, calc(100vw - 48px))',
+        bottom:        'calc(80px + env(safe-area-inset-bottom, 0px))',
+        right:         'max(24px, env(safe-area-inset-right, 24px))',
+        width:         'min(420px, calc(100vw - 32px))',
         height:        'min(560px, calc(100vh - 120px))',
         borderRadius:  20,
         background:    t.surface,
@@ -334,8 +334,8 @@ export default function ChatWidget() {
         aria-label={open ? 'Close chat' : 'Open chat'}
         style={{
           position:       'fixed',
-          bottom:         24,
-          right:          24,
+          bottom:         'calc(24px + env(safe-area-inset-bottom, 0px))',
+          right:          'max(24px, env(safe-area-inset-right, 24px))',
           width:          48,
           height:         48,
           borderRadius:   '50%',
