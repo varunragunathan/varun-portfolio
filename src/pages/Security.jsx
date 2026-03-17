@@ -509,6 +509,9 @@ const EVENT_LABELS = {
   totp_enabled:  'Authenticator app enabled',
   totp_disabled: 'Authenticator app removed',
   totp_signin:   'Signed in with authenticator app',
+  whatsapp_phone_added:   'WhatsApp backup added',
+  whatsapp_phone_removed: 'WhatsApp backup removed',
+  whatsapp_signin:        'Signed in via WhatsApp',
 };
 
 const EVENT_COLORS = {
@@ -518,6 +521,8 @@ const EVENT_COLORS = {
   recovery_code_failed: '#ef4444',
   account_frozen: '#ef4444',
   account_recovery: '#f59e0b',
+  whatsapp_phone_added: '#25d366',
+  whatsapp_signin: '#25d366',
 };
 
 function SecurityEvents() {
@@ -552,6 +557,213 @@ function SecurityEvents() {
         </Row>
       ))}
     </>
+  );
+}
+
+// ── WhatsApp backup ───────────────────────────────────────────────
+const WA_GREEN = '#25d366';
+
+function WhatsAppSection() {
+  const { t } = useTheme();
+  // 'loading' | 'none' | 'adding' | 'confirming' | 'verified'
+  const [stage,       setStage]       = useState('loading');
+  const [maskedPhone, setMaskedPhone] = useState(null);
+  const [phoneInput,  setPhoneInput]  = useState('');
+  const [code,        setCode]        = useState('');
+  const [busy,        setBusy]        = useState(false);
+  const [error,       setError]       = useState(null);
+  const [info,        setInfo]        = useState(null);
+
+  useEffect(() => {
+    fetch('/api/auth/whatsapp/status', { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => {
+        if (data.verified) { setMaskedPhone(data.phoneNumber); setStage('verified'); }
+        else setStage('none');
+      })
+      .catch(() => setStage('none'));
+  }, []);
+
+  async function handleSendOTP(e) {
+    e.preventDefault();
+    setBusy(true); setError(null);
+    const res = await fetch('/api/auth/whatsapp/send-otp', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumber: phoneInput }),
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) return setError(data.error || 'Failed to send');
+    setMaskedPhone(data.maskedPhone);
+    setInfo(`Code sent to ${data.maskedPhone} via WhatsApp`);
+    setStage('confirming');
+  }
+
+  async function handleConfirm(e) {
+    e.preventDefault();
+    setBusy(true); setError(null);
+    const res = await fetch('/api/auth/whatsapp/confirm', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) return setError(data.error || 'Verification failed');
+    setMaskedPhone(data.maskedPhone);
+    setInfo(null);
+    setStage('verified');
+  }
+
+  async function handleRemove() {
+    setBusy(true); setError(null);
+    const res = await fetch('/api/auth/whatsapp/phone', { method: 'DELETE', credentials: 'include' });
+    setBusy(false);
+    if (!res.ok) return setError('Failed to remove');
+    setMaskedPhone(null);
+    setPhoneInput(''); setCode('');
+    setStage('none');
+  }
+
+  if (stage === 'loading') {
+    return <Row last><span style={{ fontFamily: F, fontSize: 14, color: t.text3 }}>Loading…</span></Row>;
+  }
+
+  if (stage === 'verified') {
+    return (
+      <Row last>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 16 }}>📱</span>
+            <span style={{ fontFamily: F, fontSize: 14, color: t.text1 }}>{maskedPhone}</span>
+            <Badge color={WA_GREEN}>Verified</Badge>
+          </div>
+          <div style={{ fontFamily: F, fontSize: 13, color: t.text3 }}>
+            You can use WhatsApp OTP as a sign-in backup when your passkey is unavailable.
+          </div>
+          {error && <div style={{ fontFamily: F, fontSize: 13, color: '#f87171', marginTop: 8 }}>{error}</div>}
+        </div>
+        <DangerBtn onClick={handleRemove} loading={busy}>Remove</DangerBtn>
+      </Row>
+    );
+  }
+
+  if (stage === 'none') {
+    return (
+      <Row last>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: F, fontSize: 14, color: t.text1, marginBottom: 4 }}>
+            WhatsApp backup
+          </div>
+          <div style={{ fontFamily: F, fontSize: 13, color: t.text3, marginBottom: 14 }}>
+            Add a phone number to receive OTPs via WhatsApp when your passkey fails.
+          </div>
+          <form onSubmit={handleSendOTP} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input
+              type="tel"
+              value={phoneInput}
+              onChange={e => setPhoneInput(e.target.value)}
+              placeholder="+1 415 555 0100"
+              required
+              style={{
+                flex: 1, minWidth: 160,
+                padding: '9px 14px', borderRadius: 9,
+                fontFamily: M, fontSize: 13, color: t.text1,
+                background: t.surfaceAlt, border: `1px solid ${t.border}`,
+                outline: 'none',
+              }}
+            />
+            <button
+              type="submit"
+              disabled={busy || !phoneInput.trim()}
+              style={{
+                padding: '9px 18px', borderRadius: 9, cursor: 'pointer',
+                fontFamily: F, fontSize: 13, fontWeight: 500,
+                background: `rgba(37,211,102,0.12)`, color: WA_GREEN,
+                border: `1px solid rgba(37,211,102,0.3)`,
+                opacity: busy || !phoneInput.trim() ? 0.5 : 1,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {busy ? 'Sending…' : 'Send code'}
+            </button>
+          </form>
+          {error && <div style={{ fontFamily: F, fontSize: 13, color: '#f87171', marginTop: 8 }}>{error}</div>}
+        </div>
+      </Row>
+    );
+  }
+
+  // stage === 'confirming'
+  return (
+    <Row last>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {info && (
+          <div style={{ fontFamily: F, fontSize: 13, color: WA_GREEN, marginBottom: 10 }}>
+            ✓ {info}
+          </div>
+        )}
+        <div style={{ fontFamily: F, fontSize: 14, color: t.text1, marginBottom: 12 }}>
+          Enter the 6-digit code sent to you on WhatsApp:
+        </div>
+        <form onSubmit={handleConfirm} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={code}
+            onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="000000"
+            maxLength={6}
+            autoFocus
+            required
+            style={{
+              width: 120, padding: '9px 14px', borderRadius: 9,
+              fontFamily: M, fontSize: 18, letterSpacing: '0.2em',
+              color: t.text1, background: t.surfaceAlt, border: `1px solid ${t.border}`,
+              outline: 'none', textAlign: 'center',
+            }}
+          />
+          <button
+            type="submit"
+            disabled={code.length < 6 || busy}
+            style={{
+              padding: '9px 18px', borderRadius: 9, cursor: 'pointer',
+              fontFamily: F, fontSize: 13, fontWeight: 500,
+              background: code.length === 6 && !busy ? `rgba(37,211,102,0.12)` : 'transparent',
+              border: `1px solid ${code.length === 6 && !busy ? 'rgba(37,211,102,0.3)' : t.border}`,
+              color: code.length === 6 && !busy ? WA_GREEN : t.text3,
+              transition: 'all 0.15s',
+            }}
+          >
+            {busy ? 'Verifying…' : 'Verify'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setStage('none'); setError(null); setInfo(null); setCode(''); }}
+            style={{
+              padding: '9px 14px', borderRadius: 9, cursor: 'pointer',
+              fontFamily: F, fontSize: 13,
+              background: 'transparent', border: `1px solid ${t.border}`, color: t.text3,
+            }}
+          >
+            Cancel
+          </button>
+        </form>
+        <button
+          type="button"
+          onClick={handleSendOTP}
+          disabled={busy}
+          style={{
+            marginTop: 8, background: 'none', border: 'none', cursor: 'pointer',
+            fontFamily: F, fontSize: 12, color: t.text3, padding: 0,
+          }}
+        >
+          Resend code
+        </button>
+        {error && <div style={{ fontFamily: F, fontSize: 13, color: '#f87171', marginTop: 8 }}>{error}</div>}
+      </div>
+    </Row>
   );
 }
 
@@ -787,6 +999,10 @@ export default function Settings() {
 
           <Section title="Two-factor authentication" subtitle="Backup sign-in method when your passkey is unavailable">
             <TotpSection />
+          </Section>
+
+          <Section title="WhatsApp backup" subtitle="Receive a one-time code via WhatsApp when your passkey is unavailable">
+            <WhatsAppSection />
           </Section>
 
           <Section title="Recent activity" subtitle="Last 20 security events on your account">

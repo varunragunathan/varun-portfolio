@@ -10,6 +10,12 @@ RP_ID = "varunr.dev"
 ORIGIN = "https://varunr.dev"
 ADMIN_EMAIL = "ragunathanvarun@gmail.com"
 
+# ── WhatsApp Business API (Meta Cloud API) ────────────────────────
+# Fill in after Meta app approval. Template must be AUTHENTICATION category.
+WHATSAPP_PHONE_NUMBER_ID = ""
+WHATSAPP_ACCESS_TOKEN    = ""
+WHATSAPP_TEMPLATE_NAME   = "authentication_otp"
+
 
 
 [assets]

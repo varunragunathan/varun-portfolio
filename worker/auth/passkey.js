@@ -196,7 +196,7 @@ export async function getAuthOptions(request, env) {
   });
 
   await env.AUTH_KV.put(`auth_challenge:${user.id}`, options.challenge, { expirationTtl: 60 });
-  return json({ options, userId: user.id });
+  return json({ options, userId: user.id, hasWhatsApp: user.phone_verified === 1 });
 }
 
 export async function verifyAuth(request, env) {

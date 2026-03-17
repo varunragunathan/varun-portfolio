@@ -13,6 +13,10 @@ import {
   deleteAccount,
   updateNickname,
 } from './account.js';
+import {
+  getWhatsAppStatus, sendVerifyOTP, confirmPhone, removePhone,
+  sendSigninOTP, verifySigninOTP,
+} from './whatsapp.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -97,6 +101,14 @@ export async function handleAuth(request, env, url) {
   if (method === 'POST' && path === '/totp/enable')                 return totpEnable(request, env);
   if (method === 'POST' && path === '/totp/disable')                return totpDisable(request, env);
   if (method === 'POST' && path === '/totp/signin')                 return totpSignin(request, env);
+
+  // ── WhatsApp backup auth ─────────────────────────────────────────
+  if (method === 'GET'    && path === '/whatsapp/status')           return getWhatsAppStatus(request, env);
+  if (method === 'POST'   && path === '/whatsapp/send-otp')         return sendVerifyOTP(request, env);
+  if (method === 'POST'   && path === '/whatsapp/confirm')          return confirmPhone(request, env);
+  if (method === 'DELETE' && path === '/whatsapp/phone')            return removePhone(request, env);
+  if (method === 'POST'   && path === '/whatsapp/signin/send')      return sendSigninOTP(request, env);
+  if (method === 'POST'   && path === '/whatsapp/signin/verify')    return verifySigninOTP(request, env);
 
   return json({ error: 'Not found' }, 404);
 }

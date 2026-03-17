@@ -524,7 +524,7 @@ function RegisterFlow({ onSuccess }) {
 // Full account recovery (wipes passkeys) lives in the separate "Recover" tab.
 function SignInFlow({ onSuccess }) {
   const { t } = useTheme();
-  // view: 'email' | 'passkey' | 'recovery' | 'totp'
+  // view: 'email' | 'passkey' | 'recovery' | 'totp' | 'whatsapp'
   const [view, setView]               = useState('email');
   const [email, setEmail]             = useState('');
   const [userId, setUserId]           = useState('');
@@ -533,9 +533,15 @@ function SignInFlow({ onSuccess }) {
   const [passkeyFailed, setPasskeyFailed]       = useState(false);
   const [passkeySupported, setPasskeySupported] = useState(true);
   const [totpCode, setTotpCode]                 = useState('');
+  const [hasWhatsApp, setHasWhatsApp]           = useState(false);
 
   // Recovery code sign-in
   const [recoveryCode, setRecoveryCode] = useState('');
+
+  // WhatsApp sign-in
+  const [waCode,        setWaCode]        = useState('');
+  const [waMaskedPhone, setWaMaskedPhone] = useState(null);
+  const [waSent,        setWaSent]        = useState(false);
 
   // Number matching state
   const [numMatchCode, setNumMatchCode] = useState(null);
@@ -651,6 +657,7 @@ function SignInFlow({ onSuccess }) {
       const data = await res.json();
       if (!res.ok) return setError('Something went wrong. Please try again.');
       setUserId(data.userId);
+      setHasWhatsApp(!!data.hasWhatsApp);
       setView('passkey');
       setPasskeyFailed(false);
       await promptPasskey(data.userId, data.options);
@@ -705,6 +712,45 @@ function SignInFlow({ onSuccess }) {
       });
       const data = await res.json();
       if (!res.ok) return setError(data.error || 'Invalid recovery code');
+      setPendingToken(data.pendingToken);
+      setShowTrust(true);
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSendWhatsApp() {
+    setBusy(true); setError(null);
+    try {
+      const res = await fetch('/api/auth/whatsapp/signin/send', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Failed to send'); setBusy(false); return; }
+      setWaMaskedPhone(data.maskedPhone);
+      setWaSent(true);
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleVerifyWhatsApp(e) {
+    e.preventDefault();
+    setBusy(true); setError(null);
+    try {
+      const res = await fetch('/api/auth/whatsapp/signin/verify', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, code: waCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Invalid code'); return; }
       setPendingToken(data.pendingToken);
       setShowTrust(true);
     } catch {
@@ -811,6 +857,28 @@ function SignInFlow({ onSuccess }) {
                   <div style={{ fontSize: 11, color: t.text3 }}>6-digit code from your authenticator app</div>
                 </div>
               </button>
+
+              {/* WhatsApp — only shown if user has a registered phone */}
+              {hasWhatsApp && (
+                <button
+                  onClick={() => { setView('whatsapp'); setError(null); setWaCode(''); setWaSent(false); handleSendWhatsApp(); }}
+                  style={{
+                    width: '100%', padding: '11px 14px', borderRadius: 10, marginTop: 8,
+                    background: 'none', border: '1px solid rgba(37,211,102,0.3)',
+                    fontFamily: F, fontSize: 13, color: t.text2, cursor: 'pointer',
+                    textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10,
+                    transition: 'border-color 0.2s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(37,211,102,0.6)')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(37,211,102,0.3)')}
+                >
+                  <span style={{ fontSize: 16 }}>💬</span>
+                  <div>
+                    <div style={{ fontWeight: 500, marginBottom: 2, color: '#25d366' }}>Use WhatsApp</div>
+                    <div style={{ fontSize: 11, color: t.text3 }}>OTP sent to your registered WhatsApp number</div>
+                  </div>
+                </button>
+              )}
             </div>
           )}
 
@@ -867,6 +935,47 @@ function SignInFlow({ onSuccess }) {
             ← Back to passkey
           </button>
         </form>
+      )}
+
+      {view === 'whatsapp' && (
+        <div>
+          {!waSent ? (
+            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+              <div style={{ fontSize: 32, marginBottom: 12 }}>💬</div>
+              <p style={{ fontFamily: F, fontSize: 14, color: t.text2, lineHeight: 1.6 }}>
+                Sending a code to your WhatsApp…
+              </p>
+              {error && <Message text={error} type="error" />}
+            </div>
+          ) : (
+            <form onSubmit={handleVerifyWhatsApp}>
+              <p style={{ fontFamily: F, fontSize: 14, color: t.text2, lineHeight: 1.6, marginBottom: 20 }}>
+                Enter the 6-digit code sent to{' '}
+                <strong style={{ color: '#25d366' }}>{waMaskedPhone}</strong> via WhatsApp.
+              </p>
+              <Input
+                label="WhatsApp code"
+                type="text"
+                value={waCode}
+                onChange={e => setWaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                required autoFocus
+                placeholder="000000"
+                inputMode="numeric"
+                spellCheck={false}
+              />
+              <PrimaryBtn loading={busy} type="submit">Sign in →</PrimaryBtn>
+              {error && <Message text={error} type="error" />}
+              <button type="button" onClick={() => { setWaSent(false); handleSendWhatsApp(); }}
+                style={{ width: '100%', marginTop: 8, padding: '8px', background: 'none', border: 'none', fontFamily: F, fontSize: 12, color: t.text3, cursor: 'pointer' }}>
+                Resend code
+              </button>
+            </form>
+          )}
+          <button type="button" onClick={() => { setView('passkey'); setError(null); setWaSent(false); setWaCode(''); }}
+            style={{ width: '100%', marginTop: 10, padding: '10px', background: 'none', border: 'none', fontFamily: F, fontSize: 13, color: t.text3, cursor: 'pointer' }}>
+            ← Back to passkey
+          </button>
+        </div>
       )}
     </div>
   );
