@@ -483,7 +483,7 @@ function ChatArea({ t, onNewConversation, onOpenSidebar, isMobile, initialConver
           const isLast      = i === messages.length - 1;
           const isWaiting   = streaming && isLast && m.role === 'assistant' && !m.content;
           const isStreaming  = streaming && isLast && m.role === 'assistant' && !!m.content;
-          const showAvatar  = m.role === 'assistant' && !messages.slice(0, i).some(msg => msg.role === 'assistant');
+          const showAvatar  = m.role === 'assistant' && !messages.slice(i + 1).some(msg => msg.role === 'assistant');
           return isWaiting
             ? <OwlWaiting key={m.id} t={t} />
             : <MessageBubble key={m.id} message={m} t={t} isStreaming={isStreaming} showAvatar={showAvatar} />;
