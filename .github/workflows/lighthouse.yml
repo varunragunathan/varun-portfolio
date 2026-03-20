@@ -27,25 +27,30 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install LHCI
-        run: npm install -g @lhci/cli
+      - name: Install Lighthouse
+        run: npm install -g lighthouse
 
       - name: Run Lighthouse
-        run: lhci collect --url=https://varunr.dev --numberOfRuns=1
+        run: |
+          lighthouse https://varunr.dev \
+            --output=json \
+            --output=html \
+            --output-path=./lh-report \
+            --chrome-flags="--headless --no-sandbox --disable-gpu" \
+            --quiet
 
       - name: Upload HTML report
         uses: actions/upload-artifact@v4
         with:
           name: lighthouse-report-${{ github.run_id }}
-          path: .lighthouseci/
+          path: ./lh-report.report.html
           retention-days: 30
 
       - name: Append score to history
         run: |
-          REPORT=$(ls .lighthouseci/lhr-*.json 2>/dev/null | tail -1)
           node -e "
             const fs = require('fs');
-            const r = JSON.parse(fs.readFileSync('$REPORT', 'utf8'));
+            const r = JSON.parse(fs.readFileSync('./lh-report.report.json', 'utf8'));
             const c = r.categories;
             const entry = {
               date: new Date().toISOString().split('T')[0],
