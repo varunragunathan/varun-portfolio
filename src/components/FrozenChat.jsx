@@ -6,11 +6,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { useTheme } from '../hooks/useTheme';
 import PixelOwl from './PixelOwl';
-
-const F = "'Outfit', sans-serif";
-const M = "'IBM Plex Mono', monospace";
+import './FrozenChat.css';
 
 const DEMOS = [
   {
@@ -27,12 +24,13 @@ const DEMOS = [
   }
 ];
 
-const CHAR_SPEED_MS = 16;   // ms per character while typing
-const PAUSE_AFTER_MS = 3200; // ms to show complete answer before cycling
-const Q_DELAY_MS = 600;      // ms before typing starts after question appears
+const CHAR_SPEED_MS  = 16;
+const PAUSE_AFTER_MS = 3200;
+const Q_DELAY_MS     = 600;
+
+const DOT_COLORS = ['#ff5f57', '#febc2e', '#28c840'];
 
 export default function FrozenChat({ showCta = true }) {
-  const { t } = useTheme();
   const [idx, setIdx]       = useState(0);
   const [typedA, setTypedA] = useState('');
   const [phase, setPhase]   = useState('show-q'); // show-q | typing-a | done
@@ -77,75 +75,41 @@ export default function FrozenChat({ showCta = true }) {
   }, [phase]);
 
   return (
-    <div style={{
-      background: t.cardBg, border: `1px solid ${t.border}`,
-      borderRadius: 14, overflow: 'hidden',
-    }}>
+    <div className="frozen-chat">
       {/* Header bar */}
-      <div style={{
-        padding: '10px 14px', borderBottom: `1px solid ${t.border}`,
-        display: 'flex', alignItems: 'center', gap: 8,
-      }}>
-        <div style={{ display: 'flex', gap: 5 }}>
-          {['#ff5f57','#febc2e','#28c840'].map(c => (
-            <div key={c} style={{ width: 10, height: 10, borderRadius: '50%', background: c, opacity: 0.6 }} />
+      <div className="frozen-chat__header">
+        <div className="frozen-chat__header-dots">
+          {DOT_COLORS.map(c => (
+            <div key={c} className="frozen-chat__header-dot" style={{ background: c }} />
           ))}
         </div>
-        <span style={{ fontFamily: M, fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: t.text3, flex: 1, textAlign: 'center' }}>
-          AI assistant · demo
-        </span>
-        <div style={{ display: 'flex', gap: 4 }}>
+        <span className="frozen-chat__header-label">AI assistant · demo</span>
+        <div className="frozen-chat__indicators">
           {DEMOS.map((_, i) => (
-            <div key={i} style={{
-              width: 5, height: 5, borderRadius: '50%',
-              background: i === idx ? t.accent : t.border,
-              transition: 'background 0.3s',
-            }} />
+            <div
+              key={i}
+              className={`frozen-chat__indicator${i === idx ? ' frozen-chat__indicator--active' : ''}`}
+            />
           ))}
         </div>
       </div>
 
       {/* Messages */}
-      <div style={{
-        padding: '14px 14px',
-        height: 240,
-        overflow: 'hidden',
-        opacity: visible ? 1 : 0,
-        transition: 'opacity 0.35s ease',
-        position: 'relative',
-      }}>
+      <div className={`frozen-chat__messages${visible ? '' : ' frozen-chat__messages--hidden'}`}>
         {/* User bubble */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-          <div style={{
-            maxWidth: '82%', padding: '9px 13px',
-            borderRadius: '14px 14px 4px 14px',
-            background: t.accentDim, border: `1px solid ${t.accentBorder}`,
-            fontFamily: F, fontSize: 13, color: t.text1, lineHeight: 1.5,
-          }}>
-            {demo.q}
-          </div>
+        <div className="frozen-chat__user-bubble">
+          <div className="frozen-chat__user-message">{demo.q}</div>
         </div>
 
         {/* Assistant bubble */}
         {phase !== 'show-q' && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-            <div style={{ flexShrink: 0, marginTop: 2 }}>
+          <div className="frozen-chat__assistant-row">
+            <div className="frozen-chat__owl">
               <PixelOwl size={2} state={phase === 'typing-a' ? 'streaming' : 'done'} />
             </div>
-            <div style={{
-              padding: '9px 13px', borderRadius: '14px 14px 14px 4px',
-              background: t.surface, border: `1px solid ${t.border}`,
-              fontFamily: F, fontSize: 13, color: t.text2, lineHeight: 1.6,
-              minHeight: 38,
-            }}>
+            <div className="frozen-chat__assistant-message">
               {typedA}
-              {phase === 'typing-a' && (
-                <span style={{
-                  display: 'inline-block', width: 2, height: '1em',
-                  background: t.accent, marginLeft: 2, verticalAlign: 'text-bottom',
-                  animation: 'fc-blink 0.7s step-end infinite',
-                }} />
-              )}
+              {phase === 'typing-a' && <span className="frozen-chat__cursor" />}
             </div>
           </div>
         )}
@@ -153,34 +117,11 @@ export default function FrozenChat({ showCta = true }) {
 
       {/* Frosted CTA */}
       {showCta && (
-        <div style={{
-          borderTop: `1px solid ${t.border}`,
-          padding: '12px 14px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-        }}>
-          <span style={{ fontFamily: M, fontSize: 10, color: t.text3, letterSpacing: '0.03em' }}>
-            Sign in to ask your own questions
-          </span>
-          <Link
-            to="/auth"
-            style={{
-              flexShrink: 0, textDecoration: 'none',
-              fontFamily: M, fontSize: 10, letterSpacing: '0.07em',
-              color: t.accent, background: t.accentDim, border: `1px solid ${t.accentBorder}`,
-              borderRadius: 8, padding: '5px 12px',
-            }}
-          >
-            Sign in →
-          </Link>
+        <div className="frozen-chat__cta">
+          <span className="frozen-chat__cta-text">Sign in to ask your own questions</span>
+          <Link to="/auth" className="frozen-chat__cta-link">Sign in →</Link>
         </div>
       )}
-
-      <style>{`
-        @keyframes fc-blink {
-          0%, 100% { opacity: 1; }
-          50%       { opacity: 0; }
-        }
-      `}</style>
     </div>
   );
 }

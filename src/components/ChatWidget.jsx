@@ -6,62 +6,38 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
 import { useChat } from '../hooks/useChat';
 import StreamingStatus from './StreamingStatus';
 import ModelPicker from './ModelPicker';
 import UpgradeModal from './UpgradeModal';
-
-const F = "'Outfit', sans-serif";
-const M = "'IBM Plex Mono', monospace";
+import './ChatWidget.css';
 
 // ── Message bubble ───────────────────────────────────────────────
-function MessageBubble({ message, t }) {
+function MessageBubble({ message }) {
   const isUser = message.role === 'user';
   return (
-    <div style={{
-      display:        'flex',
-      justifyContent: isUser ? 'flex-end' : 'flex-start',
-      marginBottom:   12,
-    }}>
-      <div style={{
-        maxWidth:     '84%',
-        padding:      '10px 14px',
-        borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-        background:   isUser ? t.accentDim : t.surface,
-        border:       `1px solid ${isUser ? t.accentBorder : t.border}`,
-        fontFamily:   F,
-        fontSize:     14,
-        lineHeight:   1.6,
-        color:        t.text1,
-        whiteSpace:   'pre-wrap',
-        wordBreak:    'break-word',
-      }}>
-        {message.content || (
-          <span style={{ color: t.text3, fontFamily: M, fontSize: 12 }}>
-            ▋
-          </span>
-        )}
+    <div className={`message-bubble message-bubble--${isUser ? 'user' : 'assistant'}`}>
+      <div className="message-bubble__inner">
+        {message.content || <span className="message-bubble__cursor">▋</span>}
       </div>
     </div>
   );
 }
 
 // ── Chat panel ───────────────────────────────────────────────────
-function ChatPanel({ onClose, t }) {
+function ChatPanel({ onClose }) {
   const { messages, streaming, error, send, reset } = useChat();
   const { isPro, isAdmin, user }  = useAuth();
   const [input, setInput]         = useState('');
   const [selectedModel, setSelectedModel] = useState(null);
   const [models, setModels]       = useState([]);
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const bottomRef                 = useRef(null);
-  const textareaRef               = useRef(null);
+  const bottomRef   = useRef(null);
+  const textareaRef = useRef(null);
 
   const canPickModel = isPro || isAdmin;
 
-  // Fetch available models for pro/admin users
   useEffect(() => {
     if (!canPickModel) return;
     fetch('/api/chat/models', { credentials: 'include' })
@@ -71,7 +47,6 @@ function ChatPanel({ onClose, t }) {
         const list = data.models ?? data;
         if (Array.isArray(list) && list.length > 0) {
           setModels(list);
-          // Default to first model
           setSelectedModel(list[0].model_id);
         }
       })
@@ -96,99 +71,42 @@ function ChatPanel({ onClose, t }) {
     }
   }, [handleSend]);
 
+  const sendActive = input.trim() && !streaming;
+
   return (
     <>
-      <div style={{
-        position:      'fixed',
-        bottom:        'calc(80px + env(safe-area-inset-bottom, 0px))',
-        right:         'max(24px, env(safe-area-inset-right, 24px))',
-        width:         'min(420px, calc(100vw - 32px))',
-        height:        'min(560px, calc(100vh - 120px))',
-        borderRadius:  20,
-        background:    t.surface,
-        border:        `1px solid ${t.border}`,
-        boxShadow:     '0 24px 80px rgba(0,0,0,0.35)',
-        display:       'flex',
-        flexDirection: 'column',
-        zIndex:        999,
-        overflow:      'hidden',
-      }}>
+      <div className="chat-panel" role="dialog" aria-label="Chat assistant">
         {/* Header */}
-        <div style={{
-          padding:        '14px 18px',
-          borderBottom:   `1px solid ${t.border}`,
-          display:        'flex',
-          alignItems:     'center',
-          justifyContent: 'space-between',
-          flexShrink:     0,
-        }}>
-          <div>
-            <div style={{ fontFamily: F, fontSize: 15, fontWeight: 600, color: t.text1 }}>
-              Ask anything
-            </div>
-            <div style={{ fontFamily: M, fontSize: 10, color: t.accentMuted, marginTop: 2 }}>
-              RAG · llama-3.3-70b
-            </div>
+        <div className="chat-panel__header">
+          <div className="chat-panel__title-group">
+            <div className="chat-panel__title">Ask anything</div>
+            <div className="chat-panel__subtitle">RAG · llama-3.3-70b</div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Link to="/chat" onClick={onClose} style={{
-              fontFamily: M, fontSize: 10, color: t.text3, textDecoration: 'none',
-              padding: '4px 8px', borderRadius: 6, border: `1px solid ${t.border}`,
-            }}>
-              full view
-            </Link>
-            <button
-              onClick={reset}
-              title="New conversation"
-              style={{
-                background: 'none', border: `1px solid ${t.border}`, borderRadius: 6,
-                padding: '4px 8px', cursor: 'pointer', color: t.text3,
-                fontFamily: M, fontSize: 10,
-              }}
-            >
-              new
-            </button>
-            <button
-              onClick={onClose}
-              aria-label="Close chat"
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: t.text3, fontSize: 18, lineHeight: 1, padding: '2px 4px',
-              }}
-            >
-              ×
-            </button>
+          <div className="chat-panel__header-actions">
+            <Link to="/chat" onClick={onClose} className="chat-panel__full-link">full view</Link>
+            <button onClick={reset} title="New conversation" className="chat-panel__new-btn">new</button>
+            <button onClick={onClose} aria-label="Close chat" className="chat-panel__close-btn">×</button>
           </div>
         </div>
 
         {/* Model picker bar (pro/admin only) */}
         {canPickModel && models.length > 0 && (
-          <div style={{
-            padding: '8px 18px',
-            borderBottom: `1px solid ${t.border}`,
-            display: 'flex', alignItems: 'center', gap: 8,
-            flexShrink: 0,
-          }}>
-            <span style={{ fontFamily: M, fontSize: 10, color: t.text3, letterSpacing: '0.06em' }}>
-              model
-            </span>
+          <div className="chat-panel__model-bar">
+            <span className="chat-panel__model-label">model</span>
             <ModelPicker
               selectedModel={selectedModel}
               onSelect={setSelectedModel}
               models={models}
-              t={t}
             />
           </div>
         )}
 
         {/* Messages */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 14px' }}>
+        <div className="chat-panel__messages">
           {messages.length === 0 && (
-            <div style={{ textAlign: 'center', marginTop: 48 }}>
-              <div style={{ fontFamily: M, fontSize: 11, color: t.text3, letterSpacing: '0.1em' }}>
-                ASK ABOUT THE SITE
-              </div>
-              <div style={{ fontFamily: F, fontSize: 13, color: t.text3, marginTop: 8, lineHeight: 1.6 }}>
+            <div className="chat-panel__empty">
+              <div className="chat-panel__empty-label">ASK ABOUT THE SITE</div>
+              <div className="chat-panel__empty-text">
                 Architecture, auth system,<br />passkeys, RAG pipeline…
               </div>
 
@@ -197,35 +115,18 @@ function ChatPanel({ onClose, t }) {
                 const status = user.upgradeRequest?.status;
                 if (status === 'pending') {
                   return (
-                    <div style={{
-                      marginTop: 20,
-                      display: 'inline-flex', alignItems: 'center', gap: 6,
-                      fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
-                      padding: '5px 14px', borderRadius: 20,
-                      background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.3)',
-                      color: '#f5a623',
-                    }}>
+                    <div className="chat-panel__upgrade-pending">
                       <span>⏳</span> Pro request under review
                     </div>
                   );
                 }
                 if (!status || status === 'rejected') {
                   return (
-                    <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                      <button
-                        onClick={() => setShowUpgrade(true)}
-                        style={{
-                          fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
-                          padding: '6px 16px', borderRadius: 20, cursor: 'pointer',
-                          background: t.accentDim, border: `1px solid ${t.accentBorder}`,
-                          color: t.accent,
-                        }}
-                      >
+                    <div className="chat-panel__upgrade-cta">
+                      <button onClick={() => setShowUpgrade(true)} className="chat-panel__upgrade-btn">
                         ✦ Upgrade to Pro
                       </button>
-                      <span style={{ fontFamily: F, fontSize: 11, color: t.text3 }}>
-                        More models · higher rate limits
-                      </span>
+                      <span className="chat-panel__upgrade-hint">More models · higher rate limits</span>
                     </div>
                   );
                 }
@@ -233,55 +134,28 @@ function ChatPanel({ onClose, t }) {
               })()}
             </div>
           )}
+
           {messages.map((m, i) => {
             const isWaiting = streaming && i === messages.length - 1 && m.role === 'assistant' && !m.content;
             return isWaiting
-              ? <StreamingStatus key={m.id} t={t} />
-              : <MessageBubble key={m.id} message={m} t={t} />;
+              ? <StreamingStatus key={m.id} />
+              : <MessageBubble key={m.id} message={m} />;
           })}
-          {error && (
-            <div style={{
-              fontFamily: M, fontSize: 11, color: '#ff6b6b', textAlign: 'center',
-              padding: '8px 12px', background: 'rgba(255,107,107,0.08)',
-              borderRadius: 8, marginTop: 8,
-            }}>
-              {error}
-            </div>
-          )}
+
+          {error && <div className="chat-panel__error">{error}</div>}
           <div ref={bottomRef} />
         </div>
 
         {/* Input */}
-        <div style={{
-          padding:    '12px 14px',
-          borderTop:  `1px solid ${t.border}`,
-          display:    'flex',
-          gap:        8,
-          alignItems: 'flex-end',
-          flexShrink: 0,
-        }}>
+        <div className="chat-panel__input-row">
           <textarea
             ref={textareaRef}
+            className="chat-panel__input"
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKey}
             placeholder="Ask a question…"
             rows={1}
-            style={{
-              flex:         1,
-              resize:       'none',
-              background:   t.surfaceAlt,
-              border:       `1px solid ${t.border}`,
-              borderRadius: 12,
-              padding:      '10px 14px',
-              fontFamily:   F,
-              fontSize:     14,
-              color:        t.text1,
-              outline:      'none',
-              lineHeight:   1.5,
-              maxHeight:    120,
-              overflowY:    'auto',
-            }}
             onInput={e => {
               e.target.style.height = 'auto';
               e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
@@ -289,26 +163,14 @@ function ChatPanel({ onClose, t }) {
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || streaming}
-            style={{
-              background:    input.trim() && !streaming ? t.accentDim : 'transparent',
-              border:        `1px solid ${input.trim() && !streaming ? t.accentBorder : t.border}`,
-              borderRadius:  12,
-              padding:       '10px 16px',
-              cursor:        input.trim() && !streaming ? 'pointer' : 'default',
-              color:         input.trim() && !streaming ? t.accent : t.text3,
-              fontFamily:    M,
-              fontSize:      13,
-              transition:    'all 0.2s',
-              flexShrink:    0,
-            }}
+            disabled={!sendActive}
+            className={`chat-panel__send-btn${sendActive ? ' chat-panel__send-btn--active' : ' chat-panel__send-btn--idle'}`}
           >
             {streaming ? '…' : '↑'}
           </button>
         </div>
       </div>
 
-      {/* Upgrade modal */}
       {showUpgrade && (
         <UpgradeModal
           onClose={() => setShowUpgrade(false)}
@@ -321,36 +183,17 @@ function ChatPanel({ onClose, t }) {
 
 // ── Floating button ──────────────────────────────────────────────
 export default function ChatWidget() {
-  const { t }           = useTheme();
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      {open && <ChatPanel onClose={() => setOpen(false)} t={t} />}
+      {open && <ChatPanel onClose={() => setOpen(false)} />}
 
-      {/* FAB */}
       <button
+        id="chat-widget"
         onClick={() => setOpen(o => !o)}
         aria-label={open ? 'Close chat' : 'Open chat'}
-        style={{
-          position:       'fixed',
-          bottom:         'calc(24px + env(safe-area-inset-bottom, 0px))',
-          right:          'max(24px, env(safe-area-inset-right, 24px))',
-          width:          48,
-          height:         48,
-          borderRadius:   '50%',
-          background:     open ? t.surface : t.accentDim,
-          border:         `1px solid ${open ? t.border : t.accentBorder}`,
-          cursor:         'pointer',
-          display:        'flex',
-          alignItems:     'center',
-          justifyContent: 'center',
-          boxShadow:      '0 4px 20px rgba(0,0,0,0.25)',
-          transition:     'all 0.2s',
-          zIndex:         1000,
-          color:          open ? t.text3 : t.accent,
-          fontSize:       open ? 20 : 18,
-        }}
+        className={`chat-widget__fab chat-widget__fab--${open ? 'open' : 'closed'}`}
       >
         {open ? '×' : (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">

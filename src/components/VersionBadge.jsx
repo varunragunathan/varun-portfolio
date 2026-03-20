@@ -1,10 +1,9 @@
 import React, { useRef, useEffect } from 'react';
-import { useTheme } from '../hooks/useTheme';
 import { usePrefersReducedMotion } from '../hooks/useAnimations.js';
 import pkg from '../../package.json';
+import './VersionBadge.css';
 
 const LINE_H = 13; // px — matches 10px mono with natural leading
-const M      = "'IBM Plex Mono', monospace";
 
 function DigitSlot({ digit, delay }) {
   const ref     = useRef(null);
@@ -39,10 +38,10 @@ function DigitSlot({ digit, delay }) {
   }, [digit, delay, reduced, finalY]);
 
   return (
-    <span style={{ display: 'inline-block', height: LINE_H, overflow: 'hidden', verticalAlign: 'top' }}>
-      <span ref={ref} style={{ display: 'flex', flexDirection: 'column' }}>
+    <span className="version-badge__digit">
+      <span ref={ref} className="version-badge__reel">
         {digits.map((d, i) => (
-          <span key={i} style={{ display: 'block', height: LINE_H, lineHeight: `${LINE_H}px` }}>{d}</span>
+          <span key={i} className="version-badge__reel-item">{d}</span>
         ))}
       </span>
     </span>
@@ -53,21 +52,17 @@ function DigitSlot({ digit, delay }) {
 // Reads version from package.json. Each digit animates slot-machine
 // style on mount. fontSize defaults to 10 (footer size).
 export default function VersionBadge({ fontSize = 10, color }) {
-  const { t }  = useTheme();
-  const chars  = `v${pkg.version}`.split('');
+  const chars = `v${pkg.version}`.split('');
 
   return (
-    <span style={{
-      fontFamily: M, fontSize,
-      letterSpacing: '0.08em',
-      color: color ?? t.text3,
-      display: 'inline-flex',
-      alignItems: 'flex-start',
-    }}>
+    <span
+      className="version-badge"
+      style={{ fontSize, ...(color ? { color } : {}) }}
+    >
       {chars.map((char, i) => (
         /\d/.test(char)
           ? <DigitSlot key={i} digit={parseInt(char)} delay={300 + i * 90} />
-          : <span key={i} style={{ lineHeight: `${LINE_H}px` }}>{char}</span>
+          : <span key={i} className="version-badge__char">{char}</span>
       ))}
     </span>
   );

@@ -1,0 +1,104 @@
+/* ── Nav ──────────────────────────────────────────────────────────── */
+@keyframes fadeSlideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  border-bottom: 1px solid var(--border);
+  background: var(--nav-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.nav__inner {
+  max-width: 920px; margin: 0 auto; padding: 0 24px;
+  height: 52px; display: flex; align-items: center;
+}
+.nav__spacer { flex: 1; }
+.nav__actions { flex: 1; display: flex; justify-content: flex-end; align-items: center; }
+
+/* ── Logo ─────────────────────────────────────────────────────────── */
+.nav__logo { text-decoration: none; display: flex; align-items: center; }
+.nav__logo-prefix {
+  font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.03em;
+  color: var(--text-3); display: inline-block;
+  min-width: 22px; will-change: transform, opacity; transition: none;
+}
+.nav__logo-name { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.03em; color: var(--text-1); }
+.nav__logo-tld  { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.03em; color: #6366f1; }
+
+/* ── Sign-in link ─────────────────────────────────────────────────── */
+.nav__sign-in {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em;
+  text-decoration: none; color: var(--text-3);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 5px 12px; transition: color 0.15s, border-color 0.15s;
+}
+.nav__sign-in:hover { color: var(--accent); border-color: var(--accent-border); }
+
+/* ── Avatar menu ──────────────────────────────────────────────────── */
+.avatar-menu { position: relative; }
+
+.avatar-menu__trigger {
+  width: 32px; height: 32px; border-radius: 50%;
+  padding: 0; border: 2px solid var(--border);
+  cursor: pointer; background: none; transition: border-color 0.2s;
+  overflow: hidden; display: block;
+}
+.avatar-menu__trigger--open { border-color: var(--accent-border); }
+
+.identicon { display: block; border-radius: 50%; image-rendering: auto; }
+
+.avatar-menu__dropdown {
+  position: absolute; top: calc(100% + 10px); right: 0;
+  min-width: 220px; border-radius: 12px;
+  background: var(--card-bg); border: 1px solid var(--border);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  overflow: hidden; animation: fadeSlideDown 0.15s ease;
+}
+
+.avatar-menu__identity { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+
+.avatar-menu__nick-form { display: flex; gap: 6px; }
+.avatar-menu__nick-input {
+  flex: 1; padding: 5px 8px; border-radius: 7px;
+  font-family: var(--font-mono); font-size: 12px; color: var(--text-1);
+  background: var(--surface); border: 1px solid var(--accent-border);
+  outline: none; min-width: 0;
+}
+.avatar-menu__nick-save {
+  padding: 5px 10px; border-radius: 7px; border: none;
+  background: var(--accent-dim); color: var(--accent);
+  font-family: var(--font-sans); font-size: 12px; cursor: pointer;
+}
+.avatar-menu__nick-cancel {
+  padding: 5px 8px; border-radius: 7px; border: 1px solid var(--border);
+  background: none; color: var(--text-3);
+  font-family: var(--font-sans); font-size: 12px; cursor: pointer;
+}
+
+.avatar-menu__user-info { display: flex; align-items: center; gap: 6px; }
+.avatar-menu__user-text { flex: 1; min-width: 0; }
+.avatar-menu__user-name { font-family: var(--font-sans); font-size: 13px; color: var(--text-1); font-weight: 500; }
+.avatar-menu__user-email { font-family: var(--font-mono); font-size: 10px; color: var(--text-3); margin-top: 2px; }
+.avatar-menu__edit-btn {
+  background: none; border: none; cursor: pointer;
+  padding: 4px; border-radius: 5px; color: var(--text-3); flex-shrink: 0;
+}
+
+.avatar-menu__link {
+  display: block; padding: 11px 14px; text-decoration: none;
+  font-family: var(--font-sans); font-size: 13px; color: var(--text-2);
+  border-bottom: 1px solid var(--border); transition: background 0.15s;
+}
+.avatar-menu__link:hover { background: var(--hover-bg); }
+.avatar-menu__link--admin { color: #f5a623; }
+.avatar-menu__link--admin:hover { background: rgba(245,166,35,0.06); }
+
+.avatar-menu__logout {
+  width: 100%; padding: 11px 14px; text-align: left;
+  font-family: var(--font-sans); font-size: 13px; color: #f87171;
+  background: none; border: none; cursor: pointer; transition: background 0.15s;
+}
+.avatar-menu__logout:hover { background: rgba(248,113,113,0.08); }

@@ -2,9 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth.jsx';
-
-const M = "'IBM Plex Mono', monospace";
-const F = "'Outfit', sans-serif";
+import './Nav.css';
 
 // ── Identicon ─────────────────────────────────────────────────────
 // Generates a deterministic GitHub-style 5×5 symmetric geometric
@@ -27,7 +25,6 @@ function seededRng(seed) {
   };
 }
 
-// Convert HSL → RGB → relative luminance (WCAG formula)
 function hslToRgb(h, s, l) {
   s /= 100; l /= 100;
   const k = n => (n + h / 30) % 12;
@@ -48,9 +45,6 @@ function contrastRatio(l1, l2) {
   return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
 }
 
-// Finds fg lightness that meets contrast target against bg.
-// For light backgrounds, steps downward (darker fg).
-// For dark backgrounds, steps upward (lighter fg).
 function ensureContrast(hue, fgSat, bgSat, fgL, bgL, target = 4.5) {
   const [br, bg_, bb] = hslToRgb(hue, bgSat, bgL);
   const bgLum = relativeLuminance(br, bg_, bb);
@@ -74,45 +68,33 @@ function Identicon({ email, size = 32 }) {
     const canvas = canvasRef.current;
     if (!canvas || !email) return;
 
-    // Always render at high internal resolution and let CSS scale it down.
-    // The browser's image downsampling provides natural antialiasing — no
-    // more blocky pixels at small display sizes.
     const R = 300;
     canvas.width = R;
     canvas.height = R;
     const ctx = canvas.getContext('2d');
 
     const hash = hashStr(email.toLowerCase().trim());
-    const rng = seededRng(hash);
-
-    const hue = hash % 360;
-    // #f0f0f0 ≈ hsl(0, 0%, 94%) — exact GitHub background, no hue tint
-    const BG = '#f0f0f0';
+    const rng  = seededRng(hash);
+    const hue  = hash % 360;
+    const BG   = '#f0f0f0';
     const fgSat = 52;
-    // Start at 60% lightness, step darker until 3:1 non-text contrast is met
-    // (WCAG AA for decorative graphical objects, per 1.4.11)
-    const fgL = ensureContrast(hue, fgSat, 0, 60, 94, 3.0);
+    const fgL   = ensureContrast(hue, fgSat, 0, 60, 94, 3.0);
 
-    // Circular clip
     ctx.save();
     ctx.beginPath();
     ctx.arc(R / 2, R / 2, R / 2, 0, Math.PI * 2);
     ctx.clip();
 
-    // Exact GitHub background — neutral gray, no hue
     ctx.fillStyle = BG;
     ctx.fillRect(0, 0, R, R);
 
-    // 5×5 symmetric grid — pure squares, zero gaps, zero rounding
     ctx.fillStyle = `hsl(${hue}, ${fgSat}%, ${fgL}%)`;
-    const cols = 5;
-    const rows = 5;
-    const pad = R * 0.08;
+    const cols = 5, rows = 5;
+    const pad  = R * 0.08;
     const gridSize = R - pad * 2;
     const cell = gridSize / cols;
     const halfCols = Math.ceil(cols / 2);
 
-    // Pre-compute fills and guarantee at least 5 visible cells
     const fills = Array.from({ length: rows * halfCols }, () => rng() > 0.38);
     const MIN_FILLS = 5;
     let filled = fills.filter(Boolean).length;
@@ -141,7 +123,8 @@ function Identicon({ email, size = 32 }) {
       ref={canvasRef}
       width={size}
       height={size}
-      style={{ width: size, height: size, display: 'block', borderRadius: '50%', imageRendering: 'auto' }}
+      className="identicon"
+      style={{ width: size, height: size }}
       aria-hidden="true"
     />
   );
@@ -149,12 +132,11 @@ function Identicon({ email, size = 32 }) {
 
 // ── Avatar button + dropdown ──────────────────────────────────────
 function AvatarMenu({ user, onLogout }) {
-  const { t } = useTheme();
   const { setUser } = useAuth();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen]           = useState(false);
   const [editingNick, setEditingNick] = useState(false);
   const [nickDraft, setNickDraft] = useState('');
-  const [nickBusy, setNickBusy] = useState(false);
+  const [nickBusy, setNickBusy]   = useState(false);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -189,77 +171,43 @@ function AvatarMenu({ user, onLogout }) {
   }
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div ref={ref} className="avatar-menu">
       <button
         onClick={() => setOpen(o => !o)}
         aria-label="Account menu"
         aria-expanded={open}
-        style={{
-          width: 32, height: 32, borderRadius: '50%', padding: 0,
-          border: `2px solid ${open ? t.accentBorder : t.border}`,
-          cursor: 'pointer', background: 'none',
-          transition: 'border-color 0.2s',
-          overflow: 'hidden', display: 'block',
-        }}
+        className={`avatar-menu__trigger${open ? ' avatar-menu__trigger--open' : ''}`}
       >
         <Identicon email={user.maskedEmail || user.nickname || ''} size={28} />
       </button>
 
       {open && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 10px)', right: 0,
-          minWidth: 220, borderRadius: 12,
-          background: t.cardBg, border: `1px solid ${t.border}`,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-          overflow: 'hidden',
-          animation: 'fadeSlideDown 0.15s ease',
-        }}>
+        <div className="avatar-menu__dropdown">
           {/* Identity */}
-          <div style={{ padding: '12px 14px', borderBottom: `1px solid ${t.border}` }}>
+          <div className="avatar-menu__identity">
             {editingNick ? (
-              <form onSubmit={saveNick} style={{ display: 'flex', gap: 6 }}>
+              <form onSubmit={saveNick} className="avatar-menu__nick-form">
                 <input
+                  className="avatar-menu__nick-input"
                   value={nickDraft}
                   onChange={e => setNickDraft(e.target.value)}
                   autoFocus
                   maxLength={32}
-                  style={{
-                    flex: 1, padding: '5px 8px', borderRadius: 7,
-                    fontFamily: M, fontSize: 12, color: t.text1,
-                    background: t.surface, border: `1px solid ${t.accentBorder}`,
-                    outline: 'none', minWidth: 0,
-                  }}
                 />
-                <button type="submit" disabled={nickBusy} style={{
-                  padding: '5px 10px', borderRadius: 7, border: 'none',
-                  background: t.accentDim, color: t.accent, fontFamily: F, fontSize: 12,
-                  cursor: 'pointer',
-                }}>
+                <button type="submit" disabled={nickBusy} className="avatar-menu__nick-save">
                   {nickBusy ? '…' : 'Save'}
                 </button>
-                <button type="button" onClick={() => setEditingNick(false)} style={{
-                  padding: '5px 8px', borderRadius: 7, border: `1px solid ${t.border}`,
-                  background: 'none', color: t.text3, fontFamily: F, fontSize: 12, cursor: 'pointer',
-                }}>✕</button>
+                <button type="button" onClick={() => setEditingNick(false)} className="avatar-menu__nick-cancel">
+                  ✕
+                </button>
               </form>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: F, fontSize: 13, color: t.text1, fontWeight: 500 }}>
-                    {user.nickname || 'Anonymous'}
-                  </div>
-                  <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginTop: 2 }}>
-                    {user.maskedEmail}
-                  </div>
+              <div className="avatar-menu__user-info">
+                <div className="avatar-menu__user-text">
+                  <div className="avatar-menu__user-name">{user.nickname || 'Anonymous'}</div>
+                  <div className="avatar-menu__user-email">{user.maskedEmail}</div>
                 </div>
-                <button
-                  onClick={startEdit}
-                  title="Edit nickname"
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    padding: 4, borderRadius: 5, color: t.text3, flexShrink: 0,
-                  }}
-                >
+                <button onClick={startEdit} title="Edit nickname" className="avatar-menu__edit-btn">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -269,35 +217,21 @@ function AvatarMenu({ user, onLogout }) {
             )}
           </div>
 
-          {/* Security page */}
+          {/* Settings */}
           <Link
             to="/account/settings"
             onClick={() => setOpen(false)}
-            style={{
-              display: 'block', padding: '11px 14px', textDecoration: 'none',
-              fontFamily: F, fontSize: 13, color: t.text2,
-              borderBottom: `1px solid ${t.border}`,
-              transition: 'background 0.15s',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+            className="avatar-menu__link"
           >
             Settings
           </Link>
 
-          {/* Admin link — only for admins */}
+          {/* Admin — only for admins */}
           {user.role === 'admin' && (
             <Link
               to="/admin"
               onClick={() => setOpen(false)}
-              style={{
-                display: 'block', padding: '11px 14px', textDecoration: 'none',
-                fontFamily: F, fontSize: 13, color: '#f5a623',
-                borderBottom: `1px solid ${t.border}`,
-                transition: 'background 0.15s',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(245,166,35,0.06)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+              className="avatar-menu__link avatar-menu__link--admin"
             >
               Admin
             </Link>
@@ -306,14 +240,7 @@ function AvatarMenu({ user, onLogout }) {
           {/* Log out */}
           <button
             onClick={() => { setOpen(false); onLogout(); }}
-            style={{
-              width: '100%', padding: '11px 14px', textAlign: 'left',
-              fontFamily: F, fontSize: 13, color: '#f87171',
-              background: 'none', border: 'none', cursor: 'pointer',
-              transition: 'background 0.15s',
-            }}
-            onMouseEnter={e => (e.target.style.background = 'rgba(248,113,113,0.08)')}
-            onMouseLeave={e => (e.target.style.background = 'none')}
+            className="avatar-menu__logout"
           >
             Log out
           </button>
@@ -341,7 +268,6 @@ function LogoMark() {
   const prefixRef  = useRef(null);
   const rafRef     = useRef(null);
   const stateRef   = useRef({ hovering: false, startTime: null, leaveTime: null, leaveFrom: '~/', leaveFromY: 0 });
-  // Holds the current theme's rest colour for the prefix so tick() (stable ref) always reads the latest value.
   const baseColorRef = useRef(t.text3);
   useEffect(() => { baseColorRef.current = t.text3; }, [t.text3]);
 
@@ -357,9 +283,8 @@ function LogoMark() {
       const pos      = (elapsed / cycleLen) % SYMBOLS.length;
       const idx      = Math.floor(pos) % SYMBOLS.length;
       const phase    = pos - Math.floor(pos);
-
-      const env   = Math.sin(phase * Math.PI);
-      const y     = (1 - phase) * Math.sin(phase * Math.PI * 2) * -5;
+      const env      = Math.sin(phase * Math.PI);
+      const y        = (1 - phase) * Math.sin(phase * Math.PI * 2) * -5;
 
       el.textContent     = SYMBOLS[idx];
       el.style.opacity   = String(0.35 + 0.65 * env);
@@ -408,36 +333,16 @@ function LogoMark() {
   useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); }, []);
 
   return (
-    <Link
-      to="/"
-      onMouseEnter={onEnter}
-      onMouseLeave={onLeave}
-      style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}
-    >
-      <span
-        ref={prefixRef}
-        style={{
-          fontFamily: M, fontSize: 13, letterSpacing: '0.03em',
-          color: t.text3, display: 'inline-block',
-          minWidth: 22, willChange: 'transform, opacity',
-          transition: 'none',
-        }}
-      >
-        ~/
-      </span>
-      <span style={{ fontFamily: M, fontSize: 13, letterSpacing: '0.03em', color: t.text1 }}>
-        varunr
-      </span>
-      <span style={{ fontFamily: M, fontSize: 13, letterSpacing: '0.03em', color: '#6366f1' }}>
-        .dev
-      </span>
+    <Link to="/" className="nav__logo" onMouseEnter={onEnter} onMouseLeave={onLeave}>
+      <span ref={prefixRef} className="nav__logo-prefix">~/</span>
+      <span className="nav__logo-name">varunr</span>
+      <span className="nav__logo-tld">.dev</span>
     </Link>
   );
 }
 
 // ── Nav ───────────────────────────────────────────────────────────
 export default function Nav() {
-  const { t } = useTheme();
   const { user, loading, logout, enabled } = useAuth();
   const navigate = useNavigate();
 
@@ -447,56 +352,19 @@ export default function Nav() {
   };
 
   return (
-    <>
-      <style>{`
-        @keyframes fadeSlideDown {
-          from { opacity: 0; transform: translateY(-6px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
-
-      <nav
-        aria-label="Site navigation"
-        style={{
-          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
-          borderBottom: `1px solid ${t.border}`,
-          background: `${t.bg}e8`,
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-        }}
-      >
-        <div style={{
-          maxWidth: 920, margin: '0 auto', padding: '0 24px',
-          height: 52, display: 'flex', alignItems: 'center',
-        }}>
-          {/* Spacer left — mirrors avatar width so logo stays optically centred */}
-          <div style={{ flex: 1 }} />
-
-          {/* Centred logo */}
-          <LogoMark />
-
-          {/* Right side */}
-          <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-            {enabled && !loading && user && (
-              <AvatarMenu user={user} onLogout={handleLogout} />
-            )}
-            {enabled && !loading && !user && (
-              <Link
-                to="/auth"
-                style={{
-                  fontFamily: M, fontSize: 11, letterSpacing: '0.08em', textDecoration: 'none',
-                  color: t.text3, border: `1px solid ${t.border}`, borderRadius: 8,
-                  padding: '5px 12px', transition: 'color 0.15s, border-color 0.15s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.color = t.accent; e.currentTarget.style.borderColor = t.accentBorder; }}
-                onMouseLeave={e => { e.currentTarget.style.color = t.text3; e.currentTarget.style.borderColor = t.border; }}
-              >
-                sign in
-              </Link>
-            )}
-          </div>
+    <nav id="nav" className="nav" aria-label="Site navigation">
+      <div className="nav__inner">
+        <div className="nav__spacer" />
+        <LogoMark />
+        <div className="nav__actions">
+          {enabled && !loading && user && (
+            <AvatarMenu user={user} onLogout={handleLogout} />
+          )}
+          {enabled && !loading && !user && (
+            <Link to="/auth" className="nav__sign-in">sign in</Link>
+          )}
         </div>
-      </nav>
-    </>
+      </div>
+    </nav>
   );
 }

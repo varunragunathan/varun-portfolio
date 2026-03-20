@@ -1,0 +1,73 @@
+/* ── FrozenChat ───────────────────────────────────────────────────── */
+@keyframes fc-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.frozen-chat {
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 14px; overflow: hidden;
+}
+
+/* Header */
+.frozen-chat__header {
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+.frozen-chat__header-dots { display: flex; gap: 5px; }
+.frozen-chat__header-dot  { width: 10px; height: 10px; border-radius: 50%; opacity: 0.6; }
+.frozen-chat__header-label {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text-3); flex: 1; text-align: center;
+}
+.frozen-chat__indicators { display: flex; gap: 4px; }
+.frozen-chat__indicator {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--border); transition: background 0.3s;
+}
+.frozen-chat__indicator--active { background: var(--accent); }
+
+/* Messages area */
+.frozen-chat__messages {
+  padding: 14px; height: 240px; overflow: hidden;
+  opacity: 1; transition: opacity 0.35s ease; position: relative;
+}
+.frozen-chat__messages--hidden { opacity: 0; }
+
+.frozen-chat__user-bubble { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+.frozen-chat__user-message {
+  max-width: 82%; padding: 9px 13px;
+  border-radius: 14px 14px 4px 14px;
+  background: var(--accent-dim); border: 1px solid var(--accent-border);
+  font-family: var(--font-sans); font-size: 13px; color: var(--text-1); line-height: 1.5;
+}
+
+.frozen-chat__assistant-row { display: flex; gap: 8px; align-items: flex-start; }
+.frozen-chat__owl { flex-shrink: 0; margin-top: 2px; }
+.frozen-chat__assistant-message {
+  padding: 9px 13px; border-radius: 14px 14px 14px 4px;
+  background: var(--surface); border: 1px solid var(--border);
+  font-family: var(--font-sans); font-size: 13px; color: var(--text-2); line-height: 1.6;
+  min-height: 38px;
+}
+.frozen-chat__cursor {
+  display: inline-block; width: 2px; height: 1em;
+  background: var(--accent); margin-left: 2px; vertical-align: text-bottom;
+  animation: fc-blink 0.7s step-end infinite;
+}
+
+/* CTA bar */
+.frozen-chat__cta {
+  border-top: 1px solid var(--border); padding: 12px 14px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.frozen-chat__cta-text {
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--text-3); letter-spacing: 0.03em;
+}
+.frozen-chat__cta-link {
+  flex-shrink: 0; text-decoration: none;
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.07em;
+  color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-border);
+  border-radius: 8px; padding: 5px 12px;
+}

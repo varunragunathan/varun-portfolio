@@ -1,0 +1,64 @@
+/* ── Fade ─────────────────────────────────────────────────────────── */
+.fade {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity  0.6s cubic-bezier(0.22,1,0.36,1) var(--fade-delay, 0ms),
+    transform 0.6s cubic-bezier(0.22,1,0.36,1) var(--fade-delay, 0ms);
+}
+.fade--visible  { opacity: 1; transform: translateY(0); }
+.fade--reduced  { transition: none; }
+
+/* ── SectionHeader ────────────────────────────────────────────────── */
+.section-header         { margin-bottom: 44px; }
+.section-header__label  {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 400;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--accent-muted); margin-bottom: 8px;
+}
+.section-header__title  {
+  font-family: var(--font-sans); font-weight: 300;
+  font-size: clamp(24px, 4vw, 40px); letter-spacing: -0.01em;
+  line-height: 1.15; color: var(--text-1);
+}
+.section-header__subtitle {
+  font-family: var(--font-sans); font-size: 16px; font-weight: 400;
+  color: var(--text-2); margin-top: 12px; max-width: 560px; line-height: 1.6;
+}
+
+/* ── Btn ──────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 11px 22px; border-radius: 11px;
+  font-family: var(--font-sans); font-size: 14px; font-weight: 500;
+  text-decoration: none; transition: all 0.3s; cursor: pointer;
+  color: var(--text-2); border: 1px solid var(--border);
+}
+.btn--primary {
+  background: var(--accent-dim); color: var(--accent); border-color: var(--accent-border);
+}
+
+/* ── ThemeToggle ──────────────────────────────────────────────────── */
+.theme-toggle {
+  display: flex; align-items: center;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 3px; gap: 2px;
+}
+.theme-toggle__btn {
+  width: 30px; height: 30px; border-radius: 7px; border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.2s; background: transparent;
+}
+.theme-toggle__btn--active { background: var(--accent-dim); }
+
+/* ── SkipLink ─────────────────────────────────────────────────────── */
+.skip-link {
+  position: absolute; left: -9999px; top: auto;
+  width: 1px; height: 1px; overflow: hidden; z-index: 9999;
+  padding: 12px 24px; background: var(--accent); color: var(--text-inverse);
+  font-family: var(--font-mono); font-size: 14px;
+  border-radius: 8px; text-decoration: none;
+}
+.skip-link:focus {
+  left: 16px; top: 16px; width: auto; height: auto;
+}

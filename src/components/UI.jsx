@@ -1,20 +1,17 @@
 import React from 'react';
 import { useTheme } from '../hooks/useTheme';
 import { useFadeIn } from '../hooks/useAnimations';
-
-const F = "'Outfit', sans-serif";
-const M = "'IBM Plex Mono', monospace";
+import './UI.css';
 
 /** Scroll-triggered fade-in wrapper */
 export function Fade({ children, delay = 0, style = {} }) {
   const [ref, visible, reduced] = useFadeIn();
   return (
-    <div ref={ref} style={{
-      opacity: visible ? 1 : 0,
-      transform: visible ? 'translateY(0)' : 'translateY(18px)',
-      transition: reduced ? 'none' : `opacity 0.6s cubic-bezier(0.22,1,0.36,1) ${delay}ms, transform 0.6s cubic-bezier(0.22,1,0.36,1) ${delay}ms`,
-      ...style,
-    }}>
+    <div
+      ref={ref}
+      className={`fade${visible ? ' fade--visible' : ''}${reduced ? ' fade--reduced' : ''}`}
+      style={{ '--fade-delay': `${delay}ms`, ...style }}
+    >
       {children}
     </div>
   );
@@ -22,23 +19,12 @@ export function Fade({ children, delay = 0, style = {} }) {
 
 /** Section heading with label + title + optional subtitle */
 export function SectionHeader({ label, title, subtitle }) {
-  const { t } = useTheme();
   return (
     <Fade>
-      <div style={{ marginBottom: 44 }}>
-        {label && (
-          <div style={{ fontFamily: M, fontSize: 11, fontWeight: 400, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.accentMuted, marginBottom: 8 }}>
-            {label}
-          </div>
-        )}
-        <h2 style={{ fontFamily: F, fontWeight: 300, fontSize: 'clamp(24px, 4vw, 40px)', letterSpacing: '-0.01em', lineHeight: 1.15, color: t.text1 }}>
-          {title}
-        </h2>
-        {subtitle && (
-          <p style={{ fontFamily: F, fontSize: 16, fontWeight: 400, color: t.text2, marginTop: 12, maxWidth: 560, lineHeight: 1.6 }}>
-            {subtitle}
-          </p>
-        )}
+      <div className="section-header">
+        {label && <div className="section-header__label">{label}</div>}
+        <h2 className="section-header__title">{title}</h2>
+        {subtitle && <p className="section-header__subtitle">{subtitle}</p>}
       </div>
     </Fade>
   );
@@ -46,19 +32,10 @@ export function SectionHeader({ label, title, subtitle }) {
 
 /** Link-styled button */
 export function Btn({ href, primary, children, external }) {
-  const { t } = useTheme();
-  const base = {
-    display: 'inline-flex', alignItems: 'center', gap: 8,
-    padding: '11px 22px', borderRadius: 11,
-    fontFamily: F, fontSize: 14, fontWeight: 500,
-    textDecoration: 'none', transition: 'all 0.3s', cursor: 'pointer',
-  };
-  const style = primary
-    ? { ...base, background: t.accentDim, color: t.accent, border: `1px solid ${t.accentBorder}` }
-    : { ...base, color: t.text2, border: `1px solid ${t.border}` };
-
   return (
-    <a href={href} style={style}
+    <a
+      href={href}
+      className={`btn${primary ? ' btn--primary' : ''}`}
       {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
     >
       {children}
@@ -67,50 +44,48 @@ export function Btn({ href, primary, children, external }) {
 }
 
 // Icons for each theme mode
-function SunIcon({ stroke }) {
+function SunIcon({ active }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke={active ? 'var(--accent)' : 'var(--text-3)'}
+      strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
       <circle cx="12" cy="12" r="5" />
       <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
     </svg>
   );
 }
-function MoonIcon({ stroke }) {
+function MoonIcon({ active }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke={active ? 'var(--accent)' : 'var(--text-3)'}
+      strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
     </svg>
   );
 }
-function AutoIcon({ stroke }) {
+function AutoIcon({ active }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke={active ? 'var(--accent)' : 'var(--text-3)'}
+      strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
       <rect x="2" y="3" width="20" height="14" rx="2" />
       <path d="M8 21h8M12 17v4" />
     </svg>
   );
 }
 
-const MODES = ['auto', 'light', 'dark'];
+const MODES      = ['auto', 'light', 'dark'];
 const MODE_ICONS = { auto: AutoIcon, light: SunIcon, dark: MoonIcon };
 const MODE_LABELS = { auto: 'Auto', light: 'Light', dark: 'Dark' };
 
 /** 3-segment theme control (auto / light / dark). */
 export function ThemeToggle() {
-  const { t, preference, setPreference } = useTheme();
+  const { preference, setPreference } = useTheme();
 
   return (
-    <div
-      role="group"
-      aria-label="Theme preference"
-      style={{
-        display: 'flex', alignItems: 'center',
-        background: t.surface, border: `1px solid ${t.border}`,
-        borderRadius: 10, padding: 3, gap: 2,
-      }}
-    >
+    <div role="group" aria-label="Theme preference" className="theme-toggle">
       {MODES.map(m => {
-        const Icon = MODE_ICONS[m];
+        const Icon   = MODE_ICONS[m];
         const active = preference === m;
         return (
           <button
@@ -118,14 +93,9 @@ export function ThemeToggle() {
             onClick={() => setPreference(m)}
             aria-label={MODE_LABELS[m]}
             aria-pressed={active}
-            style={{
-              width: 30, height: 30, borderRadius: 7, border: 'none',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', transition: 'all 0.2s',
-              background: active ? t.accentDim : 'transparent',
-            }}
+            className={`theme-toggle__btn${active ? ' theme-toggle__btn--active' : ''}`}
           >
-            <Icon stroke={active ? t.accent : t.text3} />
+            <Icon active={active} />
           </button>
         );
       })}
@@ -135,20 +105,5 @@ export function ThemeToggle() {
 
 /** Skip to content link for keyboard users */
 export function SkipLink() {
-  const { t } = useTheme();
-  return (
-    <a
-      href="#main"
-      style={{
-        position: 'absolute', left: -9999, top: 'auto',
-        width: 1, height: 1, overflow: 'hidden', zIndex: 9999,
-        padding: '12px 24px', background: t.accent, color: t.textInverse,
-        fontFamily: F, fontSize: 14, borderRadius: 8, textDecoration: 'none',
-      }}
-      onFocus={(e) => Object.assign(e.target.style, { left: '16px', top: '16px', width: 'auto', height: 'auto' })}
-      onBlur={(e) => Object.assign(e.target.style, { left: '-9999px', width: '1px', height: '1px' })}
-    >
-      Skip to content
-    </a>
-  );
+  return <a href="#main" className="skip-link">Skip to content</a>;
 }

@@ -2,18 +2,81 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── CSS Custom Properties ───────────────────────────────────────── */
+:root {
+  /* Font stacks */
+  --font-sans: 'Outfit', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  /* Dark theme (default) */
+  --bg:            #08080c;
+  --surface:       #11111a;
+  --surface-alt:   #161620;
+  --border:        rgba(255,255,255,0.06);
+  --border-hover:  rgba(255,255,255,0.14);
+  --accent:        #64ffda;
+  --accent-muted:  #3fbfa3;
+  --accent-dim:    rgba(100,255,218,0.10);
+  --accent-border: rgba(100,255,218,0.22);
+  --accent-ghost:  rgba(100,255,218,0.04);
+  --text-1:        #e8e8f0;
+  --text-2:        #a4a4bc;
+  --text-3:        #7e7e98;
+  --text-inverse:  #08080c;
+  --particle:      100,255,218;
+  --card-bg:       #11111a;
+  --card-hover:    #1c1c2a;
+  --focus:         rgba(100,255,218,0.6);
+  --tag-bg:        rgba(255,255,255,0.05);
+  --tag-border:    rgba(255,255,255,0.08);
+  --dot-border:    #7e7e98;
+  --line:          rgba(255,255,255,0.06);
+
+  /* Derived / computed */
+  --nav-bg:   rgb(8 8 12 / 91%);
+  --hover-bg: rgba(255,255,255,0.05);
+}
+
+[data-theme="light"] {
+  --bg:            #faf9f7;
+  --surface:       #ffffff;
+  --surface-alt:   #f3f2ee;
+  --border:        rgba(0,0,0,0.09);
+  --border-hover:  rgba(0,0,0,0.16);
+  --accent:        #0a6b55;
+  --accent-muted:  #1a7d66;
+  --accent-dim:    rgba(10,107,85,0.07);
+  --accent-border: rgba(10,107,85,0.22);
+  --accent-ghost:  rgba(10,107,85,0.03);
+  --text-1:        #1a1a1a;
+  --text-2:        #4a4a4a;
+  --text-3:        #717171;
+  --text-inverse:  #ffffff;
+  --particle:      10,107,85;
+  --card-bg:       #ffffff;
+  --card-hover:    #f6f5f2;
+  --focus:         rgba(10,107,85,0.45);
+  --tag-bg:        rgba(0,0,0,0.04);
+  --tag-border:    rgba(0,0,0,0.09);
+  --dot-border:    #999999;
+  --line:          rgba(0,0,0,0.07);
+
+  --nav-bg:   rgb(250 249 247 / 91%);
+  --hover-bg: rgba(0,0,0,0.04);
+}
+
 @layer base {
   ::selection {
-    background: rgba(100, 255, 218, 0.25);
-    color: #fff;
+    background: var(--accent-dim);
+    color: var(--text-1);
   }
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(100, 255, 218, 0.15) transparent;
+    scrollbar-color: var(--accent-dim) transparent;
   }
   *::-webkit-scrollbar { width: 5px; }
   *::-webkit-scrollbar-track { background: transparent; }
-  *::-webkit-scrollbar-thumb { background: rgba(100, 255, 218, 0.12); border-radius: 3px; }
+  *::-webkit-scrollbar-thumb { background: var(--accent-dim); border-radius: 3px; }
 }
 
 /* ── Mobile baseline ─────────────────────────────────────────────

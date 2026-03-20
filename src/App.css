@@ -1,0 +1,95 @@
+/* ── Shell ────────────────────────────────────────────────────────── */
+.shell {
+  background: var(--bg);
+  min-height: 100vh;
+  transition: background 0.4s ease;
+  display: flex;
+  flex-direction: column;
+}
+.shell__content { flex: 1; }
+
+/* ── Loading ──────────────────────────────────────────────────────── */
+.loading {
+  min-height: 100vh; display: flex;
+  align-items: center; justify-content: center;
+  background: var(--bg);
+}
+.loading__text {
+  font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: 0.3em; text-transform: uppercase; color: var(--text-3);
+}
+
+/* ── Error boundary ───────────────────────────────────────────────── */
+.error-boundary {
+  min-height: 100vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: #0a0a0a; padding: 40px 24px; gap: 20px;
+}
+.error-boundary__code {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 10px; letter-spacing: 0.2em;
+  color: #ff3b30; text-transform: uppercase;
+}
+.error-boundary__message {
+  font-family: var(--font-sans, 'Outfit', sans-serif);
+  font-size: 15px; color: #e5e5e5;
+  max-width: 420px; text-align: center; line-height: 1.6;
+}
+.error-boundary__reset {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 11px; letter-spacing: 0.08em;
+  padding: 8px 20px; border-radius: 8px; cursor: pointer;
+  background: transparent; border: 1px solid #333; color: #999;
+  margin-top: 8px;
+}
+
+/* ── Footer ───────────────────────────────────────────────────────── */
+#footer { border-top: 1px solid var(--border); }
+
+.footer__feedback {
+  max-width: 920px; margin: 0 auto; padding: 32px 24px 24px;
+}
+.footer__feedback-inner { max-width: 520px; margin: 0 auto; }
+.footer__label {
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--accent-muted); margin-bottom: 6px;
+}
+.footer__title {
+  font-family: var(--font-sans); font-size: 15px;
+  font-weight: 400; color: var(--text-1); margin: 0 0 4px;
+}
+.footer__subtitle {
+  font-family: var(--font-sans); font-size: 13px;
+  color: var(--text-3); margin: 0 0 16px; line-height: 1.5;
+}
+.footer__shake-hint {
+  margin-top: 10px; display: flex; align-items: center; gap: 8px;
+}
+.footer__shake-label {
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--text-3); letter-spacing: 0.03em;
+}
+.footer__shake-btn {
+  background: none; border: 1px solid var(--border); border-radius: 6px;
+  padding: 3px 10px; cursor: pointer;
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--text-3); letter-spacing: 0.04em;
+  transition: color 0.15s, border-color 0.15s;
+}
+.footer__shake-btn:hover { color: var(--accent); border-color: var(--accent-border); }
+.footer__shake-active {
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--text-3); letter-spacing: 0.03em;
+}
+
+.footer__bottom {
+  border-top: 1px solid var(--border); padding: 16px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  max-width: 920px; margin: 0 auto;
+}
+.footer__bottom-left { display: flex; align-items: center; gap: 16px; }
+.footer__domain {
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.1em; color: var(--text-3);
+}

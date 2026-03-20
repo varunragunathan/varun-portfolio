@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useLayoutEffect } from 'react';
 
 const ThemeCtx = createContext();
 export const useTheme = () => useContext(ThemeCtx);
@@ -60,6 +60,35 @@ export function ThemeProvider({ children }) {
   }, [preference]);
 
   const resolved = preference === 'auto' ? systemTheme : preference;
+
+  // Sync theme tokens to CSS custom properties so component CSS files can use var(--token)
+  useLayoutEffect(() => {
+    const root  = document.documentElement;
+    const theme = themes[resolved];
+    root.setAttribute('data-theme', resolved);
+    root.style.setProperty('--bg',            theme.bg);
+    root.style.setProperty('--surface',       theme.surface);
+    root.style.setProperty('--surface-alt',   theme.surfaceAlt);
+    root.style.setProperty('--border',        theme.border);
+    root.style.setProperty('--border-hover',  theme.borderHover);
+    root.style.setProperty('--accent',        theme.accent);
+    root.style.setProperty('--accent-muted',  theme.accentMuted);
+    root.style.setProperty('--accent-dim',    theme.accentDim);
+    root.style.setProperty('--accent-border', theme.accentBorder);
+    root.style.setProperty('--accent-ghost',  theme.accentGhost);
+    root.style.setProperty('--text-1',        theme.text1);
+    root.style.setProperty('--text-2',        theme.text2);
+    root.style.setProperty('--text-3',        theme.text3);
+    root.style.setProperty('--text-inverse',  theme.textInverse);
+    root.style.setProperty('--particle',      theme.particle);
+    root.style.setProperty('--card-bg',       theme.cardBg);
+    root.style.setProperty('--card-hover',    theme.cardHover);
+    root.style.setProperty('--focus',         theme.focus);
+    root.style.setProperty('--tag-bg',        theme.tagBg);
+    root.style.setProperty('--tag-border',    theme.tagBorder);
+    root.style.setProperty('--dot-border',    theme.dotBorder);
+    root.style.setProperty('--line',          theme.line);
+  }, [resolved]);
 
   return (
     <ThemeCtx.Provider value={{

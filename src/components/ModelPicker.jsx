@@ -1,14 +1,12 @@
 // ── Model picker dropdown ─────────────────────────────────────────
-// Props: { selectedModel, onSelect, models, t }
+// Props: { selectedModel, onSelect, models }
 // models: Array<{ model_id: string, label: string }>
 // Renders nothing if models is empty/undefined.
 
 import React, { useState, useRef, useEffect } from 'react';
+import './ModelPicker.css';
 
-const M = "'IBM Plex Mono', monospace";
-const F = "'Outfit', sans-serif";
-
-export default function ModelPicker({ selectedModel, onSelect, models, t }) {
+export default function ModelPicker({ selectedModel, onSelect, models }) {
   const [open, setOpen] = useState(false);
   const ref             = useRef(null);
 
@@ -25,57 +23,30 @@ export default function ModelPicker({ selectedModel, onSelect, models, t }) {
   const current = models.find(m => m.model_id === selectedModel) ?? models[0];
 
   return (
-    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+    <div ref={ref} className="model-picker">
       {/* Trigger */}
       <button
         onClick={() => setOpen(o => !o)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
-          color: t.accentMuted,
-          background: 'none', border: `1px solid ${open ? t.accentBorder : t.border}`,
-          borderRadius: 6, padding: '3px 10px', cursor: 'pointer',
-          transition: 'border-color 0.15s, color 0.15s',
-        }}
+        className={`model-picker__trigger${open ? ' model-picker__trigger--open' : ''}`}
         title="Select model"
       >
-        <span style={{ color: open ? t.accent : t.accentMuted }}>{current.label}</span>
-        <span style={{ fontSize: 8, color: t.text3 }}>{open ? '▲' : '▼'}</span>
+        <span className="model-picker__label">{current.label}</span>
+        <span className="model-picker__arrow">{open ? '▲' : '▼'}</span>
       </button>
 
       {/* Dropdown */}
       {open && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 6px)', left: 0,
-          minWidth: 180, zIndex: 100,
-          background: t.surface, border: `1px solid ${t.border}`,
-          borderRadius: 8, padding: '4px 0',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
-        }}>
+        <div className="model-picker__dropdown">
           {models.map(model => {
             const isSelected = model.model_id === (selectedModel ?? models[0].model_id);
             return (
               <button
                 key={model.model_id}
                 onClick={() => { onSelect(model.model_id); setOpen(false); }}
-                style={{
-                  display: 'block', width: '100%', textAlign: 'left',
-                  padding: '8px 14px',
-                  fontFamily: F, fontSize: 13,
-                  color: isSelected ? t.accent : t.text1,
-                  background: isSelected ? t.accentDim : 'transparent',
-                  border: 'none', cursor: 'pointer',
-                  transition: 'background 0.1s',
-                }}
-                onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = t.cardHover; }}
-                onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+                className={`model-picker__option${isSelected ? ' model-picker__option--selected' : ''}`}
               >
-                <div style={{ fontFamily: F, fontSize: 13, fontWeight: isSelected ? 600 : 400 }}>
-                  {model.label}
-                </div>
-                <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginTop: 1 }}>
-                  {model.model_id}
-                </div>
+                <div className="model-picker__option-name">{model.label}</div>
+                <div className="model-picker__option-id">{model.model_id}</div>
               </button>
             );
           })}

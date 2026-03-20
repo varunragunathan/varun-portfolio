@@ -1,0 +1,12 @@
+/* ── VersionBadge ─────────────────────────────────────────────────── */
+.version-badge {
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  display: inline-flex;
+  align-items: flex-start;
+}
+.version-badge__digit { display: inline-block; height: 13px; overflow: hidden; vertical-align: top; }
+.version-badge__reel  { display: flex; flex-direction: column; }
+.version-badge__reel-item { display: block; height: 13px; line-height: 13px; }
+.version-badge__char  { line-height: 13px; }

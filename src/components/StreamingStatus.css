@@ -1,0 +1,18 @@
+/* ── StreamingStatus ──────────────────────────────────────────────── */
+@keyframes rag-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.3; transform: scale(0.7); }
+}
+
+.streaming-status {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+}
+.streaming-status__dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent); flex-shrink: 0;
+  animation: rag-pulse 1s ease-in-out infinite;
+}
+.streaming-status__text {
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--accent-muted); letter-spacing: 0.02em;
+}

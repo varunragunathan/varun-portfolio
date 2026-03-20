@@ -3,6 +3,7 @@
 // Disappears as soon as content starts arriving.
 
 import React, { useState, useEffect } from 'react';
+import './StreamingStatus.css';
 
 const MESSAGES = [
   'vectorizing your query…',
@@ -21,7 +22,7 @@ const MESSAGES = [
   'gradient descent complete, probably…',
 ];
 
-export default function StreamingStatus({ t }) {
+export default function StreamingStatus() {
   const [idx, setIdx] = useState(() => Math.floor(Math.random() * MESSAGES.length));
 
   useEffect(() => {
@@ -32,35 +33,9 @@ export default function StreamingStatus({ t }) {
   }, []);
 
   return (
-    <div style={{
-      display:    'flex',
-      alignItems: 'center',
-      gap:        10,
-      padding:    '10px 14px',
-    }}>
-      {/* Pulsing dot */}
-      <span style={{
-        width:        7,
-        height:       7,
-        borderRadius: '50%',
-        background:   t.accent,
-        flexShrink:   0,
-        animation:    'rag-pulse 1s ease-in-out infinite',
-      }} />
-      <span style={{
-        fontFamily:  "'IBM Plex Mono', monospace",
-        fontSize:    12,
-        color:       t.accentMuted,
-        letterSpacing: '0.02em',
-      }}>
-        {MESSAGES[idx]}
-      </span>
-      <style>{`
-        @keyframes rag-pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50%       { opacity: 0.3; transform: scale(0.7); }
-        }
-      `}</style>
+    <div className="streaming-status">
+      <span className="streaming-status__dot" />
+      <span className="streaming-status__text">{MESSAGES[idx]}</span>
     </div>
   );
 }
