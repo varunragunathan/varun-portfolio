@@ -11,6 +11,8 @@ env:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   lighthouse:
@@ -39,12 +41,58 @@ jobs:
             --chrome-flags="--headless --no-sandbox --disable-gpu" \
             --quiet
 
-      - name: Upload HTML report
+      - name: Upload HTML report artifact
         uses: actions/upload-artifact@v4
         with:
           name: lighthouse-report-${{ github.run_id }}
           path: ./lh-report.report.html
           retention-days: 30
+
+      - name: Publish report to GitHub Pages
+        run: |
+          # Stamp the report with the date and sha for the index page
+          DATE=$(date -u +"%Y-%m-%d")
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          SHA_SHORT="${SHA:0:7}"
+
+          # Clone gh-pages branch (or create it)
+          git fetch origin gh-pages 2>/dev/null || true
+          git worktree add gh-pages-dir gh-pages 2>/dev/null || (
+            git worktree add --orphan gh-pages-dir && cd gh-pages-dir && git checkout --orphan gh-pages
+          )
+
+          # Copy report into a dated folder
+          mkdir -p gh-pages-dir/lighthouse
+          cp ./lh-report.report.html "gh-pages-dir/lighthouse/${DATE}-${SHA_SHORT}.html"
+
+          # Regenerate the index listing
+          node -e "
+            const fs = require('fs');
+            const dir = 'gh-pages-dir/lighthouse';
+            const files = fs.readdirSync(dir)
+              .filter(f => f.endsWith('.html') && f !== 'index.html')
+              .sort().reverse();
+            const rows = files.map(f => {
+              const [date, sha] = f.replace('.html','').split('-');
+              return \`<tr><td><a href=\"\${f}\">\${date}</a></td><td><code>\${sha || ''}</code></td></tr>\`;
+            }).join('\n');
+            const html = \`<!DOCTYPE html>
+          <html lang=\"en\"><head><meta charset=\"UTF-8\">
+          <title>Lighthouse Reports — varunr.dev</title>
+          <style>body{font-family:monospace;max-width:600px;margin:40px auto;padding:0 20px}
+          table{width:100%;border-collapse:collapse}td{padding:8px;border-bottom:1px solid #eee}
+          a{color:#0a6b55}</style></head>
+          <body><h2>Lighthouse Reports</h2>
+          <table><tr><th>Date</th><th>SHA</th></tr>\${rows}</table></body></html>\`;
+            fs.writeFileSync('gh-pages-dir/lighthouse/index.html', html);
+          "
+
+          cd gh-pages-dir
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add lighthouse/
+          git diff --staged --quiet || git commit -m "lighthouse: ${DATE} ${SHA_SHORT}"
+          git push origin gh-pages
 
       - name: Append score to history
         run: |
