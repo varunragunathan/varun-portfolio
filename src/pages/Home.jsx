@@ -141,7 +141,6 @@ function ProjectCard({ role, title, description, metrics, tags, delay }) {
     <Fade delay={delay}>
       <article
         className="project-card"
-        tabIndex={0}
         aria-label={`Project: ${title}`}
       >
         <div className="project-card__accent-line" aria-hidden="true" />

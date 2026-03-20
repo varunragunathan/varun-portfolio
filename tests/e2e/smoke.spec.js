@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 // ── Smoke tests ───────────────────────────────────────────────────
 // Fast pre-push checks: verify that core pages render without crashing
@@ -60,6 +61,44 @@ test.describe('Chat page', () => {
     // We just confirm the error boundary doesn't fire.
     await page.goto('/chat');
     await expect(page.locator('text=something went wrong')).not.toBeVisible();
+  });
+});
+
+// ── Accessibility ─────────────────────────────────────────────────
+// Block on critical/serious violations only — moderate/minor are logged for awareness.
+function getCritical(violations) {
+  return violations.filter(v => v.impact === 'critical' || v.impact === 'serious');
+}
+
+test.describe('Accessibility (axe)', () => {
+  test('home page has no critical a11y violations', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa'])
+      .analyze();
+    const critical = getCritical(results.violations);
+    if (results.violations.length > critical.length) {
+      console.log('Non-critical a11y violations (not blocking):', results.violations
+        .filter(v => v.impact !== 'critical' && v.impact !== 'serious')
+        .map(v => `[${v.impact}] ${v.id}: ${v.description}`));
+    }
+    expect(critical).toEqual([]);
+  });
+
+  test('auth page has no critical a11y violations', async ({ page }) => {
+    await page.goto('/auth');
+    await page.waitForLoadState('networkidle');
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa'])
+      .analyze();
+    const critical = getCritical(results.violations);
+    if (results.violations.length > critical.length) {
+      console.log('Non-critical a11y violations (not blocking):', results.violations
+        .filter(v => v.impact !== 'critical' && v.impact !== 'serious')
+        .map(v => `[${v.impact}] ${v.id}: ${v.description}`));
+    }
+    expect(critical).toEqual([]);
   });
 });
 

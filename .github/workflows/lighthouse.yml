@@ -1,0 +1,71 @@
+name: Lighthouse
+
+on:
+  workflow_run:
+    workflows: [Deploy]
+    types: [completed]
+    branches: [main]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
+
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: 22
+
+      - name: Install LHCI
+        run: npm install -g @lhci/cli
+
+      - name: Run Lighthouse
+        run: lhci collect --url=https://varunr.dev --numberOfRuns=1
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report-${{ github.run_id }}
+          path: .lighthouseci/
+          retention-days: 30
+
+      - name: Append score to history
+        run: |
+          REPORT=$(ls .lighthouseci/lhr-*.json 2>/dev/null | tail -1)
+          node -e "
+            const fs = require('fs');
+            const r = JSON.parse(fs.readFileSync('$REPORT', 'utf8'));
+            const c = r.categories;
+            const entry = {
+              date: new Date().toISOString().split('T')[0],
+              sha: '${{ github.event.workflow_run.head_sha }}'.slice(0, 7),
+              performance:    Math.round(c.performance.score * 100),
+              accessibility:  Math.round(c.accessibility.score * 100),
+              bestPractices:  Math.round(c['best-practices'].score * 100),
+              seo:            Math.round(c.seo.score * 100),
+            };
+            const path = 'lighthouse/history.json';
+            const history = fs.existsSync(path)
+              ? JSON.parse(fs.readFileSync(path, 'utf8'))
+              : [];
+            history.push(entry);
+            fs.mkdirSync('lighthouse', { recursive: true });
+            fs.writeFileSync(path, JSON.stringify(history, null, 2));
+            console.log('Scores recorded:', JSON.stringify(entry));
+          "
+
+      - name: Commit scores
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add lighthouse/history.json
+          git diff --staged --quiet || git commit -m "chore: lighthouse scores [skip ci]"
+          git push

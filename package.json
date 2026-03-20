@@ -1,7 +1,7 @@
 {
   "name": "engineering-portfolio",
   "private": true,
-  "version": "0.2.26",
+  "version": "0.2.27",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,6 +13,7 @@
     "ingest": "node scripts/ingest-docs.js",
     "ingest:upsert": "node scripts/ingest-docs.js --upsert",
     "export:docs": "node scripts/export-docs.js",
+    "lint": "eslint src",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "prepare": "husky"
@@ -28,9 +29,15 @@
     "resend": "^6.9.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.1",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.58.2",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.0",
+    "eslint": "^10.1.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "globals": "^17.4.0",
     "husky": "^9.1.7",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",

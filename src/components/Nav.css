@@ -27,6 +27,8 @@
 }
 .nav__logo-name { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.03em; color: var(--text-1); }
 .nav__logo-tld  { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.03em; color: #6366f1; }
+/* Light mode: darker indigo to meet WCAG AA 4.5:1 contrast on #faf9f7 bg */
+[data-theme="light"] .nav__logo-tld { color: #4338ca; }
 
 /* ── Sign-in link ─────────────────────────────────────────────────── */
 .nav__sign-in {
