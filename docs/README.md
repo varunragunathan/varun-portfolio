@@ -38,6 +38,7 @@ The documentation is written for a competent developer who may not yet know WebA
 | [20](./chapters/20-endpoint-metrics.md) | Endpoint Metrics | Async request logging, path normalization, time-series queries, SVG trend chart |
 | [21](./chapters/21-bugs-fixed.md) | Bugs Fixed | Production bugs discovered, root cause analysis, and fixes |
 | [22](./chapters/22-database-migrations.md) | Database Migrations | Migration file conventions, history, how to apply to prod, how to write new migrations |
+| [23](./chapters/23-accessibility.md) | Accessibility | Three-layer a11y system: ESLint jsx-a11y, axe-core/playwright pre-push gate, Lighthouse CI post-deploy trend tracking |
 
 ### Glossary
 
