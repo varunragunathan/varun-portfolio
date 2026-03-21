@@ -1,4 +1,5 @@
 node_modules
+.vite
 .dev.vars
 .env
 dist
