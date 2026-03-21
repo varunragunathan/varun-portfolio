@@ -36,6 +36,23 @@ export async function logEndpointRequest(db, request, response) {
   }
 }
 
+function buildSparkMap(rows) {
+  const map = {};
+  for (const row of (rows ?? [])) {
+    const key = `${row.method} ${row.path}`;
+    if (!map[key]) map[key] = {};
+    map[key][row.bucket] = row.total;
+  }
+  return map;
+}
+
+function attachSparklines(endpointRows, sparkMap) {
+  return (endpointRows ?? []).map(ep => ({
+    ...ep,
+    sparkline: sparkMap[`${ep.method} ${ep.path}`] ?? {},
+  }));
+}
+
 export async function getEndpointMetrics(request, env) {
   const session = await getSession(env.AUTH_KV, request);
   const guard   = await requireAdmin(session, env);
@@ -46,8 +63,12 @@ export async function getEndpointMetrics(request, env) {
   const h24 = now - 86_400_000;
   const d7  = now - 7 * 86_400_000;
 
-  const [rHourly, rDaily, rEndpoints, rSparklines, rTotal] = await db.batch([
-    // Hourly buckets — last 24 h
+  const [
+    rHourly, rDaily,
+    rEndpoints7d, rSparklines7d, rTotal7d,
+    rEndpoints24h, rSparklines24h, rTotal24h,
+  ] = await db.batch([
+    // Hourly buckets — last 24 h (for trend chart)
     db.prepare(`
       SELECT
         (created_at / 3600000) * 3600000 AS bucket,
@@ -58,7 +79,7 @@ export async function getEndpointMetrics(request, env) {
       GROUP BY bucket ORDER BY bucket ASC
     `).bind(h24),
 
-    // Daily buckets — last 7 d
+    // Daily buckets — last 7 d (for trend chart)
     db.prepare(`
       SELECT
         (created_at / 86400000) * 86400000 AS bucket,
@@ -97,26 +118,44 @@ export async function getEndpointMetrics(request, env) {
 
     // Grand total — last 7 d
     db.prepare('SELECT COUNT(*) AS n FROM endpoint_logs WHERE created_at >= ?').bind(d7),
+
+    // Per-endpoint summary — last 24 h
+    db.prepare(`
+      SELECT
+        method, path,
+        COUNT(*) AS total,
+        SUM(CASE WHEN status >= 400 THEN 1 ELSE 0 END) AS errors,
+        SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END) AS server_errors,
+        MAX(created_at) AS last_seen
+      FROM endpoint_logs
+      WHERE created_at >= ?
+      GROUP BY method, path
+      ORDER BY total DESC
+    `).bind(h24),
+
+    // Hourly sparklines per endpoint — last 24 h
+    db.prepare(`
+      SELECT
+        method, path,
+        (created_at / 3600000) * 3600000 AS bucket,
+        COUNT(*) AS total
+      FROM endpoint_logs
+      WHERE created_at >= ?
+      GROUP BY method, path, bucket
+      ORDER BY method, path, bucket ASC
+    `).bind(h24),
+
+    // Grand total — last 24 h
+    db.prepare('SELECT COUNT(*) AS n FROM endpoint_logs WHERE created_at >= ?').bind(h24),
   ]);
 
-  // Attach sparklines to each endpoint
-  const sparkMap = {};
-  for (const row of (rSparklines.results ?? [])) {
-    const key = `${row.method} ${row.path}`;
-    if (!sparkMap[key]) sparkMap[key] = {};
-    sparkMap[key][row.bucket] = row.total;
-  }
-
-  const endpoints = (rEndpoints.results ?? []).map(ep => ({
-    ...ep,
-    sparkline: sparkMap[`${ep.method} ${ep.path}`] ?? {},
-  }));
-
   return json({
-    generated_at: now,
-    total_7d:     rTotal.results[0]?.n ?? 0,
-    hourly:       rHourly.results ?? [],
-    daily:        rDaily.results  ?? [],
-    endpoints,
+    generated_at:  now,
+    hourly:        rHourly.results        ?? [],
+    daily:         rDaily.results         ?? [],
+    total_7d:      rTotal7d.results[0]?.n  ?? 0,
+    endpoints_7d:  attachSparklines(rEndpoints7d.results,  buildSparkMap(rSparklines7d.results)),
+    total_24h:     rTotal24h.results[0]?.n ?? 0,
+    endpoints_24h: attachSparklines(rEndpoints24h.results, buildSparkMap(rSparklines24h.results)),
   });
 }

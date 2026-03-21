@@ -1164,12 +1164,13 @@ function LineChart({ data, t, height = 130, formatX }) {
   );
 }
 
-// Mini 7-bar sparkline for per-endpoint rows
-function Sparkline({ sparkline, d7Buckets, t }) {
-  const vals = d7Buckets.map(b => sparkline[b] ?? 0);
+// Mini sparkline — adapts bar size to bucket count (7 daily vs 24 hourly)
+function Sparkline({ sparkline, buckets, t }) {
+  const vals = buckets.map(b => sparkline[b] ?? 0);
   const max  = Math.max(...vals, 1);
-  const barW = 8, gap = 2;
-  const W = d7Buckets.length * (barW + gap) - gap;
+  const barW = buckets.length > 8 ? 3 : 8;
+  const gap  = buckets.length > 8 ? 1 : 2;
+  const W = buckets.length * (barW + gap) - gap;
   const H = 24;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: W, height: H, display: 'block' }}>
@@ -1189,6 +1190,56 @@ function Sparkline({ sparkline, d7Buckets, t }) {
     </svg>
   );
 }
+
+// One-line descriptions for each normalized endpoint path
+const ENDPOINT_DESCRIPTIONS = {
+  // Auth
+  '/api/auth/me':                        'Returns the current session user and role',
+  '/api/auth/register/begin':            'Starts passkey registration — returns WebAuthn options',
+  '/api/auth/register/complete':         'Finishes passkey registration — stores credential in D1',
+  '/api/auth/login/begin':               'Starts passkey authentication — returns WebAuthn challenge',
+  '/api/auth/login/complete':            'Verifies assertion and creates a new session',
+  '/api/auth/logout':                    'Destroys the current session cookie',
+  '/api/auth/otp/send':                  'Sends a one-time code to the user\'s email via Resend',
+  '/api/auth/otp/verify':                'Verifies the submitted OTP and upgrades session trust',
+  '/api/auth/account/nickname':          'Updates the display nickname for the current user',
+  '/api/auth/passkeys':                  'Lists all registered passkeys for the current user',
+  '/api/auth/passkeys/:id':              'Revokes (deletes) a specific passkey by credential ID',
+  '/api/auth/recovery/setup':            'Generates and stores 8 PBKDF2-hashed recovery codes',
+  '/api/auth/recovery/verify':           'Validates a recovery code and establishes a recovery session',
+  '/api/auth/recovery/reset':            'Resets passkeys using a verified recovery session',
+  '/api/auth/step-up/begin':             'Initiates step-up re-authentication challenge',
+  '/api/auth/step-up/complete':          'Completes step-up and elevates session trust level',
+  '/api/auth/totp/setup':                'Generates a TOTP secret and QR URI for authenticator apps',
+  '/api/auth/totp/verify':               'Verifies a TOTP code and activates 2FA for the account',
+  '/api/auth/totp/disable':              'Disables TOTP after step-up verification',
+  '/api/auth/totp/signin':               'Verifies TOTP during sign-in flow',
+  '/api/auth/whatsapp/register':         'Registers a WhatsApp number for backup authentication',
+  '/api/auth/whatsapp/send':             'Sends an OTP via Twilio WhatsApp',
+  '/api/auth/whatsapp/verify':           'Verifies the WhatsApp OTP and signs the user in',
+  // Number matching
+  '/api/num-match/:id':                  'WebSocket endpoint — real-time device approval broker (Durable Object)',
+  '/api/num-match/:id/push':             'Sends approval result from the approving device',
+  // Chat / RAG
+  '/api/chat':                           'Streams an AI response via SSE — RAG + llama-3.3-70b',
+  '/api/chat/conversations':             'Lists all conversations for the current user',
+  '/api/chat/conversations/:id':         'Fetches full message history for a conversation',
+  '/api/chat/conversations/:id/title':   'Updates the auto-generated title of a conversation',
+  // User
+  '/api/user/upgrade-request':           'Submits or retrieves the user\'s tier upgrade request',
+  '/api/feedback':                       'Stores anonymous feedback — no auth required',
+  // Admin
+  '/api/admin/metrics':                  'Returns aggregated site metrics for the Metrics tab',
+  '/api/admin/endpoint-metrics':         'Returns per-endpoint request counts and error rates',
+  '/api/admin/users':                    'Lists all registered users with roles and passkey counts',
+  '/api/admin/users/:id/role':           'Updates the role of a specific user',
+  '/api/admin/upgrade-requests':         'Lists all pending tier upgrade requests',
+  '/api/admin/upgrade-requests/:id':     'Approves or denies a specific upgrade request',
+  '/api/admin/models':                   'Lists allowed AI models per user tier',
+  '/api/admin/models/:id':               'Adds or removes an allowed model entry',
+  '/api/admin/personas':                 'Lists all AI persona configurations',
+  '/api/admin/personas/:id':             'Creates, updates, or deletes an AI persona',
+};
 
 function MethodBadge({ method }) {
   const colors = {
@@ -1239,44 +1290,78 @@ function EndpointsTab({ t }) {
   if (error)            return <TabError msg={error} t={t} />;
   if (!data)            return null;
 
-  const chartData = view === '24h' ? data.hourly : data.daily;
+  // ── Active period data ────────────────────────────────────────────
+  const is24h           = view === '24h';
+  const activeEndpoints = is24h ? (data.endpoints_24h ?? []) : (data.endpoints_7d ?? []);
+  const activeTotal     = is24h ? data.total_24h : data.total_7d;
+  const periodLabel     = is24h ? 'last 24 hours' : 'last 7 days';
+  const trendLabel      = is24h ? '24h trend' : '7d trend';
+  const chartData       = is24h ? data.hourly : data.daily;
 
-  // Build last-7-days daily bucket list for sparklines
-  const now    = data.generated_at;
-  const d7Base = Math.floor((now - 7 * 86_400_000) / 86_400_000) * 86_400_000;
-  const d7Buckets = Array.from({ length: 7 }, (_, i) => d7Base + i * 86_400_000);
+  // Bucket sequences for sparklines
+  const now     = data.generated_at;
+  const d7Base  = Math.floor((now - 7 * 86_400_000) / 86_400_000) * 86_400_000;
+  const h24Base = Math.floor((now - 86_400_000)      / 3_600_000)  * 3_600_000;
+  const d7Buckets  = Array.from({ length: 7  }, (_, i) => d7Base  + i * 86_400_000);
+  const h24Buckets = Array.from({ length: 24 }, (_, i) => h24Base + i * 3_600_000);
+  const activeBuckets = is24h ? h24Buckets : d7Buckets;
 
-  // Hour and day formatters
-  const fmtHour = ts => {
-    const d = new Date(ts);
-    return `${String(d.getHours()).padStart(2, '0')}:00`;
-  };
-  const fmtDay = ts => {
-    const d = new Date(ts);
-    return `${d.getMonth() + 1}/${d.getDate()}`;
-  };
+  // Hour and day formatters for chart x-axis
+  const fmtHour = ts => { const d = new Date(ts); return `${String(d.getHours()).padStart(2, '0')}:00`; };
+  const fmtDay  = ts => { const d = new Date(ts); return `${d.getMonth() + 1}/${d.getDate()}`; };
 
-  // Aggregate groups
+  // Aggregated group stats for active period
   const groups = ENDPOINT_GROUPS.map(g => {
-    const rows = data.endpoints.filter(e => e.path.startsWith(g.prefix));
+    const rows   = activeEndpoints.filter(e => e.path.startsWith(g.prefix));
     const total  = rows.reduce((s, r) => s + r.total, 0);
     const errors = rows.reduce((s, r) => s + r.errors, 0);
     return { ...g, total, errors, endpoints: rows.length };
   });
 
-  const totalAll  = data.total_7d;
-  const errorsAll = data.endpoints.reduce((s, e) => s + e.errors, 0);
-  const errRatePct = totalAll > 0 ? Math.round((errorsAll / totalAll) * 100) : 0;
-  const topEndpoint = data.endpoints[0];
+  const errorsAll  = activeEndpoints.reduce((s, e) => s + e.errors, 0);
+  const errRatePct = activeTotal > 0 ? Math.round((errorsAll / activeTotal) * 100) : 0;
+  const topEndpoint = activeEndpoints[0];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
 
+      {/* Period selector — controls everything below */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase' }}>
+          Showing: {periodLabel}
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {['24h', '7d'].map(v => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              style={{
+                fontFamily: M, fontSize: 10, letterSpacing: '0.08em',
+                padding: '5px 14px', borderRadius: 6,
+                background: view === v ? t.accent : 'none',
+                color: view === v ? t.textInverse : t.text2,
+                border: `1px solid ${view === v ? t.accent : t.border}`,
+                cursor: 'pointer',
+              }}
+            >{v}</button>
+          ))}
+          <button
+            onClick={load}
+            title="Refresh"
+            style={{
+              fontFamily: M, fontSize: 10, padding: '5px 10px', borderRadius: 6,
+              background: 'none', color: t.text3,
+              border: `1px solid ${t.border}`, cursor: 'pointer', marginLeft: 4,
+            }}
+          >↺</button>
+        </div>
+      </div>
+
       {/* Top stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-        <StatCard label="Total requests" value={fmt(totalAll)} sub="last 7 days" t={t} />
+        <StatCard label="Total requests" value={fmt(activeTotal)} sub={periodLabel} t={t} />
         <StatCard label="Error rate" value={`${errRatePct}%`} sub={`${errorsAll} errors`} t={t} accent={errRatePct > 5 ? '#ff3b30' : '#34c759'} />
-        <StatCard label="Unique endpoints" value={data.endpoints.length} sub="last 7 days" t={t} />
+        <StatCard label="Unique endpoints" value={activeEndpoints.length} sub={periodLabel} t={t} />
         {topEndpoint && (
           <StatCard
             label="Top endpoint"
@@ -1289,54 +1374,27 @@ function EndpointsTab({ t }) {
 
       {/* Aggregate trend chart */}
       <div style={{ padding: '20px 20px 16px', borderRadius: 12, background: t.cardBg, border: `1px solid ${t.border}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div>
-            <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase', marginBottom: 4 }}>
-              All endpoints — request volume
-            </div>
-            <div style={{ display: 'flex', gap: 16 }}>
-              <span style={{ fontFamily: M, fontSize: 10, color: t.accent }}>── total</span>
-              <span style={{ fontFamily: M, fontSize: 10, color: '#ff3b30' }}>╌╌ errors</span>
-            </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase', marginBottom: 4 }}>
+            All endpoints — request volume
           </div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {['24h', '7d'].map(v => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                style={{
-                  fontFamily: M, fontSize: 10, letterSpacing: '0.08em',
-                  padding: '4px 10px', borderRadius: 6,
-                  background: view === v ? t.accent : 'none',
-                  color: view === v ? t.textInverse : t.text2,
-                  border: `1px solid ${view === v ? t.accent : t.border}`,
-                  cursor: 'pointer',
-                }}
-              >{v}</button>
-            ))}
-            <button
-              onClick={load}
-              style={{
-                fontFamily: M, fontSize: 10, letterSpacing: '0.08em',
-                padding: '4px 10px', borderRadius: 6,
-                background: 'none', color: t.text3,
-                border: `1px solid ${t.border}`, cursor: 'pointer', marginLeft: 4,
-              }}
-            >↺</button>
+          <div style={{ display: 'flex', gap: 16 }}>
+            <span style={{ fontFamily: M, fontSize: 10, color: t.accent }}>── total</span>
+            <span style={{ fontFamily: M, fontSize: 10, color: '#ff3b30' }}>╌╌ errors</span>
           </div>
         </div>
         <LineChart
           data={chartData}
           t={t}
           height={130}
-          formatX={view === '24h' ? fmtHour : fmtDay}
+          formatX={is24h ? fmtHour : fmtDay}
         />
       </div>
 
       {/* Group breakdown */}
       <div>
         <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase', marginBottom: 12 }}>
-          By group — last 7 days
+          By group — {periodLabel}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
           {groups.map(g => {
@@ -1368,51 +1426,60 @@ function EndpointsTab({ t }) {
       {/* Per-endpoint table */}
       <div>
         <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase', marginBottom: 12 }}>
-          All endpoints — last 7 days
+          All endpoints — {periodLabel}
         </div>
-        <div style={{
-          borderRadius: 12, border: `1px solid ${t.border}`,
-          background: t.cardBg, overflow: 'hidden',
-        }}>
+        <div style={{ borderRadius: 12, border: `1px solid ${t.border}`, background: t.cardBg, overflow: 'hidden' }}>
           {/* Header */}
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: '72px 1fr 64px 64px 70px 80px',
-            gap: 8, padding: '8px 16px',
-            borderBottom: `1px solid ${t.border}`,
+            display: 'grid', gridTemplateColumns: '72px 1fr 64px 64px 70px 80px',
+            gap: 8, padding: '8px 16px', borderBottom: `1px solid ${t.border}`,
           }}>
-            {['Method', 'Path', 'Total', 'Errors', '7d trend', 'Last seen'].map(h => (
+            {['Method', 'Path', 'Total', 'Errors', trendLabel, 'Last seen'].map(h => (
               <div key={h} style={{ fontFamily: M, fontSize: 9, letterSpacing: '0.1em', color: t.text3, textTransform: 'uppercase' }}>
                 {h}
               </div>
             ))}
           </div>
 
-          {data.endpoints.length === 0 && (
+          {activeEndpoints.length === 0 && (
             <div style={{ padding: '32px 16px', textAlign: 'center', fontFamily: M, fontSize: 11, color: t.text3 }}>
               No requests logged yet — data appears after the first API call.
             </div>
           )}
 
-          {data.endpoints.map((ep, i) => {
-            const errPct = ep.total > 0 ? Math.round((ep.errors / ep.total) * 100) : 0;
+          {activeEndpoints.map((ep, i) => {
+            const errPct   = ep.total > 0 ? Math.round((ep.errors / ep.total) * 100) : 0;
             const errColor = errPct > 10 ? '#ff3b30' : errPct > 0 ? '#ff9500' : '#34c759';
-            const group = ENDPOINT_GROUPS.find(g => ep.path.startsWith(g.prefix));
+            const group    = ENDPOINT_GROUPS.find(g => ep.path.startsWith(g.prefix));
+            const desc     = ENDPOINT_DESCRIPTIONS[ep.path];
             return (
               <div
                 key={`${ep.method}-${ep.path}`}
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: '72px 1fr 64px 64px 70px 80px',
+                  display: 'grid', gridTemplateColumns: '72px 1fr 64px 64px 70px 80px',
                   gap: 8, padding: '10px 16px',
-                  borderBottom: i < data.endpoints.length - 1 ? `1px solid ${t.border}` : 'none',
+                  borderBottom: i < activeEndpoints.length - 1 ? `1px solid ${t.border}` : 'none',
                   alignItems: 'center',
                   borderLeft: group ? `3px solid ${group.color}` : `3px solid transparent`,
                 }}
               >
                 <div><MethodBadge method={ep.method} /></div>
-                <div style={{ fontFamily: M, fontSize: 11, color: t.text1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {ep.path}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                  <span style={{ fontFamily: M, fontSize: 11, color: t.text1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {ep.path}
+                  </span>
+                  {desc && (
+                    <span
+                      title={desc}
+                      style={{
+                        flexShrink: 0, width: 14, height: 14, borderRadius: '50%',
+                        background: t.surface, border: `1px solid ${t.border}`,
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        fontFamily: M, fontSize: 9, color: t.text3, cursor: 'default',
+                        lineHeight: 1,
+                      }}
+                    >?</span>
+                  )}
                 </div>
                 <div style={{ fontFamily: M, fontSize: 12, color: t.text1, fontWeight: 600 }}>
                   {fmt(ep.total)}
@@ -1421,7 +1488,7 @@ function EndpointsTab({ t }) {
                   {errPct}%
                 </div>
                 <div>
-                  <Sparkline sparkline={ep.sparkline} d7Buckets={d7Buckets} t={t} />
+                  <Sparkline sparkline={ep.sparkline} buckets={activeBuckets} t={t} />
                 </div>
                 <div style={{ fontFamily: M, fontSize: 10, color: t.text3 }}>
                   {timeAgo(ep.last_seen)}
