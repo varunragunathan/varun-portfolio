@@ -339,6 +339,10 @@ export default function Home() {
     }
   }, [enabled, loading, user]);
 
+  // Don't render during auth check — prevents Hero→GuestView layout flash.
+  // Background colour is already correct via CSS vars set before React loads.
+  if (enabled && loading) return null;
+
   return (
     <>
       {showGuest ? <GuestView /> : (
