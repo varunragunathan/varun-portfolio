@@ -41,7 +41,7 @@ class ErrorBoundary extends Component {
   }
 }
 
-const Home           = lazy(() => import('./pages/Home'));
+import Home from './pages/Home';
 const Auth           = lazy(() => import('./pages/Auth'));
 const Settings       = lazy(() => import('./pages/Security'));
 const ChatPage       = lazy(() => import('./pages/Chat'));

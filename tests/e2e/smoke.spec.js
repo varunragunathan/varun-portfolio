@@ -10,12 +10,12 @@ test.describe('Home page', () => {
   test('loads and shows nav + footer', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('nav')).toBeVisible();
-    await expect(page.locator('footer')).toBeVisible();
+    await expect(page.locator('#footer')).toBeVisible();
   });
 
   test('shows version badge in footer', async ({ page }) => {
     await page.goto('/');
-    const footer = page.locator('footer').first();
+    const footer = page.locator('#footer');
     await expect(footer).toContainText('v');
     // Matches v0.x.x pattern
     await expect(footer).toHaveText(/v\d+\.\d+\.\d+/);
