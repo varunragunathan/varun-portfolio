@@ -67,7 +67,7 @@ export default defineConfig({
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
           if (id.includes('react-dom') || id.includes('react-router') || id.includes('/react/')) return 'vendor';
-          if (id.includes('framer-motion')) return 'motion';
+
           if (id.includes('@simplewebauthn') || id.includes('qrcode')) return 'auth-libs';
         }
       }
