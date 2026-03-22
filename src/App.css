@@ -93,3 +93,10 @@
   font-family: var(--font-mono); font-size: 10px;
   letter-spacing: 0.1em; color: var(--text-3);
 }
+.footer__engineering-link {
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.1em; color: var(--accent-muted);
+  text-decoration: none; opacity: 0.7;
+  transition: opacity 0.2s;
+}
+.footer__engineering-link:hover { opacity: 1; }

@@ -40,11 +40,12 @@ class ErrorBoundary extends Component {
   }
 }
 
-const Home      = lazy(() => import('./pages/Home'));
-const Auth      = lazy(() => import('./pages/Auth'));
-const Settings  = lazy(() => import('./pages/Security'));
-const ChatPage  = lazy(() => import('./pages/Chat'));
-const AdminPage = lazy(() => import('./pages/Admin'));
+const Home           = lazy(() => import('./pages/Home'));
+const Auth           = lazy(() => import('./pages/Auth'));
+const Settings       = lazy(() => import('./pages/Security'));
+const ChatPage       = lazy(() => import('./pages/Chat'));
+const AdminPage      = lazy(() => import('./pages/Admin'));
+const EngineeringPage = lazy(() => import('./pages/Engineering'));
 
 function Loading() {
   return (
@@ -90,6 +91,7 @@ function Footer({ onShakeEnable, shakeState }) {
         <div className="footer__bottom-left">
           <span className="footer__domain">varunr.dev</span>
           <VersionBadge />
+          <a href="/engineering" className="footer__engineering-link">engineering</a>
         </div>
         <ThemeToggle />
       </div>
@@ -130,6 +132,7 @@ function Shell() {
             <Route path="/account/settings" element={<Settings />} />
             <Route path="/chat" element={<ChatPage />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/engineering" element={<EngineeringPage />} />
           </Routes>
         </Suspense>
       </main>
