@@ -7,6 +7,7 @@ import ParticleField from '../components/ParticleField';
 import { PERSONAL, STATS, PROJECTS, SKILLS, PRINCIPLES, TIMELINE, EDUCATION } from '../data/portfolio';
 import FrozenChat from '../components/FrozenChat';
 import { useState, useEffect } from 'react';
+import WelcomeTour, { TOUR_KEY } from '../components/WelcomeTour';
 import './Home.css';
 
 // ─── Guest view (unauthenticated) ─────────────────────────────────
@@ -329,6 +330,15 @@ export default function Home() {
   const authenticated = !enabled || (!loading && !!user);
   const showGuest     = enabled && !loading && !user;
 
+  const [showTour, setShowTour] = useState(false);
+
+  // Show tour once for newly authenticated users
+  useEffect(() => {
+    if (enabled && !loading && user && !localStorage.getItem(TOUR_KEY)) {
+      setShowTour(true);
+    }
+  }, [enabled, loading, user]);
+
   return (
     <>
       {showGuest ? <GuestView /> : (
@@ -348,6 +358,7 @@ export default function Home() {
           <HomeFooter />
         </>
       )}
+      {showTour && <WelcomeTour onDone={() => setShowTour(false)} />}
     </>
   );
 }
