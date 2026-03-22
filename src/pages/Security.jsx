@@ -9,7 +9,8 @@ import { useResponsive } from '../hooks/useResponsive';
 import lighthouseHistory from '../../lighthouse/history.json';
 
 // GitHub Pages URL for full Lighthouse HTML reports
-const LH_REPORTS_URL = 'https://varunr-dev.github.io/varun-portfolio/lighthouse/';
+const PAGES_BASE     = 'https://varunragunathan.github.io/varun-portfolio';
+const LH_REPORTS_URL = `${PAGES_BASE}/lighthouse/`;
 
 async function patchPreferences(body) {
   return fetch('/api/auth/account/preferences', {

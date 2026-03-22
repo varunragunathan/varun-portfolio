@@ -27,7 +27,17 @@ function GuestView() {
         {/* Identity */}
         <div className="guest-view__identity">
           <div className="guest-view__avatar-ring">
-            <img src="/varun.png" alt="Varun Ragunathan" className="guest-view__avatar" />
+            <picture>
+              <source srcSet="/varun.webp" type="image/webp" />
+              <img
+                src="/varun-320.jpg"
+                alt="Varun Ragunathan"
+                className="guest-view__avatar"
+                width={80}
+                height={80}
+                fetchPriority="high"
+              />
+            </picture>
           </div>
           <h1 className="guest-view__name">Varun Ragunathan</h1>
           <p className="guest-view__title">Staff Software Engineer</p>
@@ -81,13 +91,17 @@ function Hero() {
 
       <div className={`hero__inner${loaded ? ' hero__inner--loaded' : ''}`}>
         <div className="hero__avatar-ring">
-          <img
-            src="/varun.png"
-            alt="Varun Ragunathan"
-            width={92}
-            height={92}
-            className="hero__avatar"
-          />
+          <picture>
+            <source srcSet="/varun.webp" type="image/webp" />
+            <img
+              src="/varun-320.jpg"
+              alt="Varun Ragunathan"
+              width={92}
+              height={92}
+              className="hero__avatar"
+              fetchPriority="high"
+            />
+          </picture>
         </div>
 
         <div className="hero__eyebrow">{PERSONAL.title} · {PERSONAL.domain}</div>

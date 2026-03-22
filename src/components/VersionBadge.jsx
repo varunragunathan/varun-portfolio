@@ -25,6 +25,7 @@ function DigitSlot({ digit, delay }) {
       if (!ref.current) return;
       let start = null;
       function step(ts) {
+        if (!ref.current) return;
         if (!start) start = ts;
         const p    = Math.min((ts - start) / 800, 1);
         const ease = 1 - Math.pow(1 - p, 4); // quartic ease-out

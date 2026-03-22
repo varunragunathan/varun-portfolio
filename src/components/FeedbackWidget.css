@@ -4,7 +4,7 @@
 }
 .feedback-form__done-text {
   font-family: var(--font-mono); font-size: 12px;
-  color: #34c759; letter-spacing: 0.06em;
+  color: var(--success-color); letter-spacing: 0.06em;
 }
 
 .feedback-form__textarea {

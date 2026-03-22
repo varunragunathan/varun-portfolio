@@ -30,7 +30,7 @@ export const themes = {
     focus: 'rgba(10,107,85,0.45)',
     tagBg: 'rgba(0,0,0,0.04)', tagBorder: 'rgba(0,0,0,0.09)',
     dotBorder: '#999999', line: 'rgba(0,0,0,0.07)',
-    errorColor: '#dc2626', successColor: '#059669', warningColor: '#d97706',
+    errorColor: '#b91c1c', successColor: '#15803d', warningColor: '#b45309',
   },
 };
 

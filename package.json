@@ -1,7 +1,7 @@
 {
   "name": "engineering-portfolio",
   "private": true,
-  "version": "0.2.30",
+  "version": "0.2.32",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,7 +16,10 @@
     "lint": "eslint src",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
-    "prepare": "husky"
+    "prepare": "husky",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
+    "test:storybook": "vitest run --project=storybook"
   },
   "dependencies": {
     "@simplewebauthn/browser": "^13.3.0",
@@ -30,18 +33,35 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.1",
+    "@chromatic-com/storybook": "^5.0.2",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.58.2",
+    "@storybook/addon-a11y": "^10.3.1",
+    "@storybook/addon-docs": "^10.3.1",
+    "@storybook/addon-onboarding": "^10.3.1",
+    "@storybook/addon-vitest": "^10.3.1",
+    "@storybook/react-vite": "^10.3.1",
+    "@storybook/test": "^8.6.15",
+    "@testing-library/dom": "^10.4.1",
     "@vitejs/plugin-react": "^4.7.0",
+    "@vitest/browser-playwright": "^4.1.0",
+    "@vitest/coverage-v8": "^4.1.0",
     "autoprefixer": "^10.4.0",
     "eslint": "^10.1.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-storybook": "^10.3.1",
     "globals": "^17.4.0",
     "husky": "^9.1.7",
+    "playwright": "^1.58.2",
     "postcss": "^8.4.0",
+    "prop-types": "^15.8.1",
+    "sharp": "^0.34.5",
+    "storybook": "^10.3.1",
     "tailwindcss": "^3.4.0",
+    "typescript": "^5.9.3",
     "vite": "^6.4.1",
-    "vite-plugin-pwa": "^0.21.0"
+    "vite-plugin-pwa": "^0.21.0",
+    "vitest": "^4.1.0"
   }
 }

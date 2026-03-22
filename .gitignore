@@ -10,3 +10,6 @@ package-lock.json
 /docs/export
 test-results/.last-run.json
 /test-results
+
+*storybook.log
+storybook-static

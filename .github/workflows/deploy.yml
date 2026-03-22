@@ -14,6 +14,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # ── 1. Test → Deploy ─────────────────────────────────────────────
   deploy:
     runs-on: ubuntu-latest
     steps:
@@ -26,10 +27,22 @@ jobs:
 
       - run: yarn install --frozen-lockfile
 
+      - name: Lint
+        run: yarn lint
+
+      - name: Install Playwright + Chromium (for Storybook Vitest and smoke tests)
+        run: npx playwright install chromium --with-deps
+
+      - name: Storybook component tests (gates deploy)
+        run: yarn test:storybook
+
+      - name: Playwright smoke + axe tests (gates deploy)
+        run: yarn test
+
       - name: Read version
         run: echo "APP_VERSION=$(jq -r .version package.json)" >> $GITHUB_ENV
 
-      - name: Build
+      - name: Build app
         run: yarn build
         env:
           VITE_ENABLE_AUTH: true
@@ -40,3 +53,71 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  # ── 2. Publish Storybook to GitHub Pages (after deploy succeeds) ──
+  publish-storybook:
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          token: ${{ secrets.LIGHTHOUSE_PUSH_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: 22
+          cache: yarn
+
+      - run: yarn install --frozen-lockfile
+
+      - name: Build Storybook
+        run: yarn build-storybook --output-dir storybook-static --quiet
+
+      - name: Publish to gh-pages
+        run: |
+          git fetch origin gh-pages 2>/dev/null || true
+          git worktree add gh-pages-dir gh-pages 2>/dev/null || (
+            git worktree add --orphan gh-pages-dir && cd gh-pages-dir && git checkout --orphan gh-pages
+          )
+
+          # Replace storybook directory entirely
+          rm -rf gh-pages-dir/storybook
+          cp -r storybook-static gh-pages-dir/storybook
+
+          # Regenerate root index linking to both tools
+          node -e "
+            const fs = require('fs');
+            const html = \`<!DOCTYPE html>
+          <html lang=\"en\"><head><meta charset=\"UTF-8\">
+          <meta http-equiv=\"refresh\" content=\"0;url=storybook/\">
+          <title>Developer Tools — varunr.dev</title>
+          <style>
+            body { font-family: monospace; max-width: 600px; margin: 60px auto; padding: 0 20px; background: #0d0d0d; color: #e8e8f0; }
+            h1 { font-size: 16px; font-weight: 400; color: #64ffda; margin-bottom: 32px; }
+            a { display: block; padding: 14px 18px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; color: #64ffda; text-decoration: none; font-size: 13px; }
+            a:hover { border-color: rgba(100,255,218,0.3); }
+            .sub { color: #7e7e98; font-size: 11px; margin-top: 4px; }
+          </style></head>
+          <body>
+            <h1>varunr.dev · developer tools</h1>
+            <a href=\"storybook/\">
+              Storybook
+              <div class=\"sub\">Component library — interactive docs and visual tests</div>
+            </a>
+            <a href=\"lighthouse/\">
+              Lighthouse Reports
+              <div class=\"sub\">Accessibility, performance and SEO scores per deploy</div>
+            </a>
+          </body></html>\`;
+            fs.writeFileSync('gh-pages-dir/index.html', html);
+          "
+
+          cd gh-pages-dir
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git diff --staged --quiet || git commit -m "chore: publish storybook [skip ci]"
+          git push origin gh-pages
