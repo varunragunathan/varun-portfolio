@@ -1284,7 +1284,7 @@ export default function Auth() {
           <p style={{ fontFamily: F, fontSize: isMobile ? 16 : 14, color: t.text2, lineHeight: 1.6 }}>
             {tab === 'recover'
               ? 'Restore access using your recovery code.'
-              : 'Unlock the full portfolio and AI assistant. No password required.'}
+              : 'Access the engineering docs and AI assistant. No password required.'}
           </p>
         </div>
 

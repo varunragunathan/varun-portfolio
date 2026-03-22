@@ -48,7 +48,7 @@ function GuestView() {
         <div className="guest-card">
           <div className="guest-card__gradient" aria-hidden="true" />
           <div className="guest-card__inner">
-            <p className="guest-card__headline">This portfolio is the product.</p>
+            <p className="guest-card__headline">This site is the product.</p>
             <p className="guest-card__subtext">Explore the work, then ask the AI how it was built.</p>
 
             {/* Feature bullets */}

@@ -405,7 +405,7 @@ export default function Engineering() {
         fontFamily: F, fontWeight: 300, fontSize: isMobile ? 30 : 42,
         color: t.text1, margin: '0 0 16px', lineHeight: 1.1,
       }}>
-        This portfolio is the product.
+        This site is the product.
       </h1>
       <p style={{
         fontFamily: F, fontSize: isMobile ? 15 : 18, color: t.text2,
@@ -446,7 +446,7 @@ export default function Engineering() {
           What's in this site
         </h2>
         <p style={{ fontFamily: F, fontSize: isMobile ? 13 : 14, color: t.text2, margin: '0 0 18px', lineHeight: 1.5 }}>
-          The portfolio itself is a full production system. Here's what's running inside it.
+          This site is a full production system. Here's what's running inside it.
         </p>
         <div style={{
           background: t.surface, border: `1px solid ${t.border}`,
