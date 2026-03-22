@@ -1,4 +1,4 @@
-import { expect, within, userEvent } from '@storybook/test';
+import { expect } from '@storybook/test';
 import UpdatePrompt from '../components/UpdatePrompt';
 import '../components/UpdatePrompt.css';
 

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs */
 import { useRef, useEffect } from 'react';
 import { useTheme } from '../hooks/useTheme';
 import { usePrefersReducedMotion } from '../hooks/useAnimations';

@@ -297,14 +297,14 @@ function Passkeys() {
 
   return (
     <>
-      {passkeys.map((p, i) => (
+      {passkeys.map((p, _i) => (
         <Row key={p.id} last={false}>
           {passkeyIcon(p)}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
               {renaming?.id === p.id ? (
                 <input
-                  autoFocus
+                  autoFocus // eslint-disable-line jsx-a11y/no-autofocus
                   value={renaming.value}
                   onChange={e => setRenaming({ id: p.id, value: e.target.value })}
                   onBlur={() => saveNickname(p.id)}
@@ -576,7 +576,7 @@ function TotpSection() {
                 onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="000000"
                 maxLength={6}
-                autoFocus
+                autoFocus // eslint-disable-line jsx-a11y/no-autofocus
                 inputMode="numeric"
                 style={{
                   width: 120, padding: '9px 14px', borderRadius: 8,
@@ -935,7 +935,7 @@ function WhatsAppSection() {
             onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
             placeholder="000000"
             maxLength={6}
-            autoFocus
+            autoFocus // eslint-disable-line jsx-a11y/no-autofocus
             required
             style={{
               width: 120, padding: '9px 14px', borderRadius: 9,
@@ -1109,7 +1109,7 @@ function DeleteAccount({ onDeleted }) {
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder="your@email.com"
-              autoFocus
+              autoFocus // eslint-disable-line jsx-a11y/no-autofocus
               style={{
                 width: '100%', boxSizing: 'border-box',
                 padding: '11px 14px', borderRadius: 10, marginBottom: 16,
@@ -1153,7 +1153,7 @@ function DeleteAccount({ onDeleted }) {
 }
 
 export default function Settings() {
-  const { t, preference, setPreference, colorBlindMode, setColorBlindMode } = useTheme();
+  const { t, preference, colorBlindMode, setColorBlindMode } = useTheme();
   const { user, loading, enabled, setUser } = useAuth();
   const { isMobile } = useResponsive();
   const navigate    = useNavigate();

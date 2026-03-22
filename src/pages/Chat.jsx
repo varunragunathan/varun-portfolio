@@ -3,7 +3,7 @@
 // Right panel: active conversation with streaming messages.
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
 import { useChat } from '../hooks/useChat';
@@ -24,14 +24,14 @@ function renderContent(text, t) {
   const out   = [];
   let inCode  = false;
   let codeBuf = [];
-  let lang    = '';
+
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (line.startsWith('```')) {
       if (!inCode) {
         inCode = true;
-        lang   = line.slice(3).trim();
+
       } else {
         out.push(
           <pre key={i} style={{
@@ -49,7 +49,7 @@ function renderContent(text, t) {
         );
         inCode  = false;
         codeBuf = [];
-        lang    = '';
+
       }
       continue;
     }
@@ -142,6 +142,7 @@ function MessageBubble({ message, t, isStreaming, showAvatar }) {
 function ConvItem({ conv, active, onClick, onDelete, t }) {
   const [hover, setHover] = useState(false);
   return (
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
     <div
       onClick={onClick}
       onMouseEnter={() => setHover(true)}
@@ -189,6 +190,7 @@ function Sidebar({ conversations, activeId, onSelect, onDelete, onNew, open, onC
     <>
       {/* Mobile overlay backdrop */}
       {isMobile && (
+        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
         <div
           onClick={onClose}
           style={{
@@ -615,7 +617,6 @@ function ChatGate() {
 export default function ChatPage() {
   const { t }           = useTheme();
   const { user, loading } = useAuth();
-  const navigate        = useNavigate();
   const { isMobile }    = useResponsive();
 
   const [conversations,  setConversations]  = useState([]);

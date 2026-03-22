@@ -2,6 +2,14 @@
 # Ensure nvm-managed node/yarn are on PATH (needed when run from GUI git clients)
 export PATH="$HOME/.nvm/versions/node/v24.14.0/bin:$PATH"
 
+echo "▶ Linting…"
+yarn lint
+if [ $? -ne 0 ]; then
+  echo "✗ Lint failed — push blocked. Run 'yarn lint' to see errors."
+  exit 1
+fi
+echo "✓ Lint passed."
+
 echo "▶ Running Storybook component tests…"
 yarn test:storybook
 if [ $? -ne 0 ]; then

@@ -1,4 +1,4 @@
-import { expect, within } from '@storybook/test';
+import { expect } from '@storybook/test';
 import VersionBadge from '../components/VersionBadge';
 
 export default {
@@ -30,7 +30,6 @@ export const CustomColor = {
 /** Renders the version string correctly */
 export const RendersVersion = {
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
     // VersionBadge wraps each char — the element should be in the DOM
     const badge = canvasElement.querySelector('.version-badge');
     await expect(badge).not.toBeNull();

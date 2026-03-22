@@ -1082,7 +1082,7 @@ function TabSpinner({ t }) {
     </div>
   );
 }
-function TabError({ msg, t }) {
+function TabError({ msg, t: _t }) {
   return (
     <div style={{ fontFamily: M, fontSize: 12, color: '#ff3b30', textAlign: 'center', padding: '40px 0' }}>
       {msg}

@@ -1,4 +1,4 @@
-import { expect, within, userEvent } from '@storybook/test';
+import { expect, within } from '@storybook/test';
 import { Btn } from '../components/UI';
 import '../components/UI.css';
 

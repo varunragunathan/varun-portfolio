@@ -187,6 +187,7 @@ function AvatarMenu({ user, onLogout }) {
           <div className="avatar-menu__identity">
             {editingNick ? (
               <form onSubmit={saveNick} className="avatar-menu__nick-form">
+                {/* eslint-disable jsx-a11y/no-autofocus */}
                 <input
                   className="avatar-menu__nick-input"
                   value={nickDraft}
@@ -194,6 +195,7 @@ function AvatarMenu({ user, onLogout }) {
                   autoFocus
                   maxLength={32}
                 />
+                {/* eslint-enable jsx-a11y/no-autofocus */}
                 <button type="submit" disabled={nickBusy} className="avatar-menu__nick-save">
                   {nickBusy ? '…' : 'Save'}
                 </button>
@@ -290,6 +292,7 @@ function LogoMark() {
       el.style.opacity   = String(0.35 + 0.65 * env);
       el.style.color     = lerpColor(baseColorRef.current, '#6366f1', env);
       el.style.transform = `translateY(${y.toFixed(2)}px)`;
+      // eslint-disable-next-line react-hooks/immutability
       rafRef.current = requestAnimationFrame(tick);
     } else {
       const t    = Math.min((ts - s.leaveTime) / SETTLE_MS, 1);

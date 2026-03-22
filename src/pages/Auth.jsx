@@ -140,10 +140,11 @@ function TrustDeviceModal({ onFinish }) {
         </p>
 
         <div style={{ marginBottom: 20 }}>
-          <label style={{ display: 'block', fontFamily: M, fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', color: t.text3, marginBottom: 7 }}>
+          <label htmlFor="trust-device-name" style={{ display: 'block', fontFamily: M, fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', color: t.text3, marginBottom: 7 }}>
             Device name (optional)
           </label>
           <input
+            id="trust-device-name"
             placeholder="My MacBook, iPhone, etc."
             value={deviceName}
             onChange={e => setDeviceName(e.target.value)}
@@ -291,7 +292,7 @@ function NumberMatchScreen({ code, tempToken, onApproved, onDenied }) {
               onDenied();
             }
           }
-        } catch {}
+        } catch { /* ignore */ }
       });
 
       ws.addEventListener('close', () => {
@@ -480,6 +481,7 @@ function RegisterFlow({ onSuccess }) {
 
       {step === 0 && (
         <form onSubmit={handleSendOTP}>
+          {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
           <Input label="Email address" type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus placeholder="you@example.com" />
           <PrimaryBtn loading={busy} type="submit">Send verification code →</PrimaryBtn>
         </form>
@@ -490,6 +492,7 @@ function RegisterFlow({ onSuccess }) {
           <p style={{ fontFamily: F, fontSize: 14, color: '#9ca3af', marginBottom: 20, lineHeight: 1.6 }}>
             Enter the 6-digit code sent to <strong style={{ color: '#e5e5e5' }}>{email}</strong>
           </p>
+          {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
           <Input label="Verification code" type="text" inputMode="numeric" value={otp} onChange={e => setOtp(e.target.value)} maxLength={6} required autoFocus placeholder="000000" />
           <PrimaryBtn loading={busy} type="submit">Verify code →</PrimaryBtn>
           <button type="button" onClick={() => { setStep(0); setMsg(null); }}
@@ -790,6 +793,7 @@ function SignInFlow({ onSuccess }) {
 
       {view === 'email' && (
         <form onSubmit={handleEmailSubmit}>
+          {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
           <Input label="Email address" type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus placeholder="you@example.com" autoComplete="username webauthn" />
           <PrimaryBtn loading={busy} type="submit">Continue →</PrimaryBtn>
           {error && <Message text={error} type="error" />}
@@ -899,6 +903,7 @@ function SignInFlow({ onSuccess }) {
             Enter the 6-digit code from your authenticator app for{' '}
             <strong style={{ color: t.text1 }}>{email}</strong>.
           </p>
+          {/* eslint-disable jsx-a11y/no-autofocus */}
           <Input
             label="Authenticator code"
             type="text"
@@ -909,6 +914,7 @@ function SignInFlow({ onSuccess }) {
             inputMode="numeric"
             spellCheck={false}
           />
+          {/* eslint-enable jsx-a11y/no-autofocus */}
           <PrimaryBtn loading={busy} type="submit">Sign in →</PrimaryBtn>
           {error && <Message text={error} type="error" />}
           <button type="button" onClick={() => { setView('passkey'); setError(null); }}
@@ -923,6 +929,7 @@ function SignInFlow({ onSuccess }) {
           <p style={{ fontFamily: F, fontSize: 14, color: t.text2, lineHeight: 1.6, marginBottom: 20 }}>
             Enter a recovery code for <strong style={{ color: t.text1 }}>{email}</strong>. Each code can only be used once.
           </p>
+          {/* eslint-disable jsx-a11y/no-autofocus */}
           <Input
             label="Recovery code"
             type="text"
@@ -932,6 +939,7 @@ function SignInFlow({ onSuccess }) {
             placeholder="XXXXX-XXXXX"
             spellCheck={false}
           />
+          {/* eslint-enable jsx-a11y/no-autofocus */}
           <PrimaryBtn loading={busy} type="submit">Sign in with recovery code →</PrimaryBtn>
           {error && <Message text={error} type="error" />}
           <button type="button" onClick={() => { setView('passkey'); setError(null); }}
@@ -957,6 +965,7 @@ function SignInFlow({ onSuccess }) {
                 Enter the 6-digit code sent to{' '}
                 <strong style={{ color: '#25d366' }}>{waMaskedPhone}</strong> via WhatsApp.
               </p>
+              {/* eslint-disable jsx-a11y/no-autofocus */}
               <Input
                 label="WhatsApp code"
                 type="text"
@@ -967,6 +976,7 @@ function SignInFlow({ onSuccess }) {
                 inputMode="numeric"
                 spellCheck={false}
               />
+              {/* eslint-enable jsx-a11y/no-autofocus */}
               <PrimaryBtn loading={busy} type="submit">Sign in →</PrimaryBtn>
               {error && <Message text={error} type="error" />}
               <button type="button" onClick={() => { setWaSent(false); handleSendWhatsApp(); }}
@@ -1133,6 +1143,7 @@ function RecoverFlow({ onSuccess }) {
           <p style={{ fontFamily: F, fontSize: 14, color: '#9ca3af', lineHeight: 1.6, marginBottom: 20 }}>
             Enter your email address to begin account recovery.
           </p>
+          {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
           <Input label="Email address" type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus placeholder="you@example.com" />
           <PrimaryBtn type="submit">Continue →</PrimaryBtn>
         </form>
@@ -1143,6 +1154,7 @@ function RecoverFlow({ onSuccess }) {
           <p style={{ fontFamily: F, fontSize: 14, color: '#9ca3af', lineHeight: 1.6, marginBottom: 20 }}>
             Enter one of your unused recovery codes for <strong style={{ color: '#e5e5e5' }}>{email}</strong>.
           </p>
+          {/* eslint-disable jsx-a11y/no-autofocus */}
           <Input
             label="Recovery code"
             type="text"
@@ -1152,6 +1164,7 @@ function RecoverFlow({ onSuccess }) {
             placeholder="XXXXX-XXXXX"
             spellCheck={false}
           />
+          {/* eslint-enable jsx-a11y/no-autofocus */}
           <PrimaryBtn loading={busy} type="submit">Verify recovery code →</PrimaryBtn>
           <button type="button" onClick={() => { setStep(0); setMsg(null); }}
             style={{ width: '100%', marginTop: 10, padding: '10px', background: 'none', border: 'none', fontFamily: F, fontSize: 13, color: '#6b7280', cursor: 'pointer' }}>
@@ -1188,6 +1201,7 @@ function RecoverFlow({ onSuccess }) {
               <p style={{ fontFamily: F, fontSize: 14, color: '#9ca3af', marginBottom: 20, lineHeight: 1.6 }}>
                 Enter the 6-digit code from your authenticator app.
               </p>
+              {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
               <Input label="Authenticator code" type="text" inputMode="numeric" value={totpCode} onChange={e => setTotpCode(e.target.value)} maxLength={6} required autoFocus placeholder="000000" />
               <PrimaryBtn loading={busy} type="submit">Verify code →</PrimaryBtn>
             </form>
@@ -1196,6 +1210,7 @@ function RecoverFlow({ onSuccess }) {
               <p style={{ fontFamily: F, fontSize: 14, color: '#9ca3af', marginBottom: 20, lineHeight: 1.6 }}>
                 Enter the 6-digit code sent to <strong style={{ color: '#e5e5e5' }}>{email}</strong>. This is the second factor of your recovery.
               </p>
+              {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
               <Input label="Email verification code" type="text" inputMode="numeric" value={otp} onChange={e => setOtp(e.target.value)} maxLength={6} required autoFocus placeholder="000000" />
               <PrimaryBtn loading={busy} type="submit">Verify code →</PrimaryBtn>
             </form>

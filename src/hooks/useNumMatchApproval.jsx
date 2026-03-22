@@ -34,7 +34,7 @@ export function useNumMatchApproval(user) {
           } else if (msg.type === 'resolved') {
             setApproval(prev => prev?.approvalToken === msg.approvalToken ? null : prev);
           }
-        } catch {}
+        } catch { /* ignore */ }
       });
 
       ws.addEventListener('close', () => {

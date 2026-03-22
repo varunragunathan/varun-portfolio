@@ -71,6 +71,7 @@ export default function UpgradeModal({ onClose, onSuccess, tier = 'pro' }) {
 
   return (
     <>
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
       <div className="upgrade-modal__backdrop" onClick={onClose} />
 
       <div className="upgrade-modal__panel" role="dialog" aria-modal="true">
@@ -101,10 +102,11 @@ export default function UpgradeModal({ onClose, onSuccess, tier = 'pro' }) {
             </ul>
 
             <div className="upgrade-modal__note">
-              <label className="upgrade-modal__note-label">
+              <label htmlFor="upgrade-note" className="upgrade-modal__note-label">
                 Why do you want pro access? (optional)
               </label>
               <textarea
+                id="upgrade-note"
                 className="upgrade-modal__note-textarea"
                 value={note}
                 onChange={e => setNote(e.target.value)}
