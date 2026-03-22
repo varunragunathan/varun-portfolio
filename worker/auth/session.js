@@ -149,11 +149,14 @@ export async function getMe(request, env) {
     : (dbUser?.role ?? 'user');
 
   const tokenHash = await sha256Hex(session.token);
-  const sessionRecord = await db
-    .prepare('SELECT trusted FROM sessions WHERE token_hash = ? LIMIT 1')
-    .bind(tokenHash)
-    .first();
+  const [sessionRecord, rawPrefs] = await Promise.all([
+    db.prepare('SELECT trusted FROM sessions WHERE token_hash = ? LIMIT 1').bind(tokenHash).first(),
+    env.AUTH_KV.get(`prefs:${session.userId}`),
+  ]);
   const trusted = sessionRecord?.trusted === 1;
+  const preferences = rawPrefs
+    ? { colorBlindMode: 'none', themePref: 'auto', ...JSON.parse(rawPrefs) }
+    : { colorBlindMode: 'none', themePref: 'auto' };
 
   return json({
     user: {
@@ -162,6 +165,7 @@ export async function getMe(request, env) {
       maskedEmail: maskEmail(session.email),
       role,
       trusted,
+      preferences,
     },
   });
 }

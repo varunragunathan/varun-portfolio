@@ -157,6 +157,76 @@ useEffect(() => {
 
 ---
 
+## 11.3a User Preferences — Color Blind Mode and Theme Persistence
+
+### Storage model
+
+User preferences are stored in two places:
+
+| Store | Key | Purpose |
+|---|---|---|
+| `localStorage` | `theme-pref` | Fast load on boot — avoids flash before auth resolves |
+| `AUTH_KV` | `prefs:{userId}` | Source of truth — persisted across devices and browsers |
+
+On login, the KV value wins: `user.preferences` from `/api/auth/me` is applied to ThemeProvider, overwriting the localStorage cache. Changes are written to both simultaneously.
+
+**KV schema:**
+```json
+{ "colorBlindMode": "none", "themePref": "auto" }
+```
+
+**API:** `GET /api/auth/account/preferences` returns current prefs. `PATCH /api/auth/account/preferences` accepts `{ colorBlindMode?, themePref? }`.
+
+### Color blind mode
+
+Three modes are supported:
+
+| Mode | Problem addressed | Affected users |
+|---|---|---|
+| `none` | — | Default |
+| `deuteranopia` | Red-green confusion (most common, ~6% of males) | Replace cyan/teal accent with blue; replace red errors with orange |
+| `tritanopia` | Blue-yellow confusion | Replace cyan/teal accent with orange; replace green success with purple |
+
+Color blind overrides are applied as a second CSS custom property pass in `ThemeProvider`, on top of the base theme values. This means every component that uses `var(--accent)`, `var(--error-color)`, `var(--success-color)` updates automatically — no per-component changes needed.
+
+**Dark theme palettes:**
+
+| Token | None | Deuteranopia | Tritanopia |
+|---|---|---|---|
+| `--accent` | `#64ffda` (cyan) | `#5ba4f5` (blue) | `#f97316` (orange) |
+| `--error-color` | `#f87171` (red) | `#ff8c00` (orange) | `#ff3b30` (red — ok for tritanopia) |
+| `--success-color` | `#34d399` (green) | `#5ba4f5` (blue) | `#a78bfa` (purple) |
+
+**Light theme palettes:**
+
+| Token | None | Deuteranopia | Tritanopia |
+|---|---|---|---|
+| `--accent` | `#0a6b55` (teal) | `#1d4ed8` (blue) | `#ea580c` (orange) |
+| `--error-color` | `#dc2626` (red) | `#c84b00` (dark orange) | `#dc2626` (red — ok) |
+| `--success-color` | `#059669` (green) | `#1d4ed8` (blue) | `#7c3aed` (purple) |
+
+### Sync on login
+
+`Shell` in `App.jsx` has access to both `useAuth()` and `useTheme()`. A `useEffect` watching `user?.userId` syncs server preferences to local state on login:
+
+```jsx
+useEffect(() => {
+  if (!user?.preferences) return;
+  const { themePref, colorBlindMode } = user.preferences;
+  if (themePref) setPreference(themePref);
+  if (colorBlindMode) setColorBlindMode(colorBlindMode);
+}, [user?.userId]);
+```
+
+### Settings > Account > Appearance
+
+The Appearance section in `Security.jsx` exposes both controls:
+
+- **Theme** — the existing 3-segment ThemeToggle. A `useEffect` watching `preference` PATCHes the server on change (with a mounted-ref guard to skip the initial call).
+- **Color vision** — a button group (None / Deuteranopia / Tritanopia). Clicking calls `setColorBlindMode` and PATCHes immediately.
+
+---
+
 ## 11.4 The `useAuth` Hook
 
 ```js

@@ -14,6 +14,7 @@ import {
   updateNickname,
   listTrustedDevicesHandler, revokeTrustedDeviceHandler,
 } from './account.js';
+import { getPreferences, updatePreferences } from '../preferences.js';
 import {
   getWhatsAppStatus, sendVerifyOTP, confirmPhone, removePhone,
   sendSigninOTP, verifySigninOTP,
@@ -109,6 +110,8 @@ export async function handleAuth(request, env, url) {
 
   // ── Profile ─────────────────────────────────────────────────────
   if (method === 'PATCH' && path === '/account/nickname')           return updateNickname(request, env);
+  if (method === 'GET'   && path === '/account/preferences')        return getPreferences(request, env);
+  if (method === 'PATCH' && path === '/account/preferences')        return updatePreferences(request, env);
 
   // ── Step-up authentication ──────────────────────────────────────
   if (method === 'POST' && path === '/step-up/options')             return stepUpOptions(request, env);

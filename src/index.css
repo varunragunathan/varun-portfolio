@@ -32,6 +32,11 @@
   --dot-border:    #7e7e98;
   --line:          rgba(255,255,255,0.06);
 
+  /* Semantic status colors */
+  --error-color:   #f87171;
+  --success-color: #34d399;
+  --warning-color: #fbbf24;
+
   /* Derived / computed */
   --nav-bg:   rgb(8 8 12 / 91%);
   --hover-bg: rgba(255,255,255,0.05);
@@ -60,6 +65,11 @@
   --tag-border:    rgba(0,0,0,0.09);
   --dot-border:    #999999;
   --line:          rgba(0,0,0,0.07);
+
+  /* Semantic status colors */
+  --error-color:   #dc2626;
+  --success-color: #059669;
+  --warning-color: #d97706;
 
   --nav-bg:   rgb(250 249 247 / 91%);
   --hover-bg: rgba(0,0,0,0.04);

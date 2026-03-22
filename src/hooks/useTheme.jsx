@@ -16,6 +16,7 @@ export const themes = {
     focus: 'rgba(100,255,218,0.6)',
     tagBg: 'rgba(255,255,255,0.05)', tagBorder: 'rgba(255,255,255,0.08)',
     dotBorder: '#7e7e98', line: 'rgba(255,255,255,0.06)',
+    errorColor: '#f87171', successColor: '#34d399', warningColor: '#fbbf24',
   },
   light: {
     bg: '#faf9f7', surface: '#ffffff', surfaceAlt: '#f3f2ee',
@@ -29,6 +30,48 @@ export const themes = {
     focus: 'rgba(10,107,85,0.45)',
     tagBg: 'rgba(0,0,0,0.04)', tagBorder: 'rgba(0,0,0,0.09)',
     dotBorder: '#999999', line: 'rgba(0,0,0,0.07)',
+    errorColor: '#dc2626', successColor: '#059669', warningColor: '#d97706',
+  },
+};
+
+// Color overrides applied on top of the base theme for each color blind mode.
+// Only the tokens that differ from the base theme are listed.
+const CB_OVERRIDES = {
+  deuteranopia: {
+    dark: {
+      accent: '#5ba4f5', accentMuted: '#4a8fd4',
+      accentDim: 'rgba(91,164,245,0.10)', accentBorder: 'rgba(91,164,245,0.22)',
+      accentGhost: 'rgba(91,164,245,0.04)',
+      particle: '91,164,245',
+      focus: 'rgba(91,164,245,0.6)',
+      errorColor: '#ff8c00', successColor: '#5ba4f5',
+    },
+    light: {
+      accent: '#1d4ed8', accentMuted: '#2563eb',
+      accentDim: 'rgba(29,78,216,0.07)', accentBorder: 'rgba(29,78,216,0.22)',
+      accentGhost: 'rgba(29,78,216,0.03)',
+      particle: '29,78,216',
+      focus: 'rgba(29,78,216,0.45)',
+      errorColor: '#c84b00', successColor: '#1d4ed8',
+    },
+  },
+  tritanopia: {
+    dark: {
+      accent: '#f97316', accentMuted: '#ea580c',
+      accentDim: 'rgba(249,115,22,0.10)', accentBorder: 'rgba(249,115,22,0.22)',
+      accentGhost: 'rgba(249,115,22,0.04)',
+      particle: '249,115,22',
+      focus: 'rgba(249,115,22,0.6)',
+      successColor: '#a78bfa',
+    },
+    light: {
+      accent: '#ea580c', accentMuted: '#c2410c',
+      accentDim: 'rgba(234,88,12,0.07)', accentBorder: 'rgba(234,88,12,0.22)',
+      accentGhost: 'rgba(234,88,12,0.03)',
+      particle: '234,88,12',
+      focus: 'rgba(234,88,12,0.45)',
+      successColor: '#7c3aed',
+    },
   },
 };
 
@@ -37,8 +80,9 @@ function getSystemTheme() {
   return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
 
-// preference: 'auto' | 'light' | 'dark'
-// resolved:   'light' | 'dark'
+// preference:      'auto' | 'light' | 'dark'
+// resolved:        'light' | 'dark'
+// colorBlindMode:  'none' | 'deuteranopia' | 'tritanopia'
 export function ThemeProvider({ children }) {
   const [preference, setPreference] = useState(() => {
     if (typeof window === 'undefined') return 'auto';
@@ -46,6 +90,11 @@ export function ThemeProvider({ children }) {
   });
 
   const [systemTheme, setSystemTheme] = useState(getSystemTheme);
+
+  const [colorBlindMode, setColorBlindMode] = useState(() => {
+    if (typeof window === 'undefined') return 'none';
+    return localStorage.getItem('color-blind-mode') || 'none';
+  });
 
   // Track OS preference changes (only matters when preference === 'auto')
   useEffect(() => {
@@ -59,9 +108,13 @@ export function ThemeProvider({ children }) {
     localStorage.setItem('theme-pref', preference);
   }, [preference]);
 
+  useEffect(() => {
+    localStorage.setItem('color-blind-mode', colorBlindMode);
+  }, [colorBlindMode]);
+
   const resolved = preference === 'auto' ? systemTheme : preference;
 
-  // Sync theme tokens to CSS custom properties so component CSS files can use var(--token)
+  // Pass 1: sync all base theme tokens to CSS custom properties
   useLayoutEffect(() => {
     const root  = document.documentElement;
     const theme = themes[resolved];
@@ -71,31 +124,50 @@ export function ThemeProvider({ children }) {
     root.style.setProperty('--surface-alt',   theme.surfaceAlt);
     root.style.setProperty('--border',        theme.border);
     root.style.setProperty('--border-hover',  theme.borderHover);
-    root.style.setProperty('--accent',        theme.accent);
-    root.style.setProperty('--accent-muted',  theme.accentMuted);
-    root.style.setProperty('--accent-dim',    theme.accentDim);
-    root.style.setProperty('--accent-border', theme.accentBorder);
-    root.style.setProperty('--accent-ghost',  theme.accentGhost);
     root.style.setProperty('--text-1',        theme.text1);
     root.style.setProperty('--text-2',        theme.text2);
     root.style.setProperty('--text-3',        theme.text3);
     root.style.setProperty('--text-inverse',  theme.textInverse);
-    root.style.setProperty('--particle',      theme.particle);
     root.style.setProperty('--card-bg',       theme.cardBg);
     root.style.setProperty('--card-hover',    theme.cardHover);
-    root.style.setProperty('--focus',         theme.focus);
     root.style.setProperty('--tag-bg',        theme.tagBg);
     root.style.setProperty('--tag-border',    theme.tagBorder);
     root.style.setProperty('--dot-border',    theme.dotBorder);
     root.style.setProperty('--line',          theme.line);
   }, [resolved]);
 
+  // Pass 2: sync accent + semantic color tokens — overridden by color blind mode
+  useLayoutEffect(() => {
+    const root  = document.documentElement;
+    const base  = themes[resolved];
+    const ovr   = colorBlindMode !== 'none' ? (CB_OVERRIDES[colorBlindMode]?.[resolved] ?? {}) : {};
+    const t     = { ...base, ...ovr };
+
+    root.style.setProperty('--accent',        t.accent);
+    root.style.setProperty('--accent-muted',  t.accentMuted);
+    root.style.setProperty('--accent-dim',    t.accentDim);
+    root.style.setProperty('--accent-border', t.accentBorder);
+    root.style.setProperty('--accent-ghost',  t.accentGhost);
+    root.style.setProperty('--particle',      t.particle);
+    root.style.setProperty('--focus',         t.focus);
+    root.style.setProperty('--error-color',   t.errorColor);
+    root.style.setProperty('--success-color', t.successColor);
+    root.style.setProperty('--warning-color', t.warningColor);
+  }, [resolved, colorBlindMode]);
+
+  // Derive the effective theme object (with CB overrides merged) for JS consumers
+  const effectiveTheme = colorBlindMode !== 'none'
+    ? { ...themes[resolved], ...(CB_OVERRIDES[colorBlindMode]?.[resolved] ?? {}) }
+    : themes[resolved];
+
   return (
     <ThemeCtx.Provider value={{
-      t: themes[resolved],
+      t: effectiveTheme,
       mode: resolved,
       preference,
       setPreference,
+      colorBlindMode,
+      setColorBlindMode,
     }}>
       {children}
     </ThemeCtx.Provider>

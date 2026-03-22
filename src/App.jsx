@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useEffect, useState, useCallback, Component } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, matchPath } from 'react-router-dom';
-import { ThemeProvider } from './hooks/useTheme';
+import { ThemeProvider, useTheme } from './hooks/useTheme';
 import { SkipLink, ThemeToggle } from './components/UI';
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import Nav from './components/Nav';
@@ -99,6 +99,16 @@ function Footer({ onShakeEnable, shakeState }) {
 
 function Shell() {
   const { user } = useAuth();
+  const { setPreference, setColorBlindMode } = useTheme();
+
+  // Sync server preferences to local state on login
+  useEffect(() => {
+    if (!user?.preferences) return;
+    const { themePref, colorBlindMode } = user.preferences;
+    if (themePref)      setPreference(themePref);
+    if (colorBlindMode) setColorBlindMode(colorBlindMode);
+  }, [user?.userId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const { approval, respond } = useNumMatchApproval(user);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
 
@@ -112,7 +122,7 @@ function Shell() {
       <ScrollToTop />
       <SkipLink />
       <Nav />
-      <div id="main" className="shell__content">
+      <main id="main" className="shell__content">
         <Suspense fallback={<Loading />}>
           <Routes>
             <Route index element={<Home />} />
@@ -122,7 +132,7 @@ function Shell() {
             <Route path="/admin" element={<AdminPage />} />
           </Routes>
         </Suspense>
-      </div>
+      </main>
       {!hideFooter && <Footer shakeState={shakeState} onShakeEnable={requestPermission} />}
       {user && <ChatWidget />}
       {approval && <NumMatchApprovalModal approval={approval} onRespond={respond} />}
