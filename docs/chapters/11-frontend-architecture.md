@@ -2,7 +2,7 @@
 
 ## What You'll Learn
 
-This chapter covers every layer of the React frontend: the routing setup, the theme system, the auth context, the authentication flows and their state machines, the animated logo (including the math behind it), the Identicon avatar with WCAG contrast enforcement, the ParticleField background, the Settings page, the PWA configuration, the PixelOwl mascot and its four animation states, the FrozenChat typewriter demo for unauthenticated visitors, the ChatGate component that replaces silent redirects on `/chat`, and the anonymous feedback widget with shake-to-open on mobile.
+This chapter covers every layer of the React frontend: the routing setup, the theme system, the auth context, the authentication flows and their state machines, the animated logo (including the math behind it), the Identicon avatar with WCAG contrast enforcement, the ParticleField background, the Settings page, the PWA configuration, the PixelOwl mascot and its four animation states, the FrozenChat typewriter demo for unauthenticated visitors, the ChatGate component that replaces silent redirects on `/chat`, the anonymous feedback widget with shake-to-open on mobile, and the owl-guided WelcomeTour shown to first-time authenticated users.
 
 ---
 
@@ -297,7 +297,15 @@ A sign-in button also appears in the Nav right slot when the user is unauthentic
 
 **Authenticated view:** The full Hero section with the particle field, stats, projects, skills, philosophy, timeline, education, and CTA sections.
 
-**The loading state:** While `user === undefined` (loading), neither GuestView nor the full content renders — the page is empty (except the Nav). This prevents the flash of "guest → authenticated" that would occur if the guest view were shown during loading.
+**The loading state:** While `user === undefined` (loading), `Home` returns `null` immediately:
+
+```jsx
+if (enabled && loading) return null;
+```
+
+This prevents the layout flash that would otherwise occur. Without the guard, React renders `<Hero />` during the loading window (because `showGuest` is false while `loading` is true). When auth resolves to `!user`, the component switches to `<GuestView />` — the user sees a brief Hero flash followed by a jump to the guest layout. Returning `null` keeps the screen showing only the background colour for ~100ms until the correct view fades in.
+
+**Theme FOUC prevention:** A blocking inline script in `<head>` (before the React bundle) reads `theme-pref` from `localStorage` and sets `data-theme="light"` on `<html>` if needed. Since `index.css` already defines `[data-theme="light"]` selectors, the correct background and CSS variable values apply via pure CSS before any JavaScript runs — no dark→light flash even on light-mode-preferring users.
 
 ---
 
@@ -603,6 +611,89 @@ The feedback is stored in D1 in a `feedback` table (id, message, page, user_agen
 
 ---
 
+## 11.17 The WelcomeTour
+
+`src/components/WelcomeTour.jsx` is a six-step modal tour shown once to newly authenticated users. Its purpose is to orient first-time visitors with the owl mascot as the guide, walking through the four main features before setting them loose on the portfolio.
+
+### Trigger
+
+The tour is shown from `Home.jsx` via a `useEffect` that fires when auth resolves:
+
+```jsx
+useEffect(() => {
+  if (enabled && !loading && user && !localStorage.getItem(TOUR_KEY)) {
+    setShowTour(true);
+  }
+}, [enabled, loading, user]);
+```
+
+`TOUR_KEY = 'hasSeenWelcomeTour'`. On dismiss or completion, the key is written to `localStorage` so the tour never re-appears, even after sign-out and sign-in (the flag is per-browser, not per-account). To replay the tour during development:
+
+```js
+localStorage.removeItem('hasSeenWelcomeTour')
+```
+
+### Steps
+
+| # | Owl state | Title | Content |
+|---|-----------|-------|---------|
+| 1 | `done` | Welcome aboard | Confirms passkey sign-in and sets context |
+| 2 | `streaming` | Chat with me | Directs to the chat icon in the nav |
+| 3 | `thinking` | Browse the timeline | Points to the home page scroll |
+| 4 | `idle` | Explore the projects | Highlights featured projects section |
+| 5 | `idle` | Your account | Links to Settings — passkeys, devices, preferences |
+| 6 | `done` | You're all set | Closing message with a chat nudge |
+
+The owl's `state` prop changes per step, giving the mascot a sense of personality — it pulses happily at the start and end, streams when talking about chat, and thinks when describing the timeline.
+
+### Layout
+
+The tour is a `position: fixed` full-screen backdrop (`rgba(8,8,12,0.82)` + `backdrop-filter: blur(6px)`). The card (max-width 460px) contains:
+
+- **Top bar** — "QUICK TOUR" label + skip button
+- **Body** — `PixelOwl` (size=6) on the left, animated step content on the right
+- **Step dots** — active dot expands from 6px to 20px pill; inactive dots use `--border` colour
+- **Footer** — Back / Next (or "Get started" on the last step)
+
+On viewports narrower than 420px the owl stacks above the text (column layout, centered) via `WelcomeTour.css` media query.
+
+### Animations
+
+Step transitions use `AnimatePresence` with a slide-and-fade:
+
+```jsx
+const variants = {
+  enter: (dir) => ({ x: dir > 0 ? 32 : -32, opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit:  (dir) => ({ x: dir > 0 ? -32 : 32, opacity: 0 }),
+};
+```
+
+The `direction` state (`1` for forward, `-1` for back) is passed as the `custom` prop to `AnimatePresence`, so slides move in the correct direction for Back navigation.
+
+The card itself mounts with `scale: 0.94, y: 16, opacity: 0` and springs to its resting position over 220ms.
+
+### Keyboard navigation
+
+- `→` / `ArrowRight` — next step
+- `←` / `ArrowLeft` — previous step
+- `Escape` — dismiss immediately
+
+A `useEffect` attaches a `keydown` listener to `window` for the duration the tour is open. The card element receives `tabIndex={-1}` and is focused on mount via a `useRef` + `useEffect`, ensuring keyboard events are captured without requiring a mouse click first.
+
+### Dismissal paths
+
+| Action | Result |
+|--------|--------|
+| Click "Get started" on step 6 | Completes tour, writes flag |
+| Click "skip" | Dismisses, writes flag |
+| Press `Escape` | Dismisses, writes flag |
+| Click backdrop | Dismisses, writes flag |
+
+All four paths call the same `dismiss()` callback, which writes `localStorage.setItem(TOUR_KEY, '1')` then calls `onDone()` (which sets `showTour = false` in `Home.jsx`).
+
+---
+
 ## Key Takeaways
 
 - The app is a lazy-loaded SPA with three pages: Home, Auth, Settings. The `NumMatchApprovalModal` lives at the shell level and appears on any page.
@@ -615,3 +706,5 @@ The feedback is stored in D1 in a `feedback` table (id, message, page, user_agen
 - `FrozenChat` provides an animated typewriter demo for guests, cycling through 4 real Q&A pairs.
 - Unauthenticated `/chat` visitors see `ChatGate` — the owl, a live demo, and a CTA — instead of being silently redirected.
 - The feedback widget is anonymous, stores to D1, and supports shake-to-open on mobile.
+- The WelcomeTour is a six-step owl-guided modal shown once on first sign-in. Triggered by a `localStorage` flag, dismissed via four paths (complete / skip / ESC / backdrop), with per-step owl state changes and keyboard navigation.
+- Safari page-refresh flicker is eliminated by two changes: an inline `<head>` script that sets `data-theme` before React loads (prevents theme FOUC), and a `return null` guard in `Home` during auth loading (prevents the Hero→GuestView layout flash).

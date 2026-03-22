@@ -123,7 +123,7 @@ export default function WelcomeTour({ onDone }) {
             className="wt-skip"
             onClick={dismiss}
             aria-label="Skip tour"
-            style={{ color: t.text3 }}
+            style={{ color: t.text2 }}
           >
             skip
           </button>
@@ -198,7 +198,7 @@ export default function WelcomeTour({ onDone }) {
           <button
             className="wt-btn-next"
             onClick={next}
-            style={{ background: t.accent, color: '#08080c' }}
+            style={{ background: t.accent, color: t.textInverse }}
           >
             {isLast ? 'Get started' : 'Next →'}
           </button>

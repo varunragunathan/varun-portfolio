@@ -40,10 +40,9 @@
   font-size: 12px;
   padding: 4px 8px;
   border-radius: 6px;
-  opacity: 0.6;
   transition: opacity 0.15s;
 }
-.wt-skip:hover { opacity: 1; }
+.wt-skip:hover { opacity: 0.7; }
 
 /* Body — owl + text side by side */
 .wt-body {
