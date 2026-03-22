@@ -29,7 +29,7 @@ const STEPS = [
     owlState: 'idle',
     eyebrow: 'Feature 3 of 4',
     title: '11 years, real scale',
-    body: 'The timeline shows identity systems at 135M+ users, auth platforms built from scratch, security infrastructure at Snap and Visa. Real numbers — not summaries.',
+    body: 'The timeline shows identity systems at 135M+ users, auth platforms built from scratch, 11 years at eBay across mobile, identity, and platform teams. Real numbers — not summaries.',
   },
   {
     owlState: 'idle',
