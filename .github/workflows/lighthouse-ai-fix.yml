@@ -1,0 +1,122 @@
+name: Lighthouse AI Fix
+
+on:
+  workflow_run:
+    workflows: [Lighthouse]
+    types: [completed]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  ai-fix:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          ref: main
+          token: ${{ secrets.LIGHTHOUSE_PUSH_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: 22
+
+      # ── 1. Read latest score from history.json (committed by Lighthouse workflow)
+      - name: Check performance threshold
+        id: check
+        run: |
+          SCORE=$(node -e "
+            const h = JSON.parse(require('fs').readFileSync('lighthouse/history.json', 'utf8'));
+            console.log(h[h.length - 1].performance);
+          ")
+          SHA=$(node -e "
+            const h = JSON.parse(require('fs').readFileSync('lighthouse/history.json', 'utf8'));
+            console.log(h[h.length - 1].sha);
+          ")
+          echo "score=$SCORE" >> $GITHUB_OUTPUT
+          echo "sha=$SHA"     >> $GITHUB_OUTPUT
+          echo "Performance score: $SCORE/100 (threshold: 95)"
+          if [ "$SCORE" -lt 95 ]; then
+            echo "needs_fix=true" >> $GITHUB_OUTPUT
+          else
+            echo "needs_fix=false" >> $GITHUB_OUTPUT
+            echo "Score meets threshold — nothing to do"
+          fi
+
+      # ── 2. Skip if a fix PR already exists for this sha
+      - name: Check for existing fix PR
+        if: steps.check.outputs.needs_fix == 'true'
+        id: pr_check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BRANCH="lighthouse/ai-fix-${{ steps.check.outputs.sha }}"
+          EXISTING=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [ -n "$EXISTING" ]; then
+            echo "already_open=true" >> $GITHUB_OUTPUT
+            echo "PR #$EXISTING already open for sha ${{ steps.check.outputs.sha }} — skipping"
+          else
+            echo "already_open=false" >> $GITHUB_OUTPUT
+          fi
+
+      # ── 3. Download Lighthouse JSON from the triggering run's artifact
+      - name: Download Lighthouse JSON artifact
+        if: steps.check.outputs.needs_fix == 'true' && steps.pr_check.outputs.already_open == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download ${{ github.event.workflow_run.id }} \
+            --repo ${{ github.repository }} \
+            --pattern "lighthouse-report-*" \
+            --dir ./lh-artifact 2>/dev/null || true
+
+          JSON_FILE=$(find ./lh-artifact -name "*.json" 2>/dev/null | head -1)
+          if [ -n "$JSON_FILE" ]; then
+            cp "$JSON_FILE" ./lh-report.json
+            echo "✓ Lighthouse JSON ready"
+          else
+            echo "⚠ No JSON artifact found — AI fix will be skipped"
+          fi
+
+      # ── 4. Call Gemini, apply fixes, write PR body
+      - name: Generate and apply fixes
+        if: steps.check.outputs.needs_fix == 'true' && steps.pr_check.outputs.already_open == 'false'
+        id: ai
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          LH_SCORE:       ${{ steps.check.outputs.score }}
+          GITHUB_SHA:     ${{ steps.check.outputs.sha }}
+        run: node scripts/lighthouse-ai-fix.js
+
+      # ── 5. Open PR if fixes were applied
+      - name: Create fix branch and open PR
+        if: >
+          steps.check.outputs.needs_fix == 'true' &&
+          steps.pr_check.outputs.already_open == 'false' &&
+          steps.ai.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.LIGHTHOUSE_PUSH_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="lighthouse/ai-fix-${{ steps.check.outputs.sha }}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+
+          # Stage only source and config files (not artifacts or history)
+          git add index.html vite.config.js src/ 2>/dev/null || true
+          git diff --staged --quiet && echo "Nothing to commit" && exit 0
+
+          git commit -m "perf: lighthouse AI performance fixes (score: ${{ steps.check.outputs.score }}/100)"
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --title "perf: AI performance fixes — Lighthouse ${{ steps.check.outputs.score }}/100 → target 95+" \
+            --body "$(cat /tmp/pr-body.md)" \
+            --head "$BRANCH" \
+            --base main
