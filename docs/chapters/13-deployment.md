@@ -335,7 +335,7 @@ const AUDIT_FILES = {
 
 **3. Builds a structured prompt** with the tech stack, failing audit details (title, score, measured value, top offenders), and the full content of each relevant source file.
 
-**4. Calls Gemini 2.0 Flash Lite** (`generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent`) with `responseMimeType: 'application/json'` to get structured output:
+**4. Calls Gemini 2.0 Flash** (`generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`) with `responseMimeType: 'application/json'` to get structured output:
 
 ```json
 {

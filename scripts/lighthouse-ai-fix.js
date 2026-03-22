@@ -81,7 +81,7 @@ function formatAudit(audit) {
 
 async function callGemini(prompt) {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -242,7 +242,7 @@ Respond with ONLY a JSON object — no markdown fences, no explanation:
 
 **Lighthouse score:** \`${perfScore}/100\` → target \`95+\`
 **Source commit:** \`${sha.slice(0, 7)}\`
-**Model:** Gemini 2.0 Flash Lite
+**Model:** Gemini 2.0 Flash
 
 ---
 
