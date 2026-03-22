@@ -71,22 +71,10 @@ jobs:
           node -e "
             const fs = require('fs');
             const dir = 'gh-pages-dir/lighthouse';
-            // Sort using history.json deploy order (append-only, oldest first) so newest appears first
-            const histPath = 'lighthouse/history.json';
-            const history = fs.existsSync(histPath) ? JSON.parse(fs.readFileSync(histPath, 'utf8')) : [];
-            const shaOrder = history.map(e => e.sha).reverse();
+            // YYYY-MM-DD prefix → lexicographic sort gives newest first
             const files = fs.readdirSync(dir)
               .filter(f => f.endsWith('.html') && f !== 'index.html')
-              .sort((a, b) => {
-                const shaA = a.replace('.html', '').split('-').pop();
-                const shaB = b.replace('.html', '').split('-').pop();
-                const idxA = shaOrder.indexOf(shaA);
-                const idxB = shaOrder.indexOf(shaB);
-                if (idxA === -1 && idxB === -1) return b.localeCompare(a);
-                if (idxA === -1) return 1;
-                if (idxB === -1) return -1;
-                return idxA - idxB;
-              });
+              .sort((a, b) => b.localeCompare(a));
             const rows = files.map(f => {
               const name = f.replace('.html', '');
               const lastDash = name.lastIndexOf('-');
@@ -112,34 +100,3 @@ jobs:
           git diff --staged --quiet || git commit -m "lighthouse: ${DATE} ${SHA_SHORT}"
           git push origin gh-pages
 
-      - name: Append score to history
-        run: |
-          node -e "
-            const fs = require('fs');
-            const r = JSON.parse(fs.readFileSync('./lh-report.report.json', 'utf8'));
-            const c = r.categories;
-            const entry = {
-              date: new Date().toISOString().split('T')[0],
-              sha: '${{ github.event.workflow_run.head_sha }}'.slice(0, 7),
-              performance:    Math.round(c.performance.score * 100),
-              accessibility:  Math.round(c.accessibility.score * 100),
-              bestPractices:  Math.round(c['best-practices'].score * 100),
-              seo:            Math.round(c.seo.score * 100),
-            };
-            const path = 'lighthouse/history.json';
-            const history = fs.existsSync(path)
-              ? JSON.parse(fs.readFileSync(path, 'utf8'))
-              : [];
-            history.push(entry);
-            fs.mkdirSync('lighthouse', { recursive: true });
-            fs.writeFileSync(path, JSON.stringify(history, null, 2));
-            console.log('Scores recorded:', JSON.stringify(entry));
-          "
-
-      - name: Commit scores
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add lighthouse/history.json
-          git diff --staged --quiet || git commit -m "chore: lighthouse scores [skip ci]"
-          git push

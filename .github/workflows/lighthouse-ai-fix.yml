@@ -27,21 +27,36 @@ jobs:
         with:
           node-version: 22
 
-      # ── 1. Read latest score from history.json (committed by Lighthouse workflow)
-      - name: Check performance threshold
+      # ── 1. Download Lighthouse artifact and check score
+      - name: Download report and check score
         id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          gh run download ${{ github.event.workflow_run.id }} \
+            --repo ${{ github.repository }} \
+            --pattern "lighthouse-report-*" \
+            --dir ./lh-artifact 2>/dev/null || true
+
+          JSON_FILE=$(find ./lh-artifact -name "*.json" 2>/dev/null | head -1)
+          if [ -z "$JSON_FILE" ]; then
+            echo "No JSON artifact found — skipping"
+            echo "needs_fix=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          cp "$JSON_FILE" ./lh-report.json
+
           SCORE=$(node -e "
-            const h = JSON.parse(require('fs').readFileSync('lighthouse/history.json', 'utf8'));
-            console.log(h[h.length - 1].performance);
+            const r = JSON.parse(require('fs').readFileSync('./lh-report.json', 'utf8'));
+            console.log(Math.round(r.categories.performance.score * 100));
           ")
-          SHA=$(node -e "
-            const h = JSON.parse(require('fs').readFileSync('lighthouse/history.json', 'utf8'));
-            console.log(h[h.length - 1].sha);
-          ")
-          echo "score=$SCORE" >> $GITHUB_OUTPUT
-          echo "sha=$SHA"     >> $GITHUB_OUTPUT
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          SHA_SHORT="${SHA:0:7}"
+
+          echo "score=$SCORE"     >> $GITHUB_OUTPUT
+          echo "sha=$SHA_SHORT"   >> $GITHUB_OUTPUT
           echo "Performance score: $SCORE/100 (threshold: 95)"
+
           if [ "$SCORE" -lt 95 ]; then
             echo "needs_fix=true" >> $GITHUB_OUTPUT
           else
@@ -65,26 +80,7 @@ jobs:
             echo "already_open=false" >> $GITHUB_OUTPUT
           fi
 
-      # ── 3. Download Lighthouse JSON from the triggering run's artifact
-      - name: Download Lighthouse JSON artifact
-        if: steps.check.outputs.needs_fix == 'true' && steps.pr_check.outputs.already_open == 'false'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh run download ${{ github.event.workflow_run.id }} \
-            --repo ${{ github.repository }} \
-            --pattern "lighthouse-report-*" \
-            --dir ./lh-artifact 2>/dev/null || true
-
-          JSON_FILE=$(find ./lh-artifact -name "*.json" 2>/dev/null | head -1)
-          if [ -n "$JSON_FILE" ]; then
-            cp "$JSON_FILE" ./lh-report.json
-            echo "✓ Lighthouse JSON ready"
-          else
-            echo "⚠ No JSON artifact found — AI fix will be skipped"
-          fi
-
-      # ── 4. Call Gemini, apply fixes, write PR body
+      # ── 3. Call Gemini, apply fixes, write PR body
       - name: Generate and apply fixes
         if: steps.check.outputs.needs_fix == 'true' && steps.pr_check.outputs.already_open == 'false'
         id: ai
@@ -94,7 +90,7 @@ jobs:
           GITHUB_SHA:     ${{ steps.check.outputs.sha }}
         run: node scripts/lighthouse-ai-fix.js
 
-      # ── 5. Open PR if fixes were applied
+      # ── 4. Open PR if fixes were applied
       - name: Create fix branch and open PR
         if: >
           steps.check.outputs.needs_fix == 'true' &&
