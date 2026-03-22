@@ -69,12 +69,28 @@ jobs:
           node -e "
             const fs = require('fs');
             const dir = 'gh-pages-dir/lighthouse';
+            // Sort using history.json deploy order (append-only, oldest first) so newest appears first
+            const histPath = 'lighthouse/history.json';
+            const history = fs.existsSync(histPath) ? JSON.parse(fs.readFileSync(histPath, 'utf8')) : [];
+            const shaOrder = history.map(e => e.sha).reverse();
             const files = fs.readdirSync(dir)
               .filter(f => f.endsWith('.html') && f !== 'index.html')
-              .sort().reverse();
+              .sort((a, b) => {
+                const shaA = a.replace('.html', '').split('-').pop();
+                const shaB = b.replace('.html', '').split('-').pop();
+                const idxA = shaOrder.indexOf(shaA);
+                const idxB = shaOrder.indexOf(shaB);
+                if (idxA === -1 && idxB === -1) return b.localeCompare(a);
+                if (idxA === -1) return 1;
+                if (idxB === -1) return -1;
+                return idxA - idxB;
+              });
             const rows = files.map(f => {
-              const [date, sha] = f.replace('.html','').split('-');
-              return \`<tr><td><a href=\"\${f}\">\${date}</a></td><td><code>\${sha || ''}</code></td></tr>\`;
+              const name = f.replace('.html', '');
+              const lastDash = name.lastIndexOf('-');
+              const date = name.slice(0, lastDash);
+              const sha = name.slice(lastDash + 1);
+              return \`<tr><td><a href=\"\${f}\">\${date}</a></td><td><code>\${sha}</code></td></tr>\`;
             }).join('\n');
             const html = \`<!DOCTYPE html>
           <html lang=\"en\"><head><meta charset=\"UTF-8\">
