@@ -118,7 +118,7 @@ yarn export:docs     # Export docs to a flat format
 
 ## Docs
 
-24 chapters of full technical write-ups in [`docs/chapters/`](./docs/chapters/) — covering the full auth system (passkeys, OTP, number matching, step-up auth, recovery), session management, the RAG pipeline, the admin dashboard, endpoint metrics, accessibility, CI/CD pipeline, database migrations, and semantic versioning.
+25 chapters of full technical write-ups in [`docs/chapters/`](./docs/chapters/) — covering the full auth system (passkeys, OTP, number matching, step-up auth, recovery), session management, the RAG pipeline, the admin dashboard, endpoint metrics, accessibility, CI/CD pipeline, database migrations, semantic versioning, and site performance metrics (Lighthouse CI + AI fix workflow).
 
 Or just [ask the AI](https://varunr.dev).
 
