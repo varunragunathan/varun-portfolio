@@ -278,6 +278,20 @@ Triggers when Deploy completes successfully. Runs Lighthouse against `https://va
 
 Requires `LIGHTHOUSE_PUSH_TOKEN` secret (a GitHub PAT with `repo` scope) to push commits from the bot. Falls back to `GITHUB_TOKEN` if not set, but the fallback cannot trigger downstream workflows.
 
+### Known gap: authenticated home page is not measured
+
+The Lighthouse workflow runs without a session cookie — it always hits the unauthenticated `GuestView`. The signed-in home page (ParticleField, timeline, WelcomeTour, ChatWidget) is never measured in CI.
+
+Automated authenticated Lighthouse is not feasible with passkey auth — passkeys require a biometric gesture that cannot be scripted in a headless runner.
+
+**To measure authenticated performance manually:**
+1. Sign in to `varunr.dev` in Chrome
+2. Open DevTools → Lighthouse tab
+3. Set Mode: Navigation, Device: Desktop (or Mobile)
+4. Run — this captures the full signed-in home page including all authenticated components
+
+Signed-in repeat visits benefit from PWA asset caching, so real-world performance for returning users is naturally better than a cold Lighthouse run would suggest.
+
 ---
 
 ## 13.11 Lighthouse AI Fix Workflow
