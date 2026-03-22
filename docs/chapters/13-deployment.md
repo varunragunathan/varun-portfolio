@@ -249,36 +249,149 @@ The Worker handles both the root domain and all subpaths. The `RP_ID = "varunr.d
 
 ## 13.10 GitHub Actions / CI-CD
 
-No GitHub Actions workflow exists in this repository. Deployment is currently manual:
+The repository uses three automated GitHub Actions workflows that chain together after every push to `main`:
 
-```bash
-npm run build && npx wrangler deploy
+```
+push to main
+  └─► Deploy (.github/workflows/deploy.yml)
+        └─► Lighthouse (.github/workflows/lighthouse.yml)
+              └─► Lighthouse AI Fix (.github/workflows/lighthouse-ai-fix.yml)
 ```
 
-A basic CI/CD pipeline would:
-1. On push to `main`: run `npm run build && wrangler deploy`
-2. Require `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as GitHub secrets
-3. Optionally: run `wrangler d1 execute` to apply any schema migrations
+### Deploy workflow
 
-Example minimal workflow:
-```yaml
-name: Deploy
-on:
-  push:
-    branches: [main]
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: '20' }
-      - run: npm ci
-      - run: npm run build
-      - run: npx wrangler deploy
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+Triggers on push to `main`. Runs `npm run build && wrangler deploy`. Requires two GitHub secrets:
+
 ```
+CLOUDFLARE_API_TOKEN   — from Cloudflare dashboard → My Profile → API Tokens
+CLOUDFLARE_ACCOUNT_ID  — from Cloudflare dashboard → right sidebar
+```
+
+### Lighthouse workflow (`.github/workflows/lighthouse.yml`)
+
+Triggers when Deploy completes successfully. Runs Lighthouse against `https://varunr.dev` and:
+
+1. Uploads both the HTML and JSON report as a GitHub Actions artifact (`lighthouse-report-{run_id}`)
+2. Publishes the HTML report to the `gh-pages` branch at `/lighthouse/{date}-{sha}.html`
+3. Regenerates the report index at `/lighthouse/index.html`, sorted chronologically using `lighthouse/history.json`
+4. Appends the four category scores (performance, accessibility, best-practices, seo) to `lighthouse/history.json` and commits it to `main`
+
+Requires `LIGHTHOUSE_PUSH_TOKEN` secret (a GitHub PAT with `repo` scope) to push commits from the bot. Falls back to `GITHUB_TOKEN` if not set, but the fallback cannot trigger downstream workflows.
+
+---
+
+## 13.11 Lighthouse AI Fix Workflow
+
+**File:** `.github/workflows/lighthouse-ai-fix.yml`
+**Script:** `scripts/lighthouse-ai-fix.js`
+
+This workflow runs automatically after every Lighthouse run. If the performance score drops below 95, it calls Google Gemini Flash to generate targeted source-code fixes and opens a PR for review.
+
+### Trigger and flow
+
+```
+Lighthouse workflow completes
+  └─► Read lighthouse/history.json — get latest performance score
+        ├─ score ≥ 95: exit (nothing to do)
+        └─ score < 95:
+              └─► Check if a fix PR already exists for this sha
+                    ├─ PR exists: exit (skip duplicate)
+                    └─ PR missing:
+                          └─► Download Lighthouse JSON artifact
+                                └─► node scripts/lighthouse-ai-fix.js
+                                      └─► if has_changes=true: create branch + open PR
+```
+
+### `scripts/lighthouse-ai-fix.js` — how it works
+
+**1. Reads the Lighthouse JSON report** (`lh-report.json`) and extracts all failing audits (score < 0.9) that are in the `ACTIONABLE` set:
+
+```js
+const ACTIONABLE = new Set([
+  'render-blocking-resources', 'unused-javascript', 'unused-css-rules',
+  'modern-image-formats', 'uses-optimized-images', 'uses-responsive-images',
+  'uses-text-compression', 'uses-rel-preconnect', 'uses-rel-preload',
+  'font-display', 'largest-contentful-paint-element', 'lcp-lazy-loaded',
+  'prioritize-lcp-image', 'total-blocking-time', 'bootup-time',
+  'dom-size', 'critical-request-chains', 'preload-fonts',
+]);
+```
+
+Only audits in this set map to actionable source-code changes. Runtime-only issues (server response time, third-party scripts) are excluded.
+
+**2. Selects relevant source files** per audit ID:
+
+```js
+const AUDIT_FILES = {
+  'render-blocking-resources':        ['index.html'],
+  'unused-javascript':                ['vite.config.js'],
+  'largest-contentful-paint-element': ['src/pages/Home.jsx', 'index.html'],
+  'lcp-lazy-loaded':                  ['src/pages/Home.jsx'],
+  'uses-rel-preconnect':              ['index.html'],
+  'font-display':                     ['index.html', 'src/index.css'],
+  // ...
+};
+```
+
+**3. Builds a structured prompt** with the tech stack, failing audit details (title, score, measured value, top offenders), and the full content of each relevant source file.
+
+**4. Calls Gemini 1.5 Flash** (`generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`) with `responseMimeType: 'application/json'` to get structured output:
+
+```json
+{
+  "summary": "one-line summary of all changes",
+  "fixes": [
+    {
+      "audit": "audit-id",
+      "file": "path/to/file",
+      "description": "what this change does and expected impact",
+      "search": "exact verbatim text to find",
+      "replace": "replacement text"
+    }
+  ]
+}
+```
+
+**5. Applies fixes** with two safety guards:
+- The `search` string must exist in the file (otherwise skipped)
+- The `search` string must be unique (otherwise skipped, to avoid partial replacements)
+
+**6. Writes a PR body** to `/tmp/pr-body.md` with the score, applied changes, skipped changes, and a review checklist.
+
+**7. Sets `has_changes=true`** in `GITHUB_OUTPUT` if at least one fix was applied. The workflow step then creates a branch (`lighthouse/ai-fix-{sha}`) and opens a PR.
+
+### Required GitHub secrets
+
+| Secret | Where to get it | Purpose |
+|---|---|---|
+| `GEMINI_API_KEY` | aistudio.google.com → Get API key → Create API key | Gemini Flash API calls |
+| `LIGHTHOUSE_PUSH_TOKEN` | GitHub → Settings → Developer settings → Personal access tokens → `repo` scope | Allows bot to push branches and open PRs |
+
+**To add a secret:** GitHub repo → Settings → Secrets and variables → Actions → New repository secret.
+
+### Getting the Gemini API key
+
+1. Go to **aistudio.google.com**
+2. Click **"Get API key"** in the left sidebar
+3. Click **"Create API key"** and select a project
+4. Copy the key — this is all that's needed (no service account or IAM roles required)
+
+The free tier provides 15 requests/minute and 1M tokens/day — more than sufficient for this workflow.
+
+### Reviewing AI-generated PRs
+
+The workflow opens a PR titled `perf: AI performance fixes — Lighthouse {score}/100 → target 95+`. The PR body includes:
+
+- The Gemini-generated summary
+- Each changed file with a description of what changed and which audit it fixes
+- Any fixes that were skipped and why (search string not found, not unique, etc.)
+- A review checklist
+
+**Always review the diff before merging.** The AI constrains itself to the files shown in the prompt (`index.html`, `vite.config.js`, `src/pages/Home.jsx`, `src/index.css`) and is instructed not to change component logic, routing, or functionality — but human review is the final gate.
+
+### Duplicate PR guard
+
+The workflow checks whether a PR already exists for the current commit SHA (branch name `lighthouse/ai-fix-{sha}`). If a PR is already open, the workflow exits early — preventing duplicate PRs on re-runs.
 
 ---
 
@@ -290,3 +403,5 @@ jobs:
 - `account_id` is optional in `wrangler.toml` — wrangler infers it from your auth token.
 - Local dev requires `.dev.vars` (copy from `.dev.vars.example`) to override `RP_ID=localhost` and `ORIGIN=http://localhost:8787`.
 - Deployment is two steps: `npm run build` (Vite) then `wrangler deploy` (uploads Worker + assets).
+- Three GitHub Actions chain together: Deploy → Lighthouse → Lighthouse AI Fix. Each triggers only when the previous one succeeds.
+- `LIGHTHOUSE_PUSH_TOKEN` (GitHub PAT, `repo` scope) is required for the Lighthouse bot to push commits. `GEMINI_API_KEY` (from aistudio.google.com) is required for the AI fix workflow.
