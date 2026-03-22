@@ -116,7 +116,7 @@ async function buildSystemPrompt(kv, role, chunks) {
   const tierKey = ['admin', 'pro', 'student'].includes(role) ? role : 'user';
 
   // KV-stored persona takes priority; fall back to hardcoded default
-  const persona = (await kv.get(`persona:${tierKey}`).catch(() => null))
+  const persona = (await kv.get(`persona:${tierKey}`, { cacheTtl: 300 }).catch(() => null))
     ?? DEFAULT_PERSONAS[tierKey];
 
   const context = chunks

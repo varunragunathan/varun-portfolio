@@ -19,7 +19,7 @@ function json(data, status = 200) {
 }
 
 async function loadPrefs(kv, userId) {
-  const raw = await kv.get(`prefs:${userId}`);
+  const raw = await kv.get(`prefs:${userId}`, { cacheTtl: 300 });
   return raw ? { ...DEFAULTS, ...JSON.parse(raw) } : { ...DEFAULTS };
 }
 

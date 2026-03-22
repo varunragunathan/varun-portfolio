@@ -113,7 +113,7 @@ export async function getSession(kv, request) {
   const token = getTokenFromRequest(request);
   if (!token) return null;
   const tokenHash = await sha256Hex(token);
-  const raw = await kv.get(`session:${tokenHash}`);
+  const raw = await kv.get(`session:${tokenHash}`, { cacheTtl: 60 });
   if (!raw) return null;
   return { token, ...JSON.parse(raw) };
 }
@@ -151,7 +151,7 @@ export async function getMe(request, env) {
   const tokenHash = await sha256Hex(session.token);
   const [sessionRecord, rawPrefs] = await Promise.all([
     db.prepare('SELECT trusted FROM sessions WHERE token_hash = ? LIMIT 1').bind(tokenHash).first(),
-    env.AUTH_KV.get(`prefs:${session.userId}`),
+    env.AUTH_KV.get(`prefs:${session.userId}`, { cacheTtl: 300 }),
   ]);
   const trusted = sessionRecord?.trusted === 1;
   const preferences = rawPrefs
