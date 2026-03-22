@@ -66,9 +66,24 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
-          if (id.includes('react-dom') || id.includes('react-router') || id.includes('/react/')) return 'vendor';
-          if (id.includes('framer-motion')) return 'motion';
-          if (id.includes('@simplewebauthn') || id.includes('qrcode')) return 'auth-libs';
+          // Core React libraries
+          if (id.includes('react/') || id.includes('react-dom/')) {
+            return 'react-core';
+          }
+          // React Router
+          if (id.includes('react-router-dom/') || id.includes('react-router/')) {
+            return 'react-router';
+          }
+          // Framer Motion
+          if (id.includes('framer-motion/')) {
+            return 'motion';
+          }
+          // Auth libraries
+          if (id.includes('@simplewebauthn/') || id.includes('qrcode/')) {
+            return 'auth-libs';
+          }
+          // Fallback for other node_modules
+          return 'vendor';
         }
       }
     }
