@@ -1,0 +1,19 @@
+import{e as v}from"./index-ChtyZVKZ.js";import{r as u,j as a}from"./iframe-Y1kZefbr.js";import"./preload-helper-Dp1pzeXC.js";function k(){const[s,r]=u.useState(!1);return u.useEffect(()=>{const e=window.matchMedia("(prefers-reduced-motion: reduce)");r(e.matches);const t=n=>r(n.matches);return e.addEventListener("change",t),()=>e.removeEventListener("change",t)},[]),s}const D="0.2.42",O={version:D},T=13;function H({digit:s,delay:r}){const e=u.useRef(null),t=k(),n=[...Array.from({length:10},(c,o)=>o),...Array.from({length:s+1},(c,o)=>o)],l=-(10+s)*T;return u.useEffect(()=>{if(t){e.current&&(e.current.style.transform=`translateY(${l}px)`);return}const c=setTimeout(()=>{if(!e.current)return;let o=null;function f(g){if(!e.current)return;o||(o=g);const h=Math.min((g-o)/800,1),$=1-Math.pow(1-h,4);e.current.style.transform=`translateY(${$*l}px)`,h<1?requestAnimationFrame(f):e.current.style.transform=`translateY(${l}px)`}requestAnimationFrame(f)},r);return()=>clearTimeout(c)},[s,r,t,l]),a.jsx("span",{className:"version-badge__digit",children:a.jsx("span",{ref:e,className:"version-badge__reel",children:n.map((c,o)=>a.jsx("span",{className:"version-badge__reel-item",children:c},o))})})}function Y({fontSize:s=10,color:r}){const e=`v${O.version}`.split("");return a.jsx("span",{className:"version-badge",style:{fontSize:s,...r?{color:r}:{}},children:e.map((t,n)=>/\d/.test(t)?a.jsx(H,{digit:parseInt(t),delay:300+n*90},n):a.jsx("span",{className:"version-badge__char",children:t},n))})}Y.__docgenInfo={description:"",methods:[],displayName:"VersionBadge",props:{fontSize:{defaultValue:{value:"10",computed:!1},required:!1}}};const J={title:"UI/VersionBadge",component:Y,tags:["autodocs"],parameters:{docs:{description:{component:"Animated slot-machine version display. Reads version from package.json."}}}},i={},d={args:{fontSize:16}},p={args:{color:"#6366f1"}},m={play:async({canvasElement:s})=>{const r=s.querySelector(".version-badge");await v(r).not.toBeNull(),await v(r.textContent).toMatch(/v\d+\.\d+\.\d+/)}};var x,y,_,b,S;i.parameters={...i.parameters,docs:{...(x=i.parameters)==null?void 0:x.docs,source:{originalSource:"{}",...(_=(y=i.parameters)==null?void 0:y.docs)==null?void 0:_.source},description:{story:"Footer size (default 10px)",...(S=(b=i.parameters)==null?void 0:b.docs)==null?void 0:S.description}}};var E,j,N,w,B;d.parameters={...d.parameters,docs:{...(E=d.parameters)==null?void 0:E.docs,source:{originalSource:`{
+  args: {
+    fontSize: 16
+  }
+}`,...(N=(j=d.parameters)==null?void 0:j.docs)==null?void 0:N.source},description:{story:"Larger, for use in headings or dashboards",...(B=(w=d.parameters)==null?void 0:w.docs)==null?void 0:B.description}}};var R,V,C,M,q;p.parameters={...p.parameters,docs:{...(R=p.parameters)==null?void 0:R.docs,source:{originalSource:`{
+  args: {
+    color: '#6366f1'
+  }
+}`,...(C=(V=p.parameters)==null?void 0:V.docs)==null?void 0:C.source},description:{story:"Custom color — overrides theme token",...(q=(M=p.parameters)==null?void 0:M.docs)==null?void 0:q.description}}};var z,L,A,F,I;m.parameters={...m.parameters,docs:{...(z=m.parameters)==null?void 0:z.docs,source:{originalSource:`{
+  play: async ({
+    canvasElement
+  }) => {
+    // VersionBadge wraps each char — the element should be in the DOM
+    const badge = canvasElement.querySelector('.version-badge');
+    await expect(badge).not.toBeNull();
+    // Badge text should contain the version prefix 'v'
+    await expect(badge.textContent).toMatch(/v\\d+\\.\\d+\\.\\d+/);
+  }
+}`,...(A=(L=m.parameters)==null?void 0:L.docs)==null?void 0:A.source},description:{story:"Renders the version string correctly",...(I=(F=m.parameters)==null?void 0:F.docs)==null?void 0:I.description}}};const K=["FooterSize","Large","CustomColor","RendersVersion"];export{p as CustomColor,i as FooterSize,d as Large,m as RendersVersion,K as __namedExportsOrder,J as default};
