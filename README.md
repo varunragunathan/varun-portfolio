@@ -15,6 +15,7 @@ Personal portfolio and engineering showcase. The site itself is the product — 
 | Styling | CSS custom properties + per-component CSS files, Tailwind (base layer only) |
 | Backend | Cloudflare Workers (TypeScript) |
 | Database | Cloudflare D1 (SQLite at the edge) |
+| Session / preferences | Cloudflare KV (session tokens, UI preference sync) |
 | AI / RAG | Cloudflare AI (embeddings) + Vectorize + llama-3.3-70b |
 | Auth | WebAuthn passkeys via SimpleWebAuthn — zero passwords |
 | Email | Resend |
