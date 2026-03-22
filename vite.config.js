@@ -66,9 +66,12 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
-          if (id.includes('react-dom') || id.includes('react-router') || id.includes('/react/')) return 'vendor';
+          if (id.includes('react-dom')) return 'react-dom';
+          if (id.includes('react-router')) return 'react-router';
           if (id.includes('framer-motion')) return 'motion';
           if (id.includes('@simplewebauthn') || id.includes('qrcode')) return 'auth-libs';
+          // Group any remaining node_modules into a common vendor chunk
+          if (id.includes('node_modules')) return 'vendor';
         }
       }
     }
