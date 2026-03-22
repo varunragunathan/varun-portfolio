@@ -41,7 +41,7 @@ export default defineConfig({
       // 4 MiB — allows Storybook's sb-manager/globals-runtime.js (3.18 MB)
       // to be processed without error when build-storybook shares this config.
       // Main app assets are all well under 2 MiB so this has no PWA impact.
-      maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+      maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
       globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
       runtimeCaching: [{
         urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
