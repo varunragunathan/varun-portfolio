@@ -170,6 +170,7 @@ ${Object.entries(sourceFiles).map(([p, c]) => `### ${p}\n\`\`\`\n${c}\n\`\`\``).
 - Each "search" value must appear exactly once in its file
 - Prefer minimal, surgical changes over rewrites
 - If an audit cannot be fixed through source changes alone, skip it
+- CRITICAL: The "search" string must be copied character-for-character from the source file shown above, including exact whitespace and indentation. Do NOT reformat or re-indent the search string. If you are unsure of the exact whitespace, choose a shorter unique anchor string rather than risk a mismatch.
 
 Respond with ONLY a JSON object — no markdown fences, no explanation:
 {
