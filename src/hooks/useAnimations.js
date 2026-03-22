@@ -34,6 +34,7 @@ export function useTypewriter(texts, { typeSpeed = 70, deleteSpeed = 40, pauseTi
       }
     }, speed);
     return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [display, deleting, idx, reduced]);
 
   return display;
@@ -85,6 +86,7 @@ export function useFadeIn(threshold = 0.08) {
     }, { threshold });
     obs.observe(ref.current);
     return () => obs.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reduced]);
 
   return [ref, visible, reduced];

@@ -312,6 +312,7 @@ function NumberMatchScreen({ code, tempToken, onApproved, onDenied }) {
       clearTimeout(reconnectTimer);
       if (ws) ws.close();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- onApproved/onDenied are stable props; re-connecting on callback identity change would break auth
   }, [tempToken]);
 
   return (
@@ -584,6 +585,7 @@ function SignInFlow({ onSuccess }) {
       } catch { /* user ignored autofill or browser doesn't support conditional UI */ }
     })();
     return () => { condActiveRef.current = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- conditional UI passkey must run once; adding submitAuthResponse would restart the autofill listener
   }, []);
 
   // ── Shared verify + handle result ────────────────────────────────
@@ -1246,6 +1248,7 @@ export default function Auth() {
   useEffect(() => {
     if (!enabled) { navigate('/'); return; }
     if (!loading && user) navigate('/');
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- navigate is stable (react-router guarantee)
   }, [user, loading, enabled]);
 
   function onSuccess() {

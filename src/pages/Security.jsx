@@ -1171,6 +1171,7 @@ export default function Settings() {
     if (!enabled) { navigate('/'); return; }
     // Suppress redirect during account deletion — onDeleted handles navigation.
     if (!loading && !user && !deletingRef.current) navigate('/auth');
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- navigate is stable (react-router guarantee)
   }, [user, loading, enabled]);
 
   if (loading || !user) return null;
