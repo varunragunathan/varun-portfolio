@@ -1265,14 +1265,15 @@ export default function Settings() {
               <div style={{ flex: 1 }}>
                 <div style={{ fontFamily: F, fontSize: 14, color: t.text1, marginBottom: 2 }}>Color vision</div>
                 <div style={{ fontFamily: F, fontSize: 12, color: t.text3 }}>
-                  Adjusts accent and status colors to improve readability.
+                  Adjusts accent and status colors for color vision differences.
+                  Red-green covers deuteranopia and protanopia. Blue-yellow covers tritanopia.
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 {[
                   { id: 'none',          label: 'None' },
-                  { id: 'deuteranopia',  label: 'Deuteranopia' },
-                  { id: 'tritanopia',    label: 'Tritanopia' },
+                  { id: 'deuteranopia',  label: 'Red-green' },
+                  { id: 'tritanopia',    label: 'Blue-yellow' },
                 ].map(({ id, label }) => (
                   <button
                     key={id}
