@@ -17,13 +17,13 @@ const STEPS = [
     owlState: 'streaming',
     eyebrow: 'Feature 1 of 4',
     title: 'Ask me how any of this was built',
-    body: "I'm backed by a RAG pipeline trained on 22 chapters of engineering docs — the actual architecture decisions, tradeoffs, and code. Ask why Cloudflare Workers, how the D1 schema works, or what Durable Objects are for. I know.",
+    body: "I'm backed by a RAG pipeline trained on the full engineering docs — the actual architecture decisions, tradeoffs, and code. Ask why Cloudflare Workers, how the D1 schema works, or what Durable Objects are for. I know.",
   },
   {
     owlState: 'thinking',
     eyebrow: 'Feature 2 of 4',
     title: 'Everything is documented',
-    body: 'The Engineering page has 22 chapters covering auth, the AI pipeline, edge deployment, the Lighthouse CI that auto-files performance PRs. Every decision is documented. The same docs power this chat.',
+    body: 'The Engineering page covers auth, the AI pipeline, edge deployment, the Lighthouse CI that auto-files performance PRs. Every decision is documented. The same docs power this chat.',
   },
   {
     owlState: 'idle',
