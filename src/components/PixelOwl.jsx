@@ -5,17 +5,20 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useTheme } from '../hooks/useTheme';
 
-// ── Palette ──────────────────────────────────────────────────────
-const C = {
-  '.': null,
-  'd': '#3B1F0A',   // dark outline / body
-  'f': '#F5E6C8',   // face disc cream
-  'y': '#FFE030',   // iris yellow
-  'p': '#0A0A0A',   // pupil black
-  'k': '#E07808',   // beak orange
-  'w': '#9B5C1A',   // wing highlight
-};
+// ── Palette — body/wing shift in dark mode for visibility ─────────
+function palette(isDark) {
+  return {
+    '.': null,
+    'd': isDark ? '#7B3F12' : '#3B1F0A',   // body: lighter in dark mode (~3:1 vs #11111a)
+    'f': '#F5E6C8',                          // face disc cream
+    'y': '#FFE030',                          // iris yellow
+    'p': isDark ? '#1A1A1A' : '#0A0A0A',    // pupil
+    'k': '#E07808',                          // beak orange
+    'w': isDark ? '#C47820' : '#9B5C1A',    // wing highlight: brighter in dark mode
+  };
+}
 
 // ── Pixel frames — 12 cols × 14 rows ─────────────────────────────
 // Each string must be exactly 12 characters.
@@ -87,7 +90,7 @@ const F = {
 };
 
 // ── Render pixel grid ─────────────────────────────────────────────
-function OwlPixels({ frame, px }) {
+function OwlPixels({ frame, px, C }) {
   const rects = [];
   frame.forEach((row, ry) => {
     [...row].forEach((ch, rx) => {
@@ -115,6 +118,9 @@ const TRANS = {
 
 // ── Component ─────────────────────────────────────────────────────
 export default function PixelOwl({ state = 'idle', size = 8 }) {
+  const { mode } = useTheme();
+  const isDark = mode !== 'light';
+  const C = palette(isDark);
   const [blinking, setBlinking] = useState(false);
 
   // Periodic blink during idle
@@ -151,7 +157,7 @@ export default function PixelOwl({ state = 'idle', size = 8 }) {
         style={{ display: 'block', imageRendering: 'pixelated' }}
         aria-label="Hoot the owl"
       >
-        <OwlPixels frame={frame} px={size} />
+        <OwlPixels frame={frame} px={size} C={C} />
       </svg>
     </motion.div>
   );
