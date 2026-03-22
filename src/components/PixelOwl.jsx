@@ -4,8 +4,8 @@
 //   size   px per pixel (default 8 ≈ 96×112 px)
 
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { useTheme } from '../hooks/useTheme';
+import './PixelOwl.css';
 
 // ── Palette — body/wing shift in dark mode for visibility ─────────
 function palette(isDark) {
@@ -87,6 +87,22 @@ const F = {
     '..dd....dd..',
     '..d......d..',
   ],
+  snore: [
+    '..dd....dd..',
+    '.dddd..dddd.',
+    'dddddddddddd',
+    'ddfffddfffdd',
+    'dddddddddddd',   //  4  eyes closed
+    'dddddddddddd',   //  5  eyes closed
+    'dddddddddddd',   //  6  eyes closed
+    'ddddkdkddddd',   //  7  beak slightly open (snoring)
+    'dddddddddddd',
+    'dwwddddddwwd',
+    'dwwddddddwwd',
+    '.dddddddddd.',
+    '..dd....dd..',
+    '..d......d..',
+  ],
 };
 
 // ── Render pixel grid ─────────────────────────────────────────────
@@ -102,19 +118,6 @@ function OwlPixels({ frame, px, C }) {
   return <>{rects}</>;
 }
 
-// ── Motion configs ────────────────────────────────────────────────
-const ANIM = {
-  idle:      { y: [0, -4, 0] },
-  thinking:  { rotate: [-5, 5, -5] },
-  streaming: { y: [0, -3, 0] },
-  done:      { scale: [1, 1.14, 1] },
-};
-const TRANS = {
-  idle:      { duration: 2.5,  repeat: Infinity, ease: 'easeInOut' },
-  thinking:  { duration: 0.55, repeat: Infinity, ease: 'easeInOut' },
-  streaming: { duration: 0.32, repeat: Infinity, ease: 'easeInOut' },
-  done:      { duration: 0.3,  repeat: 2,        ease: 'easeOut'   },
-};
 
 // ── Component ─────────────────────────────────────────────────────
 export default function PixelOwl({ state = 'idle', size = 8 }) {
@@ -146,11 +149,7 @@ export default function PixelOwl({ state = 'idle', size = 8 }) {
   const H     = 14 * size;
 
   return (
-    <motion.div
-      animate={ANIM[state] ?? ANIM.idle}
-      transition={TRANS[state] ?? TRANS.idle}
-      style={{ display: 'inline-block' }}
-    >
+    <div className={`pixel-owl pixel-owl--${key}`}>
       <svg
         width={W}
         height={H}
@@ -159,6 +158,6 @@ export default function PixelOwl({ state = 'idle', size = 8 }) {
       >
         <OwlPixels frame={frame} px={size} C={C} />
       </svg>
-    </motion.div>
+    </div>
   );
 }

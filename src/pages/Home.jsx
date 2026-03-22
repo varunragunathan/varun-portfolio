@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { useTypewriter, useCounter } from '../hooks/useAnimations';
@@ -6,9 +6,10 @@ import { Fade, SectionHeader, Btn } from '../components/UI';
 import ParticleField from '../components/ParticleField';
 import { PERSONAL, STATS, PROJECTS, SKILLS, PRINCIPLES, TIMELINE, EDUCATION } from '../data/portfolio';
 import FrozenChat from '../components/FrozenChat';
-import { useState, useEffect } from 'react';
-import WelcomeTour, { TOUR_KEY } from '../components/WelcomeTour';
 import './Home.css';
+
+const TOUR_KEY = 'hasSeenWelcomeTour';
+const WelcomeTour = lazy(() => import('../components/WelcomeTour'));
 
 // ─── Guest view (unauthenticated) ─────────────────────────────────
 const GUEST_FEATURES = [
@@ -19,7 +20,7 @@ const GUEST_FEATURES = [
 
 function GuestView() {
   const [loaded, setLoaded] = useState(false);
-  useEffect(() => { setTimeout(() => setLoaded(true), 100); }, []);
+  useEffect(() => { setLoaded(true); }, []);
 
   return (
     <div className={`guest-view${loaded ? ' guest-view--loaded' : ''}`}>
@@ -340,8 +341,8 @@ export default function Home() {
   }, [enabled, loading, user]);
 
   // Don't render during auth check — prevents Hero→GuestView layout flash.
-  // Background colour is already correct via CSS vars set before React loads.
-  if (enabled && loading) return null;
+  // Reserve height so the footer doesn't shift when auth resolves.
+  if (enabled && loading) return <div aria-hidden="true" style={{ minHeight: '100vh' }} />;
 
   return (
     <>
@@ -362,7 +363,7 @@ export default function Home() {
           <HomeFooter />
         </>
       )}
-      {showTour && <WelcomeTour onDone={() => setShowTour(false)} />}
+      {showTour && <Suspense fallback={null}><WelcomeTour onDone={() => setShowTour(false)} /></Suspense>}
     </>
   );
 }
