@@ -4,12 +4,13 @@ import { ThemeProvider, useTheme } from './hooks/useTheme';
 import { SkipLink, ThemeToggle } from './components/UI';
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import Nav from './components/Nav';
-import ChatWidget from './components/ChatWidget.jsx';
 import VersionBadge from './components/VersionBadge.jsx';
 import { useNumMatchApproval } from './hooks/useNumMatchApproval.jsx';
-import NumMatchApprovalModal from './components/NumMatchApprovalModal.jsx';
 import { FeedbackForm, FeedbackModal, useShake } from './components/FeedbackWidget.jsx';
 import UpdatePrompt from './components/UpdatePrompt.jsx';
+
+const ChatWidget           = lazy(() => import('./components/ChatWidget.jsx'));
+const NumMatchApprovalModal = lazy(() => import('./components/NumMatchApprovalModal.jsx'));
 import './App.css';
 
 // ── Error boundary ────────────────────────────────────────────────
@@ -137,8 +138,8 @@ function Shell() {
         </Suspense>
       </main>
       {!hideFooter && <Footer shakeState={shakeState} onShakeEnable={requestPermission} />}
-      {user && <ChatWidget />}
-      {approval && <NumMatchApprovalModal approval={approval} onRespond={respond} />}
+      {user && <Suspense fallback={null}><ChatWidget /></Suspense>}
+      {approval && <Suspense fallback={null}><NumMatchApprovalModal approval={approval} onRespond={respond} /></Suspense>}
       {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
       <UpdatePrompt />
     </div>
