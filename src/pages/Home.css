@@ -1,11 +1,13 @@
 /* ── GuestView ────────────────────────────────────────────────────── */
+@keyframes guest-fadein {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 .guest-view {
   min-height: 100vh; display: flex; align-items: center; justify-content: center;
   padding: max(96px, 12vh) 24px 60px;
-  opacity: 0; transform: translateY(20px);
-  transition: opacity 0.7s cubic-bezier(0.22,1,0.36,1), transform 0.7s cubic-bezier(0.22,1,0.36,1);
+  animation: guest-fadein 0.7s cubic-bezier(0.22,1,0.36,1) both;
 }
-.guest-view--loaded { opacity: 1; transform: translateY(0); }
 .guest-view__inner { width: 100%; max-width: 420px; }
 
 .guest-view__identity { text-align: center; margin-bottom: 24px; }

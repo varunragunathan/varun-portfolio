@@ -19,11 +19,8 @@ const GUEST_FEATURES = [
 ];
 
 function GuestView() {
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => { setLoaded(true); }, []);
-
   return (
-    <div className={`guest-view${loaded ? ' guest-view--loaded' : ''}`}>
+    <div className="guest-view">
       <div className="guest-view__inner">
 
         {/* Identity */}
@@ -37,7 +34,7 @@ function GuestView() {
                 className="guest-view__avatar"
                 width={80}
                 height={80}
-                fetchPriority="high"
+                fetchpriority="high"
               />
             </picture>
           </div>

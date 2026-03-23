@@ -14,7 +14,11 @@ const ENABLED = import.meta.env.VITE_ENABLE_AUTH === 'true';
 
 export function AuthProvider({ children }) {
   // undefined = loading, null = not signed in, object = signed in
-  const [user, setUser] = useState(ENABLED ? undefined : null);
+  // During SSR there is no window — start as null (guest) so the server renders
+  // the guest view rather than the loading placeholder.
+  const [user, setUser] = useState(
+    ENABLED && typeof window !== 'undefined' ? undefined : null
+  );
 
   useEffect(() => {
     if (!ENABLED) return;

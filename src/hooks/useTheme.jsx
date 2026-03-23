@@ -1,5 +1,9 @@
 import { createContext, useContext, useState, useEffect, useLayoutEffect } from 'react';
 
+// useLayoutEffect causes a warning during SSR (it can't run in renderToString).
+// This alias uses useEffect on the server (a no-op) and useLayoutEffect on the client.
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
 const ThemeCtx = createContext();
 export const useTheme = () => useContext(ThemeCtx);
 
@@ -115,7 +119,7 @@ export function ThemeProvider({ children }) {
   const resolved = preference === 'auto' ? systemTheme : preference;
 
   // Pass 1: sync all base theme tokens to CSS custom properties
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const root  = document.documentElement;
     const theme = themes[resolved];
     root.setAttribute('data-theme', resolved);
@@ -137,7 +141,7 @@ export function ThemeProvider({ children }) {
   }, [resolved]);
 
   // Pass 2: sync accent + semantic color tokens — overridden by color blind mode
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const root  = document.documentElement;
     const base  = themes[resolved];
     const ovr   = colorBlindMode !== 'none' ? (CB_OVERRIDES[colorBlindMode]?.[resolved] ?? {}) : {};

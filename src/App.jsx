@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect, useState, useCallback, Component } from 'react';
-import { BrowserRouter, Routes, Route, useLocation, matchPath } from 'react-router-dom';
+import { Routes, Route, useLocation, matchPath } from 'react-router-dom';
 import { ThemeProvider, useTheme } from './hooks/useTheme';
 import { SkipLink, ThemeToggle } from './components/UI';
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
@@ -151,11 +151,9 @@ export default function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <AuthProvider>
-          <BrowserRouter>
-            <ErrorBoundary>
-              <Shell />
-            </ErrorBoundary>
-          </BrowserRouter>
+          <ErrorBoundary>
+            <Shell />
+          </ErrorBoundary>
         </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>
