@@ -35,7 +35,7 @@ export const Step1Auth = {
   name: 'Step 1 — Auth',
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await waitForTitle(canvas, 'You just used the auth');
+    await waitForTitle(canvas, "That wasn't a demo");
     await expect(canvas.getByRole('button', { name: /next/i })).toBeVisible();
     await expect(canvas.queryByRole('button', { name: /back/i })).toBeNull();
   },
@@ -46,9 +46,9 @@ export const Step2Chat = {
   name: 'Step 2 — Chat',
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await waitForTitle(canvas, 'You just used the auth');
+    await waitForTitle(canvas, "That wasn't a demo");
     await userEvent.click(canvas.getByRole('button', { name: /next/i }));
-    await waitForTitle(canvas, 'Ask me how any of this was built');
+    await waitForTitle(canvas, 'Ask how any of this was built');
     await expect(canvas.getByText(/Feature 1 of 4/i)).toBeVisible();
   },
 };
@@ -58,11 +58,11 @@ export const Step3Docs = {
   name: 'Step 3 — Docs',
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await waitForTitle(canvas, 'You just used the auth');
+    await waitForTitle(canvas, "That wasn't a demo");
     await userEvent.click(canvas.getByRole('button', { name: /next/i }));
-    await waitForTitle(canvas, 'Ask me how any of this was built');
+    await waitForTitle(canvas, 'Ask how any of this was built');
     await userEvent.click(canvas.getByRole('button', { name: /next/i }));
-    await waitForTitle(canvas, 'Everything is documented');
+    await waitForTitle(canvas, 'Every decision is documented');
     await expect(canvas.getByText(/Feature 2 of 4/i)).toBeVisible();
   },
 };
@@ -72,7 +72,7 @@ export const Step4Timeline = {
   name: 'Step 4 — Timeline',
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const stepTitles = ['You just used the auth', 'Ask me how any of this was built', 'Everything is documented', '11 years, real scale'];
+    const stepTitles = ["That wasn't a demo", 'Ask how any of this was built', 'Every decision is documented', 'Identity at scale, for real'];
     for (let i = 0; i < stepTitles.length; i++) {
       await waitForTitle(canvas, stepTitles[i]);
       if (i < stepTitles.length - 1) {
@@ -88,7 +88,7 @@ export const Step5Projects = {
   name: 'Step 5 — Projects',
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const stepTitles = ['You just used the auth', 'Ask me how any of this was built', 'Everything is documented', '11 years, real scale', 'Projects go all the way'];
+    const stepTitles = ["That wasn't a demo", 'Ask how any of this was built', 'Every decision is documented', 'Identity at scale, for real', 'Case studies go all the way'];
     for (let i = 0; i < stepTitles.length; i++) {
       await waitForTitle(canvas, stepTitles[i]);
       if (i < stepTitles.length - 1) {
@@ -104,7 +104,7 @@ export const Step6Done = {
   name: 'Step 6 — Done',
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const stepTitles = ['You just used the auth', 'Ask me how any of this was built', 'Everything is documented', '11 years, real scale', 'Projects go all the way', 'Start anywhere'];
+    const stepTitles = ["That wasn't a demo", 'Ask how any of this was built', 'Every decision is documented', 'Identity at scale, for real', 'Case studies go all the way', 'Pick a thread and pull'];
     for (let i = 0; i < stepTitles.length; i++) {
       await waitForTitle(canvas, stepTitles[i]);
       if (i < stepTitles.length - 1) {
@@ -120,15 +120,15 @@ export const BackNavigation = {
   name: 'Back navigation',
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await waitForTitle(canvas, 'You just used the auth');
+    await waitForTitle(canvas, "That wasn't a demo");
     await expect(canvas.queryByRole('button', { name: /back/i })).toBeNull();
     // Advance to step 2
     await userEvent.click(canvas.getByRole('button', { name: /next/i }));
-    await waitForTitle(canvas, 'Ask me how any of this was built');
+    await waitForTitle(canvas, 'Ask how any of this was built');
     await expect(canvas.getByRole('button', { name: /back/i })).toBeVisible();
     // Go back to step 1
     await userEvent.click(canvas.getByRole('button', { name: /back/i }));
-    await waitForTitle(canvas, 'You just used the auth');
+    await waitForTitle(canvas, "That wasn't a demo");
     await expect(canvas.queryByRole('button', { name: /back/i })).toBeNull();
   },
 };
@@ -139,12 +139,12 @@ export const FullWalkthrough = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const titles = [
-      'You just used the auth',
-      'Ask me how any of this was built',
-      'Everything is documented',
-      '11 years, real scale',
-      'Projects go all the way',
-      'Start anywhere',
+      "That wasn't a demo",
+      'Ask how any of this was built',
+      'Every decision is documented',
+      'Identity at scale, for real',
+      'Case studies go all the way',
+      'Pick a thread and pull',
     ];
 
     for (let i = 0; i < titles.length; i++) {
