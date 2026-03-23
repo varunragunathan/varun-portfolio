@@ -50,6 +50,34 @@ jobs:
             ./lh-report.report.json
           retention-days: 30
 
+      - name: Append score to history
+        run: |
+          DATE=$(date -u +"%Y-%m-%d")
+          TIME=$(date -u +"%H:%M")
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          SHA_SHORT="${SHA:0:7}"
+          node -e "
+            const fs = require('fs');
+            const r = JSON.parse(fs.readFileSync('./lh-report.report.json', 'utf8'));
+            const score = k => Math.round(r.categories[k].score * 100);
+            const history = JSON.parse(fs.readFileSync('lighthouse/history.json', 'utf8'));
+            history.push({
+              date: '${DATE}',
+              time: '${TIME}',
+              sha:  '${SHA_SHORT}',
+              performance:   score('performance'),
+              accessibility: score('accessibility'),
+              bestPractices: score('best-practices'),
+              seo:           score('seo'),
+            });
+            fs.writeFileSync('lighthouse/history.json', JSON.stringify(history, null, 2) + '\n');
+          "
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add lighthouse/history.json
+          git diff --staged --quiet || git commit -m "lighthouse: ${DATE} ${SHA_SHORT}"
+          git push origin main
+
       - name: Publish report to GitHub Pages
         run: |
           # Stamp the report with datetime + sha so filenames sort chronologically

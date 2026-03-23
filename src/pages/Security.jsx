@@ -1322,7 +1322,9 @@ export default function Settings() {
                     <Row>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontFamily: F, fontSize: 13, color: t.text2, marginBottom: 12 }}>
-                          Latest — <span style={{ fontFamily: M, color: t.text3 }}>{latest.date} · {latest.sha}</span>
+                          Latest — <span style={{ fontFamily: M, color: t.text3 }}>
+                            {latest.date}{latest.time ? ` ${latest.time} UTC` : ''} · {latest.sha}
+                          </span>
                         </div>
                         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                           <ScorePill value={latest.performance}   label="Performance" />
@@ -1337,8 +1339,8 @@ export default function Settings() {
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: M, fontSize: 12 }}>
                       <thead>
                         <tr style={{ borderBottom: `1px solid ${t.border}` }}>
-                          {['Date', 'SHA', 'Perf', 'A11y', 'BP', 'SEO'].map(h => (
-                            <th key={h} style={{ padding: '8px 16px', color: t.text3, fontWeight: 400, textAlign: h === 'Date' || h === 'SHA' ? 'left' : 'center' }}>{h}</th>
+                          {['Date', 'Time (UTC)', 'SHA', 'Perf', 'A11y', 'BP', 'SEO'].map(h => (
+                            <th key={h} style={{ padding: '8px 16px', color: t.text3, fontWeight: 400, textAlign: ['Date', 'Time (UTC)', 'SHA'].includes(h) ? 'left' : 'center' }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
@@ -1346,6 +1348,7 @@ export default function Settings() {
                         {recent.map((row, i) => (
                           <tr key={i} style={{ borderBottom: i < recent.length - 1 ? `1px solid ${t.border}` : 'none' }}>
                             <td style={{ padding: '8px 16px', color: t.text2 }}>{row.date}</td>
+                            <td style={{ padding: '8px 16px', color: t.text3 }}>{row.time ?? '—'}</td>
                             <td style={{ padding: '8px 16px', color: t.text3 }}>{row.sha}</td>
                             {[row.performance, row.accessibility, row.bestPractices, row.seo].map((v, j) => (
                               <td key={j} style={{ padding: '8px 16px', textAlign: 'center', color: scoreColor(v), fontWeight: 500 }}>{v}</td>
