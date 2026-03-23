@@ -14,9 +14,38 @@
   align-items: center; justify-content: center;
   background: var(--bg);
 }
-.loading__text {
-  font-family: var(--font-mono); font-size: 11px;
-  letter-spacing: 0.3em; text-transform: uppercase; color: var(--text-3);
+
+.loading__owl {
+  position: relative;
+  display: inline-flex;
+}
+
+.loading__zs {
+  position: absolute;
+  top: 4px;
+  right: -18px;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 1px;
+  pointer-events: none;
+}
+
+.loading__zs span {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  opacity: 0;
+  animation: loading-z 2.4s ease-in-out infinite;
+}
+.loading__zs span:nth-child(1) { font-size: 10px; animation-delay: 0s; }
+.loading__zs span:nth-child(2) { font-size: 13px; animation-delay: 0.8s; }
+.loading__zs span:nth-child(3) { font-size: 16px; animation-delay: 1.6s; }
+
+@keyframes loading-z {
+  0%   { opacity: 0; transform: translateY(0); }
+  20%  { opacity: 0.9; }
+  80%  { opacity: 0.3; }
+  100% { opacity: 0; transform: translateY(-22px); }
 }
 
 /* ── Error boundary ───────────────────────────────────────────────── */

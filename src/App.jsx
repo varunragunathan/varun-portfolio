@@ -4,6 +4,7 @@ import { ThemeProvider, useTheme } from './hooks/useTheme';
 import { SkipLink, ThemeToggle } from './components/UI';
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import Nav from './components/Nav';
+import PixelOwl from './components/PixelOwl';
 import VersionBadge from './components/VersionBadge.jsx';
 import { useNumMatchApproval } from './hooks/useNumMatchApproval.jsx';
 import { FeedbackForm, FeedbackModal, useShake } from './components/FeedbackWidget.jsx';
@@ -51,7 +52,14 @@ const EngineeringPage = lazy(() => import('./pages/Engineering'));
 function Loading() {
   return (
     <div className="loading">
-      <div className="loading__text">Loading</div>
+      <div className="loading__owl">
+        <PixelOwl size={7} state="snore" />
+        <div className="loading__zs" aria-hidden="true">
+          <span>z</span>
+          <span>z</span>
+          <span>z</span>
+        </div>
+      </div>
     </div>
   );
 }
