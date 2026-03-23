@@ -52,8 +52,8 @@ jobs:
 
       - name: Publish report to GitHub Pages
         run: |
-          # Stamp the report with the date and sha for the index page
-          DATE=$(date -u +"%Y-%m-%d")
+          # Stamp the report with datetime + sha so filenames sort chronologically
+          DATETIME=$(date -u +"%Y-%m-%dT%H-%M")
           SHA="${{ github.event.workflow_run.head_sha }}"
           SHA_SHORT="${SHA:0:7}"
 
@@ -65,31 +65,34 @@ jobs:
 
           # Copy report into a dated folder
           mkdir -p gh-pages-dir/lighthouse
-          cp ./lh-report.report.html "gh-pages-dir/lighthouse/${DATE}-${SHA_SHORT}.html"
+          cp ./lh-report.report.html "gh-pages-dir/lighthouse/${DATETIME}-${SHA_SHORT}.html"
 
           # Regenerate the index listing
           node -e "
             const fs = require('fs');
             const dir = 'gh-pages-dir/lighthouse';
-            // YYYY-MM-DD prefix → lexicographic sort gives newest first
+            // YYYY-MM-DDTHH-MM prefix → lexicographic sort gives newest first
             const files = fs.readdirSync(dir)
               .filter(f => f.endsWith('.html') && f !== 'index.html')
               .sort((a, b) => b.localeCompare(a));
             const rows = files.map(f => {
               const name = f.replace('.html', '');
               const lastDash = name.lastIndexOf('-');
-              const date = name.slice(0, lastDash);
               const sha = name.slice(lastDash + 1);
-              return \`<tr><td><a href=\"\${f}\">\${date}</a></td><td><code>\${sha}</code></td></tr>\`;
+              const ts = name.slice(0, lastDash); // YYYY-MM-DDTHH-MM
+              const [datePart, timePart] = ts.split('T');
+              const time = timePart ? timePart.replace('-', ':') + ' UTC' : '';
+              const label = time ? \`\${datePart} \${time}\` : datePart;
+              return \`<tr><td><a href=\"\${f}\">\${label}</a></td><td><code>\${sha}</code></td></tr>\`;
             }).join('\n');
             const html = \`<!DOCTYPE html>
           <html lang=\"en\"><head><meta charset=\"UTF-8\">
           <title>Lighthouse Reports — varunr.dev</title>
-          <style>body{font-family:monospace;max-width:600px;margin:40px auto;padding:0 20px}
+          <style>body{font-family:monospace;max-width:640px;margin:40px auto;padding:0 20px}
           table{width:100%;border-collapse:collapse}td{padding:8px;border-bottom:1px solid #eee}
           a{color:#0a6b55}</style></head>
           <body><h2>Lighthouse Reports</h2>
-          <table><tr><th>Date</th><th>SHA</th></tr>\${rows}</table></body></html>\`;
+          <table><tr><th>Run time (UTC)</th><th>SHA</th></tr>\${rows}</table></body></html>\`;
             fs.writeFileSync('gh-pages-dir/lighthouse/index.html', html);
           "
 
@@ -97,6 +100,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add lighthouse/
-          git diff --staged --quiet || git commit -m "lighthouse: ${DATE} ${SHA_SHORT}"
+          git diff --staged --quiet || git commit -m "lighthouse: ${DATETIME} ${SHA_SHORT}"
           git push origin gh-pages
 
