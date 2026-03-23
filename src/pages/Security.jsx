@@ -6,11 +6,12 @@ import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { ThemeToggle } from '../components/UI';
 import { useResponsive } from '../hooks/useResponsive';
-import lighthouseHistory from '../../lighthouse/history.json';
+import lighthouseHistoryStatic from '../../lighthouse/history.json';
 
 // GitHub Pages URL for full Lighthouse HTML reports
 const PAGES_BASE     = 'https://varunragunathan.github.io/varun-portfolio';
 const LH_REPORTS_URL = `${PAGES_BASE}/lighthouse/`;
+const LH_HISTORY_URL = 'https://raw.githubusercontent.com/varunragunathan/varun-portfolio/main/lighthouse/history.json';
 
 async function patchPreferences(body) {
   return fetch('/api/auth/account/preferences', {
@@ -1159,6 +1160,14 @@ export default function Settings() {
   const navigate    = useNavigate();
   const deletingRef = useRef(false);
   const [tab, setTab] = useState('security');
+  const [lighthouseHistory, setLighthouseHistory] = useState(lighthouseHistoryStatic);
+
+  useEffect(() => {
+    fetch(LH_HISTORY_URL)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (Array.isArray(data) && data.length > 0) setLighthouseHistory(data); })
+      .catch(() => {});
+  }, []);
 
   // Persist theme preference to server when it changes (skip initial mount)
   const prefMounted = useRef(false);
