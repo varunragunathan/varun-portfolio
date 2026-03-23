@@ -10,6 +10,18 @@ const LH_HISTORY_URL = 'https://raw.githubusercontent.com/varunragunathan/varun-
 const F = "'Outfit', sans-serif";
 const M = "'IBM Plex Mono', monospace";
 
+const scoreColor = (n) => n >= 90 ? '#34d399' : n >= 70 ? '#fbbf24' : '#f87171';
+
+function ScorePill({ value, label }) {
+  const { t } = useTheme();
+  return (
+    <div style={{ textAlign: 'center', minWidth: 70 }}>
+      <div style={{ fontFamily: M, fontSize: 20, fontWeight: 600, color: scoreColor(value) }}>{value}</div>
+      <div style={{ fontFamily: F, fontSize: 11, color: t.text3, marginTop: 2 }}>{label}</div>
+    </div>
+  );
+}
+
 function Section({ title, subtitle, children }) {
   const { t } = useTheme();
   return (
@@ -52,14 +64,6 @@ export default function Transparency() {
 
   const recent = [...history].reverse().slice(0, 10);
   const latest = recent[0];
-  const scoreColor = (n) => n >= 90 ? '#34d399' : n >= 70 ? '#fbbf24' : '#f87171';
-
-  const ScorePill = ({ value, label }) => (
-    <div style={{ textAlign: 'center', minWidth: 70 }}>
-      <div style={{ fontFamily: M, fontSize: 20, fontWeight: 600, color: scoreColor(value) }}>{value}</div>
-      <div style={{ fontFamily: F, fontSize: 11, color: t.text3, marginTop: 2 }}>{label}</div>
-    </div>
-  );
 
   return (
     <main style={{ minHeight: '100vh', padding: isMobile ? '80px 16px 48px' : '96px 24px 60px', maxWidth: 700, margin: '0 auto' }}>
