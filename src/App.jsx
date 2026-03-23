@@ -47,7 +47,8 @@ const Auth           = lazy(() => import('./pages/Auth'));
 const Settings       = lazy(() => import('./pages/Security'));
 const ChatPage       = lazy(() => import('./pages/Chat'));
 const AdminPage      = lazy(() => import('./pages/Admin'));
-const EngineeringPage = lazy(() => import('./pages/Engineering'));
+const EngineeringPage    = lazy(() => import('./pages/Engineering'));
+const TransparencyPage   = lazy(() => import('./pages/Transparency'));
 
 function Loading() {
   return (
@@ -101,6 +102,7 @@ function Footer({ onShakeEnable, shakeState }) {
           <span className="footer__domain">varunr.dev</span>
           <VersionBadge />
           <a href="/engineering" className="footer__engineering-link">engineering</a>
+          <a href="/transparency" className="footer__engineering-link">transparency</a>
         </div>
         <ThemeToggle />
       </div>
@@ -142,6 +144,7 @@ function Shell() {
             <Route path="/chat" element={<ChatPage />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/engineering" element={<EngineeringPage />} />
+            <Route path="/transparency" element={<TransparencyPage />} />
           </Routes>
         </Suspense>
       </main>

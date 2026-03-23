@@ -6,12 +6,6 @@ import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { ThemeToggle } from '../components/UI';
 import { useResponsive } from '../hooks/useResponsive';
-import lighthouseHistoryStatic from '../../lighthouse/history.json';
-
-// GitHub Pages URL for full Lighthouse HTML reports
-const PAGES_BASE     = 'https://varunragunathan.github.io/varun-portfolio';
-const LH_REPORTS_URL = `${PAGES_BASE}/lighthouse/`;
-const LH_HISTORY_URL = 'https://raw.githubusercontent.com/varunragunathan/varun-portfolio/main/lighthouse/history.json';
 
 async function patchPreferences(body) {
   return fetch('/api/auth/account/preferences', {
@@ -1160,14 +1154,6 @@ export default function Settings() {
   const navigate    = useNavigate();
   const deletingRef = useRef(false);
   const [tab, setTab] = useState('security');
-  const [lighthouseHistory, setLighthouseHistory] = useState(lighthouseHistoryStatic);
-
-  useEffect(() => {
-    fetch(LH_HISTORY_URL)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (Array.isArray(data) && data.length > 0) setLighthouseHistory(data); })
-      .catch(() => {});
-  }, []);
 
   // Persist theme preference to server when it changes (skip initial mount)
   const prefMounted = useRef(false);
@@ -1205,7 +1191,7 @@ export default function Settings() {
         marginBottom: 32, border: `1px solid ${t.border}`,
         width: isMobile ? '100%' : 'fit-content',
       }}>
-        {[{ id: 'security', label: 'Security' }, { id: 'account', label: 'Account' }, { id: 'transparency', label: 'Transparency' }].map(({ id, label }) => (
+        {[{ id: 'security', label: 'Security' }, { id: 'account', label: 'Account' }].map(({ id, label }) => (
           <button key={id} onClick={() => setTab(id)} style={{
             flex: isMobile ? 1 : undefined,
             padding: isMobile ? '12px 22px' : '8px 22px', borderRadius: 8, border: 'none', cursor: 'pointer',
@@ -1308,93 +1294,6 @@ export default function Settings() {
         </>
       )}
 
-      {/* ── Transparency tab ── */}
-      {tab === 'transparency' && (
-        <>
-          <Section title="Site quality scores" subtitle="Lighthouse scores captured after each production deploy">
-            {(() => {
-              const recent = [...lighthouseHistory].reverse().slice(0, 10);
-              const latest = recent[0];
-              const scoreColor = (n) => n >= 90 ? '#34d399' : n >= 70 ? '#fbbf24' : '#f87171';
-              const ScorePill = ({ value, label }) => (
-                <div style={{ textAlign: 'center', minWidth: 70 }}>
-                  <div style={{
-                    fontFamily: M, fontSize: 20, fontWeight: 600,
-                    color: scoreColor(value),
-                  }}>{value}</div>
-                  <div style={{ fontFamily: F, fontSize: 11, color: t.text3, marginTop: 2 }}>{label}</div>
-                </div>
-              );
-              return (
-                <>
-                  {latest && (
-                    <Row>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontFamily: F, fontSize: 13, color: t.text2, marginBottom: 12 }}>
-                          Latest — <span style={{ fontFamily: M, color: t.text3 }}>
-                            {latest.date}{latest.time ? ` ${latest.time} UTC` : ''} · {latest.sha}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                          <ScorePill value={latest.performance}   label="Performance" />
-                          <ScorePill value={latest.accessibility} label="Accessibility" />
-                          <ScorePill value={latest.bestPractices} label="Best practices" />
-                          <ScorePill value={latest.seo}           label="SEO" />
-                        </div>
-                      </div>
-                    </Row>
-                  )}
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: M, fontSize: 12 }}>
-                      <thead>
-                        <tr style={{ borderBottom: `1px solid ${t.border}` }}>
-                          {['Date', 'Time (UTC)', 'SHA', 'Perf', 'A11y', 'BP', 'SEO'].map(h => (
-                            <th key={h} style={{ padding: '8px 16px', color: t.text3, fontWeight: 400, textAlign: ['Date', 'Time (UTC)', 'SHA'].includes(h) ? 'left' : 'center' }}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {recent.map((row, i) => (
-                          <tr key={i} style={{ borderBottom: i < recent.length - 1 ? `1px solid ${t.border}` : 'none' }}>
-                            <td style={{ padding: '8px 16px', color: t.text2 }}>{row.date}</td>
-                            <td style={{ padding: '8px 16px', color: t.text3 }}>{row.time ?? '—'}</td>
-                            <td style={{ padding: '8px 16px', color: t.text3 }}>{row.sha}</td>
-                            {[row.performance, row.accessibility, row.bestPractices, row.seo].map((v, j) => (
-                              <td key={j} style={{ padding: '8px 16px', textAlign: 'center', color: scoreColor(v), fontWeight: 500 }}>{v}</td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              );
-            })()}
-          </Section>
-          <Section title="Full reports" subtitle="Detailed HTML reports from each Lighthouse run">
-            <Row last>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: F, fontSize: 14, color: t.text1, marginBottom: 2 }}>Lighthouse report archive</div>
-                <div style={{ fontFamily: F, fontSize: 12, color: t.text3 }}>
-                  Full Lighthouse HTML reports published after each deploy, hosted on GitHub Pages.
-                </div>
-              </div>
-              <a
-                href={LH_REPORTS_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  padding: '6px 14px', borderRadius: 8, border: `1px solid ${t.accentBorder}`,
-                  fontFamily: F, fontSize: 13, color: t.accent, textDecoration: 'none',
-                  background: t.accentGhost, whiteSpace: 'nowrap',
-                }}
-              >
-                View reports →
-              </a>
-            </Row>
-          </Section>
-        </>
-      )}
     </main>
   );
 }
