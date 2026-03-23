@@ -1,4 +1,3 @@
-/* eslint-env node */
 import React from 'react';
 import { renderToPipeableStream } from 'react-dom/server';
 import { Writable } from 'stream';
@@ -11,8 +10,9 @@ import './index.css';
 export async function render(url) {
   return new Promise((resolve, reject) => {
     const chunks = [];
+    const decoder = new TextDecoder();
     const writable = new Writable({
-      write(chunk, _enc, cb) { chunks.push(chunk); cb(); },
+      write(chunk, _enc, cb) { chunks.push(decoder.decode(chunk, { stream: true })); cb(); },
     });
 
     const { pipe } = renderToPipeableStream(
@@ -24,7 +24,7 @@ export async function render(url) {
       {
         onAllReady() {
           pipe(writable);
-          writable.on('finish', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+          writable.on('finish', () => resolve(chunks.join('') + decoder.decode()));
           writable.on('error', reject);
         },
         onError: reject,
