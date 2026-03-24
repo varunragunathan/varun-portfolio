@@ -70,7 +70,6 @@ export default defineConfig({
           if (id.includes('react-router-dom/') || id.includes('react-router/')) return 'vendor';
           if (id.includes('framer-motion/')) return 'motion';
           if (id.includes('@simplewebauthn/') || id.includes('qrcode/')) return 'auth-libs';
-          return 'vendor';
         }
       }
     }
