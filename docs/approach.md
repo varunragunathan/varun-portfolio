@@ -1,110 +1,53 @@
-# How I Build and Maintain Production Applications
+# The role of an architect when AI can write the code
 
-This is a direct account of how I approach software — from the first line of code to a system that's been running for years. It's written for anyone who wants to understand the thinking behind the work, not just the output.
+The question I hear most these days — from directors, VPs, people deciding where to place a bet on an engineering hire — is some version of: *what do you actually do when AI can generate most of the code?*
 
----
-
-## 1. Understand the problem before touching the stack
-
-Before picking a framework, a database, or a deployment model, I need to know what I'm actually solving. Most over-engineered systems are the result of skipping this step. I spend time with the constraints: Who uses this? At what scale? What fails catastrophically vs. inconveniently? What can be added later vs. what's expensive to change?
-
-The architecture should follow from the answers, not from what's popular that quarter.
+It's the right question. Here's my honest answer.
 
 ---
 
-## 2. Own the full stack, end to end
+Software isn't a codebase. It's a machine with four moving parts: the people using it, the people building it, the technology running it, and the people funding it. An architect's job is to understand all four well enough to keep them turning together.
 
-Production systems don't fail at language boundaries — they fail at the seams. I stay fluent across the full path: schema design, API contracts, client rendering, caching behavior, deployment pipeline, and monitoring. I don't hand off a "backend" and stop caring about latency. I don't write a "frontend" and stay ignorant of what the server is doing.
+AI changes one of those parts — technology — in significant ways. It makes certain kinds of output cheaper and faster. It doesn't change the other three at all. Users still have needs they can't fully articulate. Developers still make different tradeoffs under different constraints. Businesses still have timelines, budgets, and priorities that don't emerge from a prompt.
 
-Knowing the whole system means I can reason about tradeoffs rather than guessing.
-
----
-
-## 3. Performance is a feature, not a phase
-
-I treat performance as a first-class requirement, not something to optimize after the fact. That means:
-
-- Bundle size is tracked and budgeted at build time
-- Rendering paths are designed with LCP and FCP in mind from the start
-- Caches — CDN, edge KV, browser — are an intentional part of the architecture, not an afterthought
-- Performance regressions are caught in CI before they reach users, not in a postmortem after
-
-Every deploy runs Lighthouse. The scores are public. That accountability is intentional.
+The architect's job isn't to write code. It's to hold the full picture while everyone else — including AI — is working inside a smaller one.
 
 ---
 
-## 4. Security is structural, not bolted on
+## Knowing your users is a practice, not a project
 
-Security decisions made late are expensive. I build auth correctly the first time: WebAuthn passkeys over passwords, TOTP for privileged escalation, short-lived sessions with explicit revocation, trusted-device tracking. Not because these are trendy, but because they reflect how trust actually works in production systems at scale.
+The biggest mistake I see is treating user understanding as something you do once — a research phase, a discovery sprint, a set of interviews — and then you're done. You're never done.
 
-The rule: if an attacker gets the database, what do they have? The answer should be: not much.
+I've learned more from watching someone navigate around a feature they should have used than from any feedback survey. I've caught more real problems from noticing an uptick in a specific error event than from scheduled retrospectives. Feedback forms, 1:1 conversations, real-time metrics, a support ticket that uses an unexpected word — all of it is signal if you're paying attention.
 
----
+The product is always in motion. Users change. Their context changes. Something that worked last year becomes friction this year. There's always something better to be done, which sounds like an exhausting treadmill but is actually the most interesting part of the job. The system is never finished because the people using it never stop evolving.
 
-## 5. Automate every quality gate
-
-If a check can be automated, it should be. My CI pipeline runs lint, component tests, end-to-end smoke tests, accessibility checks, and Lighthouse audits on every push. No human is faster or more consistent than a check that runs in three minutes on every commit.
-
-The discipline is in never making exceptions. One skip becomes a habit.
+Understanding your users isn't a box you check. It's how you stay grounded.
 
 ---
 
-## 6. Document decisions, not just code
+## The cogs have to turn together
 
-Code explains what the system does. Documentation explains why it works that way. I maintain a living engineering journal that covers architecture decisions, tradeoffs I explicitly chose not to take, and the reasoning behind major implementation choices.
+In practice, knowing your users isn't enough on its own. A product shaped entirely around user feedback and no technical constraints produces a roadmap no team can execute. A product built on pure technical elegance with no user feedback produces something nobody asked for. A system that's technically excellent but can't be maintained by the team that inherits it creates a different kind of failure.
 
-This pays off in three situations: when someone joins the team, when I return to a system after six months, and when I need to make a change that touches something old. In all three cases, the decision log is worth more than the code comments.
+The architect's job is to sit at the intersection of all of these — users, developers, technology, business — and make decisions that don't optimize one at the expense of the others. That requires actually understanding each perspective, not just interfacing with it. I've found that the engineers who struggle at senior levels aren't the ones who can't write good code. They're the ones who stopped being curious about the perspectives they don't personally occupy.
 
----
-
-## 7. Know your costs and limits
-
-Every production system has resource constraints: database reads per second, memory limits, cold start latency, API rate limits. I learn these limits for whatever infrastructure I'm running on and design to stay well inside them — not to see how close I can get.
-
-When we hit 50% of our KV read quota, I added `cacheTtl` to the three highest-frequency reads that day. Not when we hit 90%. The point is to know the number before it becomes a problem.
+Operating from assumptions about any one of those four parts is how systems quietly fail.
 
 ---
 
-## 8. Design for failure
+## Software is also an art
 
-Systems fail. The question is how. I build with explicit fallbacks: error boundaries at every layer, graceful degradation when dependencies are unavailable, retry logic with backoff where appropriate. I distinguish between errors that should surface to users and errors that should be handled silently and monitored.
+I genuinely enjoy this work — including the parts most engineers describe as painful. A tricky bug is interesting. A constraint that seems impossible usually contains a better design waiting to be found. The performance regression that turns out to be three lines of CSS. The auth flow that has to be both secure and frictionless. These aren't problems to get through on the way to the real work. They are the real work.
 
-A system that fails loudly and informatively is better than one that fails silently and completely.
-
----
-
-## 9. Deploy small, deploy often
-
-Large deploys are risky. Every line of code that sits unreleased is inventory — it has cost but no value yet, and it accumulates risk. I prefer shipping small, verified changes frequently over batching up features into large releases.
-
-Each commit should do one thing, explain why, and leave the system in a better state than it found it.
+There's a craft to building software that goes beyond correctness and performance. How a system feels to the people who use it every day. How it feels to the engineer who has to change it at 2am. How gracefully it fails when something goes wrong. These things matter and they require a kind of attention that isn't reducible to a spec or a metric.
 
 ---
 
-## 10. Measure before you optimize
+## What this means practically
 
-Intuition about performance is often wrong. I measure first — real metrics, not guesses — and then act on what the data shows. This applies to perceived load time, database query duration, bundle parse cost, and cache hit rates. The optimization that matters is rarely the one that feels most satisfying.
+The architect in an AI-assisted world does less authoring and more judgment. More listening. More translating between what users experience, what developers can realistically build, what the technology makes possible, and what the business actually needs.
 
-When Lighthouse showed a performance regression from opacity animation behavior, the fix was three lines of CSS. The diagnosis was the hard part, and it required measurement.
+None of that is new. What's new is that the coding part is no longer the bottleneck, which means the other parts — the human parts — matter more than they used to. The people who will do this work well are the ones who were already curious about all the cogs, not just the ones they were personally responsible for turning.
 
----
-
-## 11. Write for the next person
-
-The next person who reads this code might be a teammate, a future hire, or me in eight months. I write commits with full context ("why" not "what"), keep naming consistent and self-describing, and leave the codebase in a state where the obvious move is also the correct one.
-
-Good code doesn't need a lot of comments. It needs clear intent and predictable behavior.
-
----
-
-## 12. Production is the source of truth
-
-Staging environments diverge from production. Local environments diverge further. I run real checks against the production URL — Lighthouse runs against varunr.dev, not localhost. Smoke tests run against the built artifact. Migrations are tested against production-equivalent data.
-
-This site has its own CI pipeline, Lighthouse history, transparency dashboard, and automated migration tooling — not because it's a large system, but because those habits should be default, not reserved for large systems.
-
----
-
-## The short version
-
-Build things that work correctly under realistic conditions. Automate the things that should be consistent. Measure the things that matter. Document the decisions, not just the code. And treat the infrastructure as part of the product — it's not plumbing, it's the system.
+That's been my approach for eleven years. It still is.
