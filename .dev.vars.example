@@ -17,6 +17,11 @@ RESEND_API_KEY=re_your_key_here
 # Generate with: openssl rand -hex 32
 TOTP_ENCRYPTION_KEY=your_64_char_hex_key_here
 
+# Anthropic API key — https://console.anthropic.com
+# Required for the LLM Eval Pipeline tab in the admin dashboard.
+# Production: wrangler secret put ANTHROPIC_API_KEY
+ANTHROPIC_API_KEY=sk-ant-your_key_here
+
 # Twilio credentials — https://console.twilio.com
 TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=your_auth_token_here

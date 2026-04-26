@@ -23,6 +23,7 @@ TWILIO_WHATSAPP_FROM = "whatsapp:+14155238886"
 #                                            #   openssl rand -hex 32
 #   wrangler secret put TWILIO_ACCOUNT_SID   # from console.twilio.com
 #   wrangler secret put TWILIO_AUTH_TOKEN    # from console.twilio.com
+#   wrangler secret put ANTHROPIC_API_KEY    # from console.anthropic.com — LLM eval pipeline
 
 
 

@@ -1502,8 +1502,392 @@ function EndpointsTab({ t }) {
   );
 }
 
+// ── Tab: LLM Evals ────────────────────────────────────────────────
+const EVAL_SCORE_KEYS   = ['accuracy', 'hallucination_risk', 'relevance', 'tone'];
+const EVAL_SCORE_LABELS = { accuracy: 'Accuracy', hallucination_risk: 'No Halluc.', relevance: 'Relevance', tone: 'Tone' };
+
+function evalScoreColor(score) {
+  if (score >= 4.5) return '#34c759';
+  if (score >= 3.5) return '#34c759';
+  if (score >= 2.5) return '#f5a623';
+  if (score >= 1.5) return '#ff9500';
+  return '#ff3b30';
+}
+
+function evalScoreBg(score) {
+  if (score >= 4.5) return 'rgba(52,199,89,0.15)';
+  if (score >= 3.5) return 'rgba(52,199,89,0.08)';
+  if (score >= 2.5) return 'rgba(245,166,35,0.15)';
+  if (score >= 1.5) return 'rgba(255,149,0,0.12)';
+  return 'rgba(255,59,48,0.12)';
+}
+
+function EvalScorePill({ label, score }) {
+  const color = evalScoreColor(score);
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+      padding: '5px 10px', borderRadius: 6, minWidth: 68,
+      background: evalScoreBg(score), border: `1px solid ${color}44`,
+    }}>
+      <span style={{ fontFamily: M, fontSize: 9, letterSpacing: '0.06em', color: '#888', textTransform: 'uppercase' }}>
+        {label}
+      </span>
+      <span style={{ fontFamily: F, fontSize: 17, fontWeight: 700, color, lineHeight: 1 }}>
+        {score ?? '?'}
+      </span>
+    </div>
+  );
+}
+
+function EvalCompareScorePill({ label, before, after }) {
+  const color      = evalScoreColor(after);
+  const delta      = (typeof after === 'number' && typeof before === 'number') ? after - before : null;
+  const deltaColor = delta > 0 ? '#34c759' : delta < 0 ? '#ff3b30' : '#888';
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+      padding: '5px 10px', borderRadius: 6, minWidth: 76,
+      background: evalScoreBg(after), border: `1px solid ${color}44`,
+    }}>
+      <span style={{ fontFamily: M, fontSize: 9, letterSpacing: '0.06em', color: '#888', textTransform: 'uppercase' }}>
+        {label}
+      </span>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+        <span style={{ fontFamily: F, fontSize: 17, fontWeight: 700, color, lineHeight: 1 }}>{after ?? '?'}</span>
+        {delta !== null && delta !== 0 && (
+          <span style={{ fontFamily: M, fontSize: 10, color: deltaColor }}>{delta > 0 ? '+' : ''}{delta}</span>
+        )}
+      </div>
+      <span style={{ fontFamily: M, fontSize: 9, color: '#666' }}>was {before ?? '?'}</span>
+    </div>
+  );
+}
+
+function EvalAvgCard({ label, score, t }) {
+  const color = evalScoreColor(score ?? 0);
+  return (
+    <div style={{
+      padding: '16px 20px', borderRadius: 12,
+      background: t.cardBg, border: `1px solid ${t.border}`,
+      borderLeft: `3px solid ${color}`,
+    }}>
+      <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase', marginBottom: 8 }}>
+        {label}
+      </div>
+      <div style={{ fontFamily: F, fontSize: 28, fontWeight: 700, color, lineHeight: 1, marginBottom: 4 }}>
+        {score !== null && score !== undefined ? score.toFixed(1) : '—'}
+      </div>
+      <div style={{ fontFamily: M, fontSize: 9, color: t.text3 }}>avg / 5.0</div>
+    </div>
+  );
+}
+
+function EvalCompareAvgCard({ label, before, after, t }) {
+  const color      = evalScoreColor(after ?? 0);
+  const delta      = (typeof after === 'number' && typeof before === 'number')
+    ? Math.round((after - before) * 10) / 10
+    : null;
+  const deltaColor = delta > 0 ? '#34c759' : delta < 0 ? '#ff3b30' : t.text3;
+  return (
+    <div style={{
+      padding: '16px 20px', borderRadius: 12,
+      background: t.cardBg, border: `1px solid ${t.border}`,
+      borderLeft: `3px solid ${color}`,
+    }}>
+      <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase', marginBottom: 8 }}>
+        {label}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
+        <span style={{ fontFamily: F, fontSize: 28, fontWeight: 700, color, lineHeight: 1 }}>
+          {after !== null && after !== undefined ? after.toFixed(1) : '—'}
+        </span>
+        {delta !== null && (
+          <span style={{ fontFamily: M, fontSize: 13, color: deltaColor, fontWeight: 600 }}>
+            {delta > 0 ? '+' : ''}{delta}
+          </span>
+        )}
+      </div>
+      <div style={{ fontFamily: M, fontSize: 9, color: t.text3 }}>
+        baseline: {before !== null && before !== undefined ? before.toFixed(1) : '—'}
+      </div>
+    </div>
+  );
+}
+
+function EvalResultCard({ result, compareResult, t }) {
+  const [expanded, setExpanded] = useState(false);
+  const showCompare = !!compareResult;
+  return (
+    <div style={{
+      padding: '14px 18px', borderRadius: 10,
+      background: t.cardBg, border: `1px solid ${t.border}`,
+    }}>
+      {/* Category + question */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+        <span style={{
+          fontFamily: M, fontSize: 10, padding: '2px 8px', borderRadius: 4, flexShrink: 0,
+          background: t.accentDim, color: t.accent, border: `1px solid ${t.accentBorder}`,
+        }}>
+          {result.category}
+        </span>
+        <div style={{ fontFamily: F, fontSize: 13, color: t.text1, flex: 1, lineHeight: 1.4 }}>
+          {result.question}
+        </div>
+      </div>
+
+      {/* Score pills */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+        {EVAL_SCORE_KEYS.map(key =>
+          showCompare ? (
+            <EvalCompareScorePill
+              key={key}
+              label={EVAL_SCORE_LABELS[key]}
+              before={result.scores[key]}
+              after={compareResult.scores[key]}
+            />
+          ) : (
+            <EvalScorePill key={key} label={EVAL_SCORE_LABELS[key]} score={result.scores[key]} />
+          )
+        )}
+      </div>
+
+      {/* Judge reasoning */}
+      {result.scores.reasoning && (
+        <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginBottom: 8, fontStyle: 'italic' }}>
+          {result.scores.reasoning}
+        </div>
+      )}
+
+      {/* Toggle response */}
+      <button
+        onClick={() => setExpanded(e => !e)}
+        style={{
+          fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
+          background: 'none', border: `1px solid ${t.border}`,
+          cursor: 'pointer', color: t.text3, padding: '3px 10px', borderRadius: 4,
+        }}
+      >
+        {expanded ? '▾ hide response' : '▸ show response'}
+      </button>
+
+      {expanded && (
+        <div style={{
+          fontFamily: F, fontSize: 12, color: t.text2, lineHeight: 1.6,
+          background: t.surfaceAlt, borderRadius: 6, padding: '10px 14px',
+          borderLeft: `3px solid ${t.border}`, marginTop: 10,
+        }}>
+          {result.response}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EvalsTab({ t }) {
+  const [baseline,          setBaseline]          = useState(null);
+  const [comparison,        setComparison]        = useState(null);
+  const [systemPrompt,      setSystemPrompt]      = useState('');
+  const [runningBaseline,   setRunningBaseline]   = useState(false);
+  const [runningComparison, setRunningComparison] = useState(false);
+  const [error,             setError]             = useState(null);
+
+  const runBaseline = useCallback(async () => {
+    setRunningBaseline(true);
+    setError(null);
+    setComparison(null);
+    try {
+      const res = await fetch('/api/admin/evals/run', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error ?? `HTTP ${res.status}`);
+      }
+      setBaseline(await res.json());
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRunningBaseline(false);
+    }
+  }, []);
+
+  const runComparison = useCallback(async () => {
+    setRunningComparison(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/evals/run', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ systemPrompt: systemPrompt.trim() || undefined }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error ?? `HTTP ${res.status}`);
+      }
+      setComparison(await res.json());
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRunningComparison(false);
+    }
+  }, [systemPrompt]);
+
+  const isRunning   = runningBaseline || runningComparison;
+  const showCompare = !!(baseline && comparison);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+
+      {/* Description + run button */}
+      <div>
+        <div style={{ fontFamily: F, fontSize: 13, color: t.text3, lineHeight: 1.6, marginBottom: 20 }}>
+          Tests how well Claude (claude-sonnet-4-20250514) answers 10 financial questions across
+          investing, markets, bonds, taxes, and more. Each response is scored by a second Claude
+          call acting as judge across accuracy, hallucination risk, relevance, and tone (1–5).
+          Run the baseline first, then optionally test a custom system prompt to detect regressions.
+        </div>
+        <button
+          onClick={runBaseline}
+          disabled={isRunning}
+          style={{
+            fontFamily: M, fontSize: 12, letterSpacing: '0.06em',
+            padding: '10px 24px', borderRadius: 8, cursor: isRunning ? 'default' : 'pointer',
+            background: runningBaseline ? 'transparent' : t.accentDim,
+            border: `1px solid ${runningBaseline ? t.border : t.accentBorder}`,
+            color: runningBaseline ? t.text3 : t.accent,
+            transition: 'all 0.15s',
+          }}
+        >
+          {runningBaseline ? '↻ running…' : baseline ? '↺ re-run baseline' : '▶ run evals'}
+        </button>
+      </div>
+
+      {/* Error banner */}
+      {error && (
+        <div style={{
+          fontFamily: M, fontSize: 11, color: '#ff3b30',
+          padding: '10px 14px', borderRadius: 6,
+          background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.25)',
+        }}>
+          {error}
+        </div>
+      )}
+
+      {/* Loading state */}
+      {isRunning && (
+        <div style={{
+          fontFamily: M, fontSize: 11, color: t.text3, letterSpacing: '0.12em',
+          padding: '40px', textAlign: 'center',
+          background: t.surfaceAlt, borderRadius: 12, border: `1px solid ${t.border}`,
+        }}>
+          {runningBaseline ? 'running baseline evals' : 'running comparison'}&nbsp;&nbsp;
+          <span style={{ fontSize: 10 }}>(~30s — evaluating 10 questions in parallel)</span>
+        </div>
+      )}
+
+      {/* Results */}
+      {baseline && !isRunning && (
+        <>
+          {/* Average score cards */}
+          <div>
+            <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase', marginBottom: 12 }}>
+              {showCompare ? 'comparison — averages (custom vs baseline)' : 'baseline — average scores'}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: 10 }}>
+              {EVAL_SCORE_KEYS.map(key =>
+                showCompare ? (
+                  <EvalCompareAvgCard
+                    key={key}
+                    label={EVAL_SCORE_LABELS[key]}
+                    before={baseline.averages[key]}
+                    after={comparison.averages[key]}
+                    t={t}
+                  />
+                ) : (
+                  <EvalAvgCard key={key} label={EVAL_SCORE_LABELS[key]} score={baseline.averages[key]} t={t} />
+                )
+              )}
+            </div>
+          </div>
+
+          {/* Run metadata */}
+          <div style={{ fontFamily: M, fontSize: 10, color: t.text3 }}>
+            {showCompare
+              ? `Baseline run: ${new Date(baseline.runAt).toLocaleTimeString()} · Comparison: ${new Date(comparison.runAt).toLocaleTimeString()}`
+              : `Run at ${new Date(baseline.runAt).toLocaleTimeString()} · prompt: "${baseline.systemPrompt.slice(0, 80)}${baseline.systemPrompt.length > 80 ? '…' : ''}"`
+            }
+          </div>
+
+          {/* Per-question results */}
+          <div>
+            <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase', marginBottom: 12 }}>
+              {showCompare ? 'per-question comparison (scores: custom → delta vs baseline)' : 'per-question results'}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {baseline.results.map((result, i) => (
+                <EvalResultCard
+                  key={result.id}
+                  result={result}
+                  compareResult={showCompare ? comparison.results[i] : null}
+                  t={t}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Regression testing panel */}
+          <div style={{
+            padding: '20px', borderRadius: 12,
+            background: t.surfaceAlt, border: `1px solid ${t.border}`,
+          }}>
+            <div style={{ fontFamily: M, fontSize: 11, letterSpacing: '0.1em', color: t.text3, marginBottom: 12, textTransform: 'uppercase' }}>
+              Regression Testing — Custom System Prompt
+            </div>
+            <div style={{ fontFamily: F, fontSize: 12, color: t.text3, marginBottom: 14, lineHeight: 1.5 }}>
+              Paste an alternative system prompt below and run the comparison to see scores side by side against the baseline.
+              Positive deltas are green, negative are red.
+            </div>
+            <textarea
+              value={systemPrompt}
+              onChange={e => setSystemPrompt(e.target.value)}
+              placeholder="You are a concise financial assistant. Answer in two sentences maximum…"
+              rows={6}
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                fontFamily: M, fontSize: 11, lineHeight: 1.7,
+                color: t.text1, background: t.surface,
+                border: `1px solid ${t.border}`, borderRadius: 8,
+                padding: '10px 14px', outline: 'none', resize: 'vertical',
+                marginBottom: 12,
+              }}
+            />
+            <button
+              onClick={runComparison}
+              disabled={isRunning || !systemPrompt.trim()}
+              style={{
+                fontFamily: M, fontSize: 12, letterSpacing: '0.06em',
+                padding: '10px 24px', borderRadius: 8,
+                cursor: isRunning || !systemPrompt.trim() ? 'default' : 'pointer',
+                background: (isRunning || !systemPrompt.trim()) ? 'transparent' : 'rgba(99,102,241,0.1)',
+                border: `1px solid ${(isRunning || !systemPrompt.trim()) ? t.border : 'rgba(99,102,241,0.4)'}`,
+                color: (isRunning || !systemPrompt.trim()) ? t.text3 : '#6366f1',
+                transition: 'all 0.15s',
+              }}
+            >
+              {runningComparison ? '↻ running comparison…' : '⟳ run comparison'}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Admin page ────────────────────────────────────────────────────
-const TABS = ['Metrics', 'Upgrade Requests', 'Users', 'Models', 'Personas', 'Endpoints'];
+const TABS = ['Metrics', 'Upgrade Requests', 'Users', 'Models', 'Personas', 'Endpoints', 'LLM Evals'];
 
 export default function Admin() {
   const { t }       = useTheme();
@@ -1590,6 +1974,7 @@ export default function Admin() {
         {tab === 3 && <ModelsTab t={t} />}
         {tab === 4 && <PersonasTab t={t} />}
         {tab === 5 && <EndpointsTab t={t} />}
+        {tab === 6 && <EvalsTab t={t} />}
       </div>
     </div>
   );

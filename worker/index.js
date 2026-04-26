@@ -17,6 +17,7 @@ import {
   getPersonas,
   updatePersonas,
 } from './admin.js';
+import { runEvals } from './evals.js';
 import { submitUpgradeRequest, getUpgradeRequest } from './userTier.js';
 import { submitFeedbackHandler } from './feedback.js';
 import { checkIpRateLimit } from './rateLimit.js';
@@ -134,6 +135,8 @@ async function handleRequest(request, env) {
         response = await getPersonas(request, env);
       } else if (path === '/api/admin/personas' && method === 'PUT') {
         response = await updatePersonas(request, env);
+      } else if (path === '/api/admin/evals/run' && method === 'POST') {
+        response = await runEvals(request, env);
       } else {
         response = new Response(JSON.stringify({ error: 'Not found' }), {
           status: 404,
