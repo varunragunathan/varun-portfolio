@@ -41,6 +41,7 @@ The dashboard has six tabs:
 | 3 | Models | Add, enable, or disable AI models |
 | 4 | Personas | Edit the system prompt for each user role |
 | 5 | Endpoints | API and page navigation request metrics |
+| 6 | LLM Evals | Run the eval pipeline against the financial Q&A dataset — see [Chapter 26](./26-llm-eval-pipeline.md) |
 
 ---
 

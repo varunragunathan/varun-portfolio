@@ -8,14 +8,13 @@ export default defineConfig({
 
   use: {
     baseURL: 'http://localhost:5173',
-    channel: 'chrome',       // use system Chrome — no browser download needed
     headless: true,
     screenshot: 'only-on-failure',
     video: 'off',
   },
 
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'], channel: 'chrome' } },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
 
   // Start vite dev server automatically; reuse if already running locally.

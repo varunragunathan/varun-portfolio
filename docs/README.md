@@ -39,6 +39,7 @@ The documentation is written for a competent developer who may not yet know WebA
 | [21](./chapters/21-bugs-fixed.md) | Bugs Fixed | Production bugs discovered, root cause analysis, and fixes |
 | [22](./chapters/22-database-migrations.md) | Database Migrations | Migration file conventions, history, how to apply to prod, how to write new migrations |
 | [23](./chapters/23-accessibility.md) | Accessibility | Three-layer a11y system: ESLint jsx-a11y, axe-core/playwright pre-push gate, Lighthouse CI post-deploy trend tracking |
+| [26](./chapters/26-llm-eval-pipeline.md) | LLM Eval Pipeline | Two-phase generate-then-judge pipeline, financial Q&A dataset, scoring dimensions, baseline/comparison workflow, secret management |
 
 ### Glossary
 

@@ -8,6 +8,7 @@ import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
 import { startAuthentication } from '@simplewebauthn/browser';
 import VersionBadge from '../components/VersionBadge.jsx';
+import './Admin.css';
 
 const F = "'Outfit', sans-serif";
 const M = "'IBM Plex Mono', monospace";
@@ -1653,10 +1654,8 @@ function EvalResultCard({ result, compareResult, t }) {
       </div>
 
       {/* Judge reasoning */}
-      {result.scores.reasoning && (
-        <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginBottom: 8, fontStyle: 'italic' }}>
-          {result.scores.reasoning}
-        </div>
+      {!showCompare && result.scores.reasoning && (
+        <div className="eval-reasoning">{result.scores.reasoning}</div>
       )}
 
       {/* Toggle response */}
@@ -1671,13 +1670,26 @@ function EvalResultCard({ result, compareResult, t }) {
         {expanded ? '▾ hide response' : '▸ show response'}
       </button>
 
-      {expanded && (
-        <div style={{
-          fontFamily: F, fontSize: 12, color: t.text2, lineHeight: 1.6,
-          background: t.surfaceAlt, borderRadius: 6, padding: '10px 14px',
-          borderLeft: `3px solid ${t.border}`, marginTop: 10,
-        }}>
-          {result.response}
+      {expanded && !showCompare && (
+        <div className="eval-response">{result.response}</div>
+      )}
+
+      {expanded && showCompare && (
+        <div className="eval-compare-grid">
+          <div>
+            <div className="eval-compare-col-label">baseline</div>
+            {result.scores.reasoning && (
+              <div className="eval-compare-reasoning">{result.scores.reasoning}</div>
+            )}
+            <div className="eval-compare-response">{result.response}</div>
+          </div>
+          <div>
+            <div className="eval-compare-col-label eval-compare-col-label--custom">custom prompt</div>
+            {compareResult.scores.reasoning && (
+              <div className="eval-compare-reasoning">{compareResult.scores.reasoning}</div>
+            )}
+            <div className="eval-compare-response eval-compare-response--custom">{compareResult.response}</div>
+          </div>
         </div>
       )}
     </div>
