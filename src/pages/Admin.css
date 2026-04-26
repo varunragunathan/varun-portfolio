@@ -62,3 +62,32 @@
 .eval-compare-response--custom {
   border-left-color: var(--accent-border);
 }
+
+/* ── Eval trend chart container ───────────────────────────────────── */
+.eval-trend-wrap {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 8px;
+}
+
+/* ── Eval run history row ─────────────────────────────────────────── */
+.eval-history-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 9px 14px;
+  border-radius: 8px;
+  margin-bottom: 5px;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+}
+.eval-history-row--primary {
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
+}
+.eval-history-row--compare {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.3);
+}

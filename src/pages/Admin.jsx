@@ -1506,6 +1506,17 @@ function EndpointsTab({ t }) {
 // ── Tab: LLM Evals ────────────────────────────────────────────────
 const EVAL_SCORE_KEYS   = ['accuracy', 'hallucination_risk', 'relevance', 'tone'];
 const EVAL_SCORE_LABELS = { accuracy: 'Accuracy', hallucination_risk: 'No Halluc.', relevance: 'Relevance', tone: 'Tone' };
+const EVAL_TREND_COLORS = { accuracy: '#64ffda', hallucination_risk: '#6366f1', relevance: '#f5a623', tone: '#34c759' };
+const EVAL_STORAGE_KEY  = 'eval_runs_v1';
+
+function loadStoredRuns() {
+  try { return JSON.parse(localStorage.getItem(EVAL_STORAGE_KEY) ?? '[]'); }
+  catch { return []; }
+}
+function persistRuns(runs) {
+  try { localStorage.setItem(EVAL_STORAGE_KEY, JSON.stringify(runs.slice(-50))); }
+  catch { /* storage unavailable */ }
+}
 
 function evalScoreColor(score) {
   if (score >= 4.5) return '#34c759';
@@ -1521,6 +1532,107 @@ function evalScoreBg(score) {
   if (score >= 2.5) return 'rgba(245,166,35,0.15)';
   if (score >= 1.5) return 'rgba(255,149,0,0.12)';
   return 'rgba(255,59,48,0.12)';
+}
+
+// Multi-line trend chart — one line per score dimension over all stored runs
+function EvalTrendChart({ runs, t }) {
+  if (runs.length < 2) return null;
+  const W = 800, H = 150;
+  const padL = 28, padR = 82, padT = 12, padB = 28;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const n = runs.length;
+  const xs = runs.map((_, i) => padL + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW));
+  const yScore = s => padT + (1 - (s - 1) / 4) * plotH;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H, display: 'block' }}>
+      {[1, 2, 3, 4, 5].map(s => (
+        <g key={s}>
+          <line x1={padL} y1={yScore(s)} x2={W - padR} y2={yScore(s)} stroke={t.border} strokeWidth={0.5} />
+          <text x={padL - 4} y={yScore(s) + 3.5} textAnchor="end" fill={t.text3} fontFamily={M} fontSize={9}>{s}</text>
+        </g>
+      ))}
+      {runs.map((run, i) => (
+        <text key={i} x={xs[i]} y={H - 4} textAnchor="middle" fill={t.text3} fontFamily={M} fontSize={9}>{run.version}</text>
+      ))}
+      {EVAL_SCORE_KEYS.map((key, ki) => {
+        const color = EVAL_TREND_COLORS[key];
+        const pts = runs.map((r, i) => `${xs[i].toFixed(1)},${yScore(r.averages[key]).toFixed(1)}`).join(' ');
+        return (
+          <g key={key}>
+            <polyline points={pts} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" opacity={0.85} />
+            {runs.map((r, i) => <circle key={i} cx={xs[i]} cy={yScore(r.averages[key])} r={2.5} fill={color} />)}
+            <g transform={`translate(${W - padR + 10},${padT + ki * 22})`}>
+              <circle cx={4} cy={4} r={3} fill={color} />
+              <text x={11} y={8} fill={t.text3} fontFamily={M} fontSize={8}>{EVAL_SCORE_LABELS[key]}</text>
+            </g>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// Tiny inline sparkline per question — 4 lines, one per dimension
+function EvalQuestionTrend({ questionId, allRuns }) {
+  if (!allRuns || allRuns.length < 2) return null;
+  const W = 80, H = 24;
+  const pad = 2;
+  const plotW = W - pad * 2, plotH = H - pad * 2;
+  const n = allRuns.length;
+  const xs = allRuns.map((_, i) => pad + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW));
+  const yScore = s => pad + (1 - (s - 1) / 4) * plotH;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: W, height: H, display: 'block', flexShrink: 0 }} title="Score trend across runs">
+      {EVAL_SCORE_KEYS.map(key => {
+        const pts = allRuns.map((run, i) => {
+          const r = run.results?.find(r => r.id === questionId);
+          return r ? `${xs[i].toFixed(1)},${yScore(r.scores[key]).toFixed(1)}` : null;
+        }).filter(Boolean).join(' ');
+        return pts
+          ? <polyline key={key} points={pts} fill="none" stroke={EVAL_TREND_COLORS[key]} strokeWidth={1} strokeLinejoin="round" strokeLinecap="round" opacity={0.75} />
+          : null;
+      })}
+    </svg>
+  );
+}
+
+// Run history row — shown in the history list
+function EvalRunHistoryRow({ run, isPrimary, isCompare, onSelectPrimary, onSelectCompare, t }) {
+  const timeStr = new Date(run.runAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const snippet = run.systemPrompt.length > 55 ? run.systemPrompt.slice(0, 55) + '…' : run.systemPrompt;
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+      padding: '9px 14px', borderRadius: 8, marginBottom: 5,
+      background: isPrimary ? t.accentDim : isCompare ? 'rgba(99,102,241,0.08)' : t.surfaceAlt,
+      border: `1px solid ${isPrimary ? t.accentBorder : isCompare ? 'rgba(99,102,241,0.3)' : t.border}`,
+    }}>
+      <span style={{ fontFamily: M, fontSize: 11, fontWeight: 600, color: isPrimary ? t.accent : isCompare ? '#6366f1' : t.text3, minWidth: 26 }}>{run.version}</span>
+      <span style={{ fontFamily: M, fontSize: 10, color: t.text3, minWidth: 110 }}>{timeStr}</span>
+      <div style={{ display: 'flex', gap: 10, flex: 1 }}>
+        {EVAL_SCORE_KEYS.map(key => (
+          <span key={key} style={{ fontFamily: M, fontSize: 10, color: evalScoreColor(run.averages[key]) }}>
+            {run.averages[key]}
+          </span>
+        ))}
+      </div>
+      <span style={{ fontFamily: M, fontSize: 9, color: t.text3, flex: 2, minWidth: 100 }}>{snippet}</span>
+      <div style={{ display: 'flex', gap: 5 }}>
+        <button onClick={onSelectPrimary} style={{
+          fontFamily: M, fontSize: 9, letterSpacing: '0.05em', padding: '3px 8px', borderRadius: 4,
+          background: isPrimary ? t.accentDim : 'none', border: `1px solid ${isPrimary ? t.accentBorder : t.border}`,
+          color: isPrimary ? t.accent : t.text3, cursor: 'pointer',
+        }}>view</button>
+        <button onClick={onSelectCompare} style={{
+          fontFamily: M, fontSize: 9, letterSpacing: '0.05em', padding: '3px 8px', borderRadius: 4,
+          background: isCompare ? 'rgba(99,102,241,0.15)' : 'none',
+          border: `1px solid ${isCompare ? 'rgba(99,102,241,0.4)' : t.border}`,
+          color: isCompare ? '#6366f1' : t.text3, cursor: 'pointer',
+        }}>cmp</button>
+      </div>
+    </div>
+  );
 }
 
 function EvalScorePill({ label, score }) {
@@ -1616,7 +1728,7 @@ function EvalCompareAvgCard({ label, before, after, t }) {
   );
 }
 
-function EvalResultCard({ result, compareResult, t }) {
+function EvalResultCard({ result, compareResult, allRuns, t }) {
   const [expanded, setExpanded] = useState(false);
   const showCompare = !!compareResult;
   return (
@@ -1624,7 +1736,7 @@ function EvalResultCard({ result, compareResult, t }) {
       padding: '14px 18px', borderRadius: 10,
       background: t.cardBg, border: `1px solid ${t.border}`,
     }}>
-      {/* Category + question */}
+      {/* Category + question + trend sparkline */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
         <span style={{
           fontFamily: M, fontSize: 10, padding: '2px 8px', borderRadius: 4, flexShrink: 0,
@@ -1635,6 +1747,7 @@ function EvalResultCard({ result, compareResult, t }) {
         <div style={{ fontFamily: F, fontSize: 13, color: t.text1, flex: 1, lineHeight: 1.4 }}>
           {result.question}
         </div>
+        <EvalQuestionTrend questionId={result.id} allRuns={allRuns} />
       </div>
 
       {/* Score pills */}
@@ -1697,58 +1810,54 @@ function EvalResultCard({ result, compareResult, t }) {
 }
 
 function EvalsTab({ t }) {
-  const [baseline,          setBaseline]          = useState(null);
-  const [comparison,        setComparison]        = useState(null);
-  const [systemPrompt,      setSystemPrompt]      = useState('');
-  const [runningBaseline,   setRunningBaseline]   = useState(false);
-  const [runningComparison, setRunningComparison] = useState(false);
-  const [error,             setError]             = useState(null);
+  const [runs,       setRuns]       = useState(loadStoredRuns);
+  const [primaryId,  setPrimaryId]  = useState(() => { const s = loadStoredRuns(); return s.length ? s[s.length - 1].version : null; });
+  const [compareId,  setCompareId]  = useState(null);
+  const [running,    setRunning]    = useState(false);
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [error,      setError]      = useState(null);
 
-  const runBaseline = useCallback(async () => {
-    setRunningBaseline(true);
+  const primary  = runs.find(r => r.version === primaryId)  ?? null;
+  const compare  = runs.find(r => r.version === compareId)  ?? null;
+  const showCompare = !!(primary && compare);
+
+  const doRun = useCallback(async (promptOverride) => {
+    setRunning(true);
     setError(null);
-    setComparison(null);
     try {
       const res = await fetch('/api/admin/evals/run', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify(promptOverride ? { systemPrompt: promptOverride } : {}),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error ?? `HTTP ${res.status}`);
       }
-      setBaseline(await res.json());
+      const data = await res.json();
+      setRuns(prev => {
+        const version = `v${prev.length + 1}`;
+        const newRun  = { version, runAt: data.runAt, systemPrompt: data.systemPrompt, averages: data.averages, results: data.results };
+        const updated = [...prev, newRun];
+        persistRuns(updated);
+        setPrimaryId(version);
+        setCompareId(null);
+        return updated;
+      });
     } catch (err) {
       setError(err.message);
     } finally {
-      setRunningBaseline(false);
+      setRunning(false);
     }
   }, []);
 
-  const runComparison = useCallback(async () => {
-    setRunningComparison(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/admin/evals/run', {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ systemPrompt: systemPrompt.trim() || undefined }),
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.error ?? `HTTP ${res.status}`);
-      }
-      setComparison(await res.json());
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setRunningComparison(false);
-    }
-  }, [systemPrompt]);
-
-  const isRunning   = runningBaseline || runningComparison;
-  const showCompare = !!(baseline && comparison);
+  const clearHistory = useCallback(() => {
+    if (!confirm('Clear all eval run history? This cannot be undone.')) return;
+    localStorage.removeItem(EVAL_STORAGE_KEY);
+    setRuns([]);
+    setPrimaryId(null);
+    setCompareId(null);
+  }, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
@@ -1759,21 +1868,21 @@ function EvalsTab({ t }) {
           Tests how well Claude (claude-sonnet-4-20250514) answers 10 financial questions across
           investing, markets, bonds, taxes, and more. Each response is scored by a second Claude
           call acting as judge across accuracy, hallucination risk, relevance, and tone (1–5).
-          Run the baseline first, then optionally test a custom system prompt to detect regressions.
+          Every run is versioned and saved locally — select any two to compare.
         </div>
         <button
-          onClick={runBaseline}
-          disabled={isRunning}
+          onClick={() => doRun(null)}
+          disabled={running}
           style={{
             fontFamily: M, fontSize: 12, letterSpacing: '0.06em',
-            padding: '10px 24px', borderRadius: 8, cursor: isRunning ? 'default' : 'pointer',
-            background: runningBaseline ? 'transparent' : t.accentDim,
-            border: `1px solid ${runningBaseline ? t.border : t.accentBorder}`,
-            color: runningBaseline ? t.text3 : t.accent,
+            padding: '10px 24px', borderRadius: 8, cursor: running ? 'default' : 'pointer',
+            background: running ? 'transparent' : t.accentDim,
+            border: `1px solid ${running ? t.border : t.accentBorder}`,
+            color: running ? t.text3 : t.accent,
             transition: 'all 0.15s',
           }}
         >
-          {runningBaseline ? '↻ running…' : baseline ? '↺ re-run baseline' : '▶ run evals'}
+          {running ? '↻ running…' : '▶ new run'}
         </button>
       </div>
 
@@ -1789,37 +1898,71 @@ function EvalsTab({ t }) {
       )}
 
       {/* Loading state */}
-      {isRunning && (
+      {running && (
         <div style={{
           fontFamily: M, fontSize: 11, color: t.text3, letterSpacing: '0.12em',
           padding: '40px', textAlign: 'center',
           background: t.surfaceAlt, borderRadius: 12, border: `1px solid ${t.border}`,
         }}>
-          {runningBaseline ? 'running baseline evals' : 'running comparison'}&nbsp;&nbsp;
-          <span style={{ fontSize: 10 }}>(~30s — evaluating 10 questions in parallel)</span>
+          running evals…&nbsp;&nbsp;<span style={{ fontSize: 10 }}>(~30s — evaluating 10 questions in parallel)</span>
         </div>
       )}
 
-      {/* Results */}
-      {baseline && !isRunning && (
+      {/* Score trend chart */}
+      {runs.length >= 2 && !running && (
+        <div>
+          <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase', marginBottom: 10 }}>
+            score trend
+          </div>
+          <div style={{ background: t.surfaceAlt, borderRadius: 10, padding: '12px 8px', border: `1px solid ${t.border}` }}>
+            <EvalTrendChart runs={runs} t={t} />
+          </div>
+        </div>
+      )}
+
+      {/* Run history */}
+      {runs.length > 0 && !running && (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase' }}>
+              run history&nbsp;
+              <span style={{ fontFamily: M, fontSize: 9, color: t.text3, letterSpacing: '0.06em' }}>
+                — acc · halluc · rel · tone
+              </span>
+            </div>
+            <button onClick={clearHistory} style={{
+              fontFamily: M, fontSize: 9, padding: '2px 8px', borderRadius: 4,
+              background: 'none', border: `1px solid ${t.border}`, color: t.text3, cursor: 'pointer',
+            }}>clear</button>
+          </div>
+          {[...runs].reverse().map(run => (
+            <EvalRunHistoryRow
+              key={run.version}
+              run={run}
+              isPrimary={run.version === primaryId}
+              isCompare={run.version === compareId}
+              onSelectPrimary={() => { setPrimaryId(run.version); setCompareId(null); }}
+              onSelectCompare={() => setCompareId(run.version === compareId ? null : run.version)}
+              t={t}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Results for selected run(s) */}
+      {primary && !running && (
         <>
           {/* Average score cards */}
           <div>
             <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase', marginBottom: 12 }}>
-              {showCompare ? 'comparison — averages (custom vs baseline)' : 'baseline — average scores'}
+              {showCompare ? `${compareId} vs ${primaryId} — average scores` : `${primaryId} — average scores`}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: 10 }}>
               {EVAL_SCORE_KEYS.map(key =>
                 showCompare ? (
-                  <EvalCompareAvgCard
-                    key={key}
-                    label={EVAL_SCORE_LABELS[key]}
-                    before={baseline.averages[key]}
-                    after={comparison.averages[key]}
-                    t={t}
-                  />
+                  <EvalCompareAvgCard key={key} label={EVAL_SCORE_LABELS[key]} before={primary.averages[key]} after={compare.averages[key]} t={t} />
                 ) : (
-                  <EvalAvgCard key={key} label={EVAL_SCORE_LABELS[key]} score={baseline.averages[key]} t={t} />
+                  <EvalAvgCard key={key} label={EVAL_SCORE_LABELS[key]} score={primary.averages[key]} t={t} />
                 )
               )}
             </div>
@@ -1828,22 +1971,23 @@ function EvalsTab({ t }) {
           {/* Run metadata */}
           <div style={{ fontFamily: M, fontSize: 10, color: t.text3 }}>
             {showCompare
-              ? `Baseline run: ${new Date(baseline.runAt).toLocaleTimeString()} · Comparison: ${new Date(comparison.runAt).toLocaleTimeString()}`
-              : `Run at ${new Date(baseline.runAt).toLocaleTimeString()} · prompt: "${baseline.systemPrompt.slice(0, 80)}${baseline.systemPrompt.length > 80 ? '…' : ''}"`
+              ? `${primaryId}: ${new Date(primary.runAt).toLocaleString()} · ${compareId}: ${new Date(compare.runAt).toLocaleString()}`
+              : `${primaryId} · ${new Date(primary.runAt).toLocaleString()} · "${primary.systemPrompt.slice(0, 70)}${primary.systemPrompt.length > 70 ? '…' : ''}"`
             }
           </div>
 
           {/* Per-question results */}
           <div>
             <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3, textTransform: 'uppercase', marginBottom: 12 }}>
-              {showCompare ? 'per-question comparison (scores: custom → delta vs baseline)' : 'per-question results'}
+              {showCompare ? `per-question — ${compareId} vs ${primaryId}` : 'per-question results'}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {baseline.results.map((result, i) => (
+              {primary.results.map(result => (
                 <EvalResultCard
                   key={result.id}
                   result={result}
-                  compareResult={showCompare ? comparison.results[i] : null}
+                  compareResult={showCompare ? compare.results.find(r => r.id === result.id) : null}
+                  allRuns={runs}
                   t={t}
                 />
               ))}
@@ -1851,45 +1995,40 @@ function EvalsTab({ t }) {
           </div>
 
           {/* Regression testing panel */}
-          <div style={{
-            padding: '20px', borderRadius: 12,
-            background: t.surfaceAlt, border: `1px solid ${t.border}`,
-          }}>
+          <div style={{ padding: '20px', borderRadius: 12, background: t.surfaceAlt, border: `1px solid ${t.border}` }}>
             <div style={{ fontFamily: M, fontSize: 11, letterSpacing: '0.1em', color: t.text3, marginBottom: 12, textTransform: 'uppercase' }}>
-              Regression Testing — Custom System Prompt
+              Run with Custom System Prompt
             </div>
             <div style={{ fontFamily: F, fontSize: 12, color: t.text3, marginBottom: 14, lineHeight: 1.5 }}>
-              Paste an alternative system prompt below and run the comparison to see scores side by side against the baseline.
-              Positive deltas are green, negative are red.
+              Paste an alternative system prompt to run a new versioned eval. The result will appear in history and you can compare any two runs.
             </div>
             <textarea
-              value={systemPrompt}
-              onChange={e => setSystemPrompt(e.target.value)}
+              value={customPrompt}
+              onChange={e => setCustomPrompt(e.target.value)}
               placeholder="You are a concise financial assistant. Answer in two sentences maximum…"
-              rows={6}
+              rows={5}
               style={{
                 width: '100%', boxSizing: 'border-box',
                 fontFamily: M, fontSize: 11, lineHeight: 1.7,
                 color: t.text1, background: t.surface,
                 border: `1px solid ${t.border}`, borderRadius: 8,
-                padding: '10px 14px', outline: 'none', resize: 'vertical',
-                marginBottom: 12,
+                padding: '10px 14px', outline: 'none', resize: 'vertical', marginBottom: 12,
               }}
             />
             <button
-              onClick={runComparison}
-              disabled={isRunning || !systemPrompt.trim()}
+              onClick={() => doRun(customPrompt.trim())}
+              disabled={running || !customPrompt.trim()}
               style={{
                 fontFamily: M, fontSize: 12, letterSpacing: '0.06em',
                 padding: '10px 24px', borderRadius: 8,
-                cursor: isRunning || !systemPrompt.trim() ? 'default' : 'pointer',
-                background: (isRunning || !systemPrompt.trim()) ? 'transparent' : 'rgba(99,102,241,0.1)',
-                border: `1px solid ${(isRunning || !systemPrompt.trim()) ? t.border : 'rgba(99,102,241,0.4)'}`,
-                color: (isRunning || !systemPrompt.trim()) ? t.text3 : '#6366f1',
+                cursor: running || !customPrompt.trim() ? 'default' : 'pointer',
+                background: (running || !customPrompt.trim()) ? 'transparent' : 'rgba(99,102,241,0.1)',
+                border: `1px solid ${(running || !customPrompt.trim()) ? t.border : 'rgba(99,102,241,0.4)'}`,
+                color: (running || !customPrompt.trim()) ? t.text3 : '#6366f1',
                 transition: 'all 0.15s',
               }}
             >
-              {runningComparison ? '↻ running comparison…' : '⟳ run comparison'}
+              {running ? '↻ running…' : '⟳ run with custom prompt'}
             </button>
           </div>
         </>
