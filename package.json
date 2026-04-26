@@ -16,7 +16,7 @@
     "lint": "eslint src",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
-    "prepare": "husky",
+    "prepare": "husky && playwright install --with-deps chromium",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test:storybook": "vitest run --project=storybook"
