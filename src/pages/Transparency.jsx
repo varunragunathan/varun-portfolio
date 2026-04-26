@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from '../hooks/useTheme';
 import { useResponsive } from '../hooks/useResponsive';
-import lighthouseHistoryStatic from '../../lighthouse/history.json';
-
 const PAGES_BASE     = 'https://varunragunathan.github.io/varun-portfolio';
 const LH_REPORTS_URL = `${PAGES_BASE}/lighthouse/`;
-const LH_HISTORY_URL = 'https://raw.githubusercontent.com/varunragunathan/varun-portfolio/main/lighthouse/history.json';
+const LH_HISTORY_URL = `${PAGES_BASE}/lighthouse/history.json`;
 
 const F = "'Outfit', sans-serif";
 const M = "'IBM Plex Mono', monospace";
@@ -53,7 +51,7 @@ function Row({ children, last }) {
 export default function Transparency() {
   const { t } = useTheme();
   const { isMobile } = useResponsive();
-  const [history, setHistory] = useState(lighthouseHistoryStatic);
+  const [history, setHistory] = useState([]);
 
   useEffect(() => {
     fetch(LH_HISTORY_URL)
