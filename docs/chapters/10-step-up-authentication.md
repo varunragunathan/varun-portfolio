@@ -47,7 +47,7 @@ The step-up flow has two endpoints:
 ```js
 // worker/auth/stepUp.js lines 43-63
 export async function stepUpOptions(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
   const creds = await getPasskeyCredsByUserId(env.varun_portfolio_auth, session.userId);
@@ -59,7 +59,7 @@ export async function stepUpOptions(request, env) {
     allowCredentials: creds.map(c => ({ id: c.id, type: 'public-key' })),
   });
 
-  await env.AUTH_KV.put(
+  await env.KV.put(
     `step_up_challenge:${session.userId}`,
     options.challenge,
     { expirationTtl: STEP_UP_TTL }, // 120 seconds
@@ -76,14 +76,14 @@ Note `userVerification: 'required'` (not `'preferred'`). For step-up, user verif
 ```js
 // worker/auth/stepUp.js lines 66-110
 export async function stepUpVerify(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   // ... verify the passkey response ...
   if (!verification.verified) return json({ error: 'Not verified' }, 400);
 
   await updateSignCount(env.varun_portfolio_auth, cred.id, verification.authenticationInfo.newCounter);
 
   const stepUpToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
-  await env.AUTH_KV.put(`step_up:${stepUpToken}`, session.userId, { expirationTtl: STEP_UP_TTL });
+  await env.KV.put(`step_up:${stepUpToken}`, session.userId, { expirationTtl: STEP_UP_TTL });
 
   return json({ ok: true, stepUpToken });
 }

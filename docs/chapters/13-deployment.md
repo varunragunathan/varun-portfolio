@@ -17,29 +17,53 @@ This chapter covers everything needed to deploy this project: Cloudflare account
 
 ## 13.2 `wrangler.toml` — Line by Line
 
+The file uses Cloudflare's named environment feature to keep development and production completely separate. The top-level config is the **development environment** (used by `wrangler dev`). The `[env.production]` section is the **production environment** (deployed via `--env production`).
+
 ```toml
-name = "varun-portfolio"
+name = "varun-portfolio-dev"
 compatibility_date = "2025-09-27"
 compatibility_flags = ["nodejs_compat"]
 main = "worker/index.js"
 ```
 
-- `name`: The Worker's name in the Cloudflare dashboard. Also used as the default route prefix.
-- `account_id`: Not required — wrangler infers it from your auth token. You may add it explicitly if you manage multiple Cloudflare accounts: `account_id = "<YOUR_CLOUDFLARE_ACCOUNT_ID>"`.
-- `compatibility_date`: The Workers runtime behavior snapshot. Set this to a recent date when creating a new project to get all current features. Do not roll it back — this can introduce breaking changes.
+- `name`: The default environment deploys to a Worker named `varun-portfolio-dev`. The production environment (below) overrides this to `varun-portfolio`, keeping the real worker name unchanged.
+- `compatibility_date`: The Workers runtime behavior snapshot. Do not roll back — this can introduce breaking changes.
 - `compatibility_flags = ["nodejs_compat"]`: Enables Node.js-compatible APIs needed by the `resend` npm package.
-- `main = "worker/index.js"`: The Worker entry point.
 
 ```toml
 [vars]
 ENABLE_AUTH = "true"
-RP_ID = "varunr.dev"
-ORIGIN = "https://varunr.dev"
+RP_ID = "localhost"
+ORIGIN = "http://localhost:8787"
+TWILIO_WHATSAPP_FROM = "whatsapp:+14155238886"
 ```
 
-- `ENABLE_AUTH`: Feature flag. Set to `"false"` to disable all auth routes (returns 404). Safe for deploying the portfolio without auth functionality.
-- `RP_ID`: The WebAuthn Relying Party ID. Must be the domain of the site. Must match the domain set during passkey registration. **Changing this after users have registered passkeys invalidates all existing passkeys.**
-- `ORIGIN`: The expected origin for WebAuthn verification. Must be `https://{your-domain}` in production. Used in `expectedOrigin()` to validate passkey assertions.
+These are **development defaults**. `wrangler dev` picks them up automatically — no `.dev.vars` overrides needed for these values. `RP_ID=localhost` allows WebAuthn to work in local dev without any extra config.
+
+```toml
+[[kv_namespaces]]
+binding = "KV"
+id = "..."
+preview_id = ""   # fill in after: npx wrangler kv namespace create KV-dev
+```
+
+`wrangler dev` (local mode) uses an in-process KV simulation — neither `id` nor `preview_id` is touched. `preview_id` only matters for `wrangler dev --remote` (opt-in remote testing). When left empty, `wrangler dev --remote` falls back to the production `id` — so fill it in if you run remote dev sessions.
+
+```toml
+[env.production]
+name = "varun-portfolio"
+
+[env.production.vars]
+ENABLE_AUTH = "true"
+RP_ID = "varunr.dev"
+ORIGIN = "https://varunr.dev"
+TWILIO_WHATSAPP_FROM = "whatsapp:+14155238886"
+```
+
+The production environment explicitly sets `name = "varun-portfolio"` to deploy to the same Worker as before (preventing Cloudflare from creating a new `varun-portfolio-production` Worker). All production bindings are fully declared in `[env.production.*]` sections below this block.
+
+- `RP_ID`: The WebAuthn Relying Party ID. Must be the domain of the site. **Changing this after users have registered passkeys invalidates all existing passkeys.**
+- `ORIGIN`: The expected origin for WebAuthn verification. Used in `expectedOrigin()` to validate passkey assertions.
 
 ```toml
 [assets]
@@ -61,11 +85,11 @@ database_id = "<YOUR_D1_DATABASE_ID>"
 
 ```toml
 [[kv_namespaces]]
-binding = "AUTH_KV"
+binding = "KV"
 id = "<YOUR_KV_NAMESPACE_ID>"
 ```
 
-- `binding`: How KV is accessed: `env.AUTH_KV`.
+- `binding`: How KV is accessed: `env.KV`.
 - `id`: The KV namespace ID assigned by Cloudflare.
 
 ```toml
@@ -106,13 +130,16 @@ The schema file is `worker/schema.sql`. It uses `CREATE TABLE IF NOT EXISTS` thr
 ## 13.4 Creating the KV Namespace
 
 ```bash
-# Create the KV namespace
-npx wrangler kv namespace create AUTH_KV
+# Create the production namespace
+npx wrangler kv namespace create KV
+# → copy the id into [[env.production.kv_namespaces]] id = "..."
 
-# Copy the id from the output and put it in wrangler.toml
+# Create the dev namespace (for wrangler dev --remote isolation)
+npx wrangler kv namespace create KV-dev
+# → copy the id into [[kv_namespaces]] preview_id = "..."
 ```
 
-For local dev, `wrangler dev` automatically creates a local KV store. You don't need to create a separate namespace for development.
+`wrangler dev` (local mode, the default) uses an in-process simulation — no cloud namespace is accessed. The `preview_id` only matters if you explicitly run `wrangler dev --remote`.
 
 ---
 
@@ -137,24 +164,22 @@ Switch to `new_sqlite_classes` in the `[[migrations]]` section.
 
 ## 13.6 Environment Variables and Secrets
 
-**Public vars (in `wrangler.toml`):**
-- `ENABLE_AUTH` — feature flag
-- `RP_ID` — WebAuthn RP ID (your domain)
-- `ORIGIN` — WebAuthn expected origin (your domain)
-- `TWILIO_WHATSAPP_FROM` — WhatsApp sandbox from-number (not a secret)
+**Public vars** are committed in `wrangler.toml` — separate blocks for dev and production. No action needed for these; they are already set correctly.
 
-**Secrets (set once via CLI, never committed):**
+**Secrets** are per-environment. All production secrets must be set with `--env production`:
+
 ```bash
-wrangler secret put ADMIN_EMAIL          # admin account email
-wrangler secret put RESEND_API_KEY       # from resend.com
-wrangler secret put TOTP_ENCRYPTION_KEY  # openssl rand -hex 32
-wrangler secret put TWILIO_ACCOUNT_SID   # from console.twilio.com
-wrangler secret put TWILIO_AUTH_TOKEN    # from console.twilio.com
+npx wrangler secret put ADMIN_EMAIL          --env production
+npx wrangler secret put RESEND_API_KEY       --env production
+npx wrangler secret put TOTP_ENCRYPTION_KEY  --env production
+npx wrangler secret put TWILIO_ACCOUNT_SID   --env production
+npx wrangler secret put TWILIO_AUTH_TOKEN    --env production
+npx wrangler secret put ANTHROPIC_API_KEY    --env production
 ```
 
-Secrets are stored encrypted by Cloudflare and injected into the Worker as `env.*`. They are never visible in the dashboard, in `wrangler.toml`, or in the repository.
+Secrets are stored encrypted by Cloudflare, scoped to their environment, and injected as `env.*`. They are never visible in the dashboard, `wrangler.toml`, or the repository.
 
-For local development, copy `.dev.vars.example` to `.dev.vars` and fill in real values. `.dev.vars` is gitignored.
+For **local development**, copy `.dev.vars.example` to `.dev.vars` and fill in values. Dev secrets (ADMIN_EMAIL, API keys) are read from `.dev.vars` by `wrangler dev`. `.dev.vars` is gitignored. Unlike before, you do not need to set `RP_ID` or `ORIGIN` in `.dev.vars` — they are already `localhost`/`http://localhost:8787` in the default `[vars]` block.
 
 ---
 
@@ -162,45 +187,40 @@ For local development, copy `.dev.vars.example` to `.dev.vars` and fill in real 
 
 ```bash
 # Install dependencies
-npm install
+yarn install
 
-# Build the React frontend
-npm run build
+# Local dev (build + wrangler dev)
+yarn wd
 
-# Build + deploy to Cloudflare
-npx wrangler deploy
+# Deploy to production
+yarn deploy
+# equivalent to: yarn build && npx wrangler deploy --env production
 ```
 
-`npm run build` runs Vite and outputs the React bundle to `dist/`. `wrangler deploy` then uploads both the Worker code (`worker/`) and the static assets (`dist/`) to Cloudflare.
+`yarn build` runs Vite and outputs the React bundle to `dist/`. `wrangler deploy --env production` uploads both the Worker code (`worker/`) and the static assets (`dist/`) under the `[env.production]` configuration — the production KV namespace, production vars, and production D1 binding.
 
-The `package.json` includes a convenience script:
-```json
-"wd": "npm run build && npx wrangler dev"
-```
-This builds and starts the local dev server in one command.
+**Never run `npx wrangler deploy` without `--env production` on this project** — it would deploy the dev-configured worker (RP_ID=localhost) to the `varun-portfolio-dev` worker name, not to production.
 
 ---
 
 ## 13.8 Local Development
 
-Local dev uses `wrangler dev`:
-
 ```bash
-npm run wd
-# or: npm run build && npx wrangler dev
+yarn wd
+# equivalent to: yarn build && npx wrangler dev
 ```
 
-`wrangler dev` starts a local Worker that:
-- Binds to a local port (typically `http://localhost:8787`)
-- Uses a local D1 database (`.wrangler/state/v3/d1/`)
-- Uses local KV (`.wrangler/state/v3/kv/`)
+`wrangler dev` (local mode) starts a fully isolated local Worker:
+- Binds to `http://localhost:8787`
+- Uses a local D1 database at `.wrangler/state/v3/d1/` — production D1 is never touched
+- Uses in-process KV simulation at `.wrangler/state/v3/kv/` — production KV is never touched
 - Simulates Durable Objects locally
 
-**The local origin problem and fix:**
+**RP_ID and ORIGIN are already correct for local dev.** The default `[vars]` in `wrangler.toml` sets `RP_ID=localhost` and `ORIGIN=http://localhost:8787`. No `.dev.vars` override is needed for these.
 
-When running locally, the Worker serves at `http://localhost:8787` (or a different port — wrangler dev picks an available port). The Vite dev server runs at `http://localhost:5173`. These are different origins.
+**`.dev.vars` is only for secrets.** Copy `.dev.vars.example` → `.dev.vars` and fill in your actual keys (ADMIN_EMAIL, RESEND_API_KEY, etc.). These are picked up automatically by `wrangler dev`.
 
-For WebAuthn, the `expectedOrigin` must match the origin in the authenticator data. The fix in `worker/auth/passkey.js`:
+**The origin flexibility fix** in `worker/auth/passkey.js`:
 
 ```js
 function expectedOrigin(request, env) {
@@ -212,25 +232,7 @@ function expectedOrigin(request, env) {
 }
 ```
 
-In local dev, the origin is taken from the request's `Origin` header. This works regardless of which port wrangler dev chose.
-
-**The RP_ID in local dev:**
-
-WebAuthn's `rpID` must match the effective domain. `varunr.dev` cannot be used locally (the browser won't match it). For local development, you need to either:
-
-1. Use `localhost` as the `rpID` — requires overriding the env var locally
-2. Use a `.dev.vars` file (the local equivalent of `wrangler.toml` vars for local dev):
-
-```
-# .dev.vars (not committed, gitignored)
-RP_ID=localhost
-ORIGIN=http://localhost:8787
-RESEND_API_KEY=re_your_key_here
-```
-
-Then run `wrangler dev` — it will read `.dev.vars` for local environment variables.
-
-**Note:** `.dev.vars` is not committed to the repository. Add it to `.gitignore`.
+In local dev, the origin is taken from the request's `Origin` header rather than `env.ORIGIN`. This works regardless of which port the browser is on.
 
 ---
 
@@ -260,7 +262,7 @@ push to main
 
 ### Deploy workflow
 
-Triggers on push to `main`. Runs `npm run build && wrangler deploy`. Requires two GitHub secrets:
+Triggers on push to `main`. Runs `yarn build && npx wrangler deploy --env production`. Requires two GitHub secrets:
 
 ```
 CLOUDFLARE_API_TOKEN   — from Cloudflare dashboard → My Profile → API Tokens
@@ -411,11 +413,12 @@ The workflow checks whether a PR already exists for the current commit SHA (bran
 
 ## Key Takeaways
 
+- **Two environments, one file.** The default `wrangler.toml` config is dev (safe localhost values). `[env.production]` holds all production config. Deploy with `--env production`; develop without it.
+- **Never `wrangler deploy` without `--env production`** — it would push dev config (RP_ID=localhost) to the wrong worker name.
+- **Secrets are per-environment.** Always use `npx wrangler secret put KEY --env production` for production secrets. Dev secrets go in `.dev.vars`.
+- **Local dev never touches production data.** `wrangler dev` uses in-process KV and local SQLite — no cloud resources are accessed.
 - `new_sqlite_classes` (not `new_classes`) is required for Durable Objects on the Cloudflare free plan.
 - `RP_ID` and `ORIGIN` are critical — changing them after users register passkeys invalidates all existing credentials.
-- Five secrets must be set via `wrangler secret put` before the Worker will function: `ADMIN_EMAIL`, `RESEND_API_KEY`, `TOTP_ENCRYPTION_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`.
 - `account_id` is optional in `wrangler.toml` — wrangler infers it from your auth token.
-- Local dev requires `.dev.vars` (copy from `.dev.vars.example`) to override `RP_ID=localhost` and `ORIGIN=http://localhost:8787`.
-- Deployment is two steps: `npm run build` (Vite) then `wrangler deploy` (uploads Worker + assets).
 - Three GitHub Actions chain together: Deploy → Lighthouse → Lighthouse AI Fix. Each triggers only when the previous one succeeds.
 - `LIGHTHOUSE_PUSH_TOKEN` (GitHub PAT, `repo` scope) is required for the Lighthouse bot to push commits. `GEMINI_API_KEY` (from aistudio.google.com) is required for the AI fix workflow.

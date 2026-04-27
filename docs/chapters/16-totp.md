@@ -142,7 +142,7 @@ Disabling TOTP requires a step-up authentication — the same passkey re-authent
 ```js
 // worker/auth/totp.js — POST /api/auth/totp/disable
 const { stepUpToken } = await request.json().catch(() => ({}));
-const valid = await consumeStepUpToken(env.AUTH_KV, stepUpToken, session.userId);
+const valid = await consumeStepUpToken(env.KV, stepUpToken, session.userId);
 if (!valid) return json({ error: 'Step-up verification required' }, 403);
 
 await env.varun_portfolio_auth
@@ -175,7 +175,7 @@ try {
 const valid = await verifyTotp(secret, code);
 if (!valid) return deny();
 
-const pendingToken = await createPendingSession(env.AUTH_KV, {
+const pendingToken = await createPendingSession(env.KV, {
   userId: user.id,
   email:  user.email,
 });

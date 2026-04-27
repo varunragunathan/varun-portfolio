@@ -33,7 +33,7 @@ Browser
   ▼
 Cloudflare Worker (worker/index.js → worker/chat.js: postChat)
   │
-  ├── getSession(env.AUTH_KV, request)        ← session check (KV lookup)
+  ├── getSession(env.KV, request)        ← session check (KV lookup)
   ├── getOrCreateConversation(db, ...)         ← D1 write (first turn)
   ├── getConversationHistory(db, convId)       ← D1 read (last 10 turns)
   │
@@ -275,7 +275,7 @@ The route handler is `postChat` in `worker/chat.js`, called by `worker/index.js`
 
 ```js
 // worker/chat.js — postChat
-const session = await getSession(env.AUTH_KV, request);
+const session = await getSession(env.KV, request);
 if (!session) return json({ error: 'Unauthorized' }, 401);
 ```
 

@@ -24,18 +24,18 @@ async function loadPrefs(kv, userId) {
 }
 
 export async function getPreferences(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
-  const prefs = await loadPrefs(env.AUTH_KV, session.userId);
+  const prefs = await loadPrefs(env.KV, session.userId);
   return json({ prefs });
 }
 
 export async function updatePreferences(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
   const body = await request.json().catch(() => ({}));
-  const prefs = await loadPrefs(env.AUTH_KV, session.userId);
+  const prefs = await loadPrefs(env.KV, session.userId);
 
   if (body.colorBlindMode !== undefined) {
     if (!VALID_CBM.has(body.colorBlindMode))
@@ -48,6 +48,6 @@ export async function updatePreferences(request, env) {
     prefs.themePref = body.themePref;
   }
 
-  await env.AUTH_KV.put(`prefs:${session.userId}`, JSON.stringify(prefs));
+  await env.KV.put(`prefs:${session.userId}`, JSON.stringify(prefs));
   return json({ ok: true, prefs });
 }

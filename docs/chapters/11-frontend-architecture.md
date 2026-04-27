@@ -166,7 +166,7 @@ User preferences are stored in two places:
 | Store | Key | Purpose |
 |---|---|---|
 | `localStorage` | `theme-pref` | Fast load on boot — avoids flash before auth resolves |
-| `AUTH_KV` | `prefs:{userId}` | Source of truth — persisted across devices and browsers |
+| `KV` | `prefs:{userId}` | Source of truth — persisted across devices and browsers |
 
 On login, the KV value wins: `user.preferences` from `/api/auth/me` is applied to ThemeProvider, overwriting the localStorage cache. Changes are written to both simultaneously.
 

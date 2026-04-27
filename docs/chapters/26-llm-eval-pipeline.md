@@ -2,7 +2,7 @@
 
 ## What You'll Learn
 
-This chapter documents the LLM evaluation pipeline built into the admin dashboard. It covers the two-phase architecture (generate then judge), the hardcoded financial Q&A dataset, how scoring works, how to use the baseline/comparison workflow to detect regressions, and where each piece of code lives.
+This chapter documents the LLM evaluation pipeline built into the admin dashboard. It covers the two-phase architecture (generate then judge), the hardcoded financial Q&A dataset, how scoring works, the versioned run history persisted in Cloudflare KV, the score trend chart, and where each piece of code lives.
 
 ---
 
@@ -195,15 +195,23 @@ The worker reads it via `env.ANTHROPIC_API_KEY` at runtime. If the variable is a
 
 The **LLM Evals** tab is the seventh tab in the admin dashboard (index 6). It lives in `src/pages/Admin.jsx` starting at the `EvalsTab` component.
 
+### Run history and versioning
+
+Every run is automatically assigned a version (`v1`, `v2`, …) and a timestamp. Runs are persisted server-side in Cloudflare KV under the key `eval:runs` (up to the last 50), so history survives page reloads, different browsers, and different origins. On mount, `EvalsTab` fetches the full history from `GET /api/admin/evals/runs` and restores the most recent run as the selected primary.
+
 ### Workflow
 
-1. **Run baseline** — click "▶ run evals". No body is sent; the default system prompt is used. Results and per-dimension averages are stored in React state.
+1. **Click "▶ new run"** — a new versioned run is created and appended to history. The run is saved to KV on the server before the response is returned, so it persists immediately.
 
-2. **Enter a custom system prompt** — type into the textarea that appears after the baseline run completes.
+2. **Inspect the run** — average score cards and per-question cards appear. Expanding a question card shows the model's response and the judge's one-sentence reasoning.
 
-3. **Run comparison** — click "▶ compare". The custom prompt is sent in the request body. Comparison results are stored separately.
+3. **Compare two runs** — in the run history list, one run is marked as "primary" (highlighted in accent color). Click "cmp" on any other run to set it as the comparison target. The question cards switch to a two-column grid:
+   - **Left column** — primary run response + judge reasoning, neutral border
+   - **Right column** — comparison run response + judge reasoning, accent border
 
-4. **Inspect** — average score cards switch to delta view (custom vs baseline, with colored arrows). Each question card shows score pills with before/after deltas. Expanding a card shows both the baseline response and the custom prompt response side by side.
+4. **Score trend chart** — once two or more runs exist, a multi-line SVG chart appears above the history list, plotting all four dimensions (accuracy, hallucination risk, relevance, tone) across every run. Each question card also shows a tiny sparkline of its own scores across all runs.
+
+5. **Clear history** — the "clear" button calls `DELETE /api/admin/evals/runs`, which deletes the KV key and resets state.
 
 ### Score color scale
 
@@ -217,12 +225,7 @@ The **LLM Evals** tab is the seventh tab in the admin dashboard (index 6). It li
 
 ### Side-by-side response view
 
-When a comparison run exists, expanding a question card renders a two-column grid:
-
-- **Left column** — baseline response + judge reasoning, neutral left border
-- **Right column** — custom prompt response + judge reasoning, accent-colored left border
-
-This makes it immediately visible whether the custom prompt produced a different (and better or worse) answer. Styles for this grid live in `src/pages/Admin.css` under `.eval-compare-grid` and related classes.
+When a comparison run is selected, expanding a question card renders a two-column grid. Styles for this grid live in `src/pages/Admin.css` under `.eval-compare-grid` and related classes.
 
 ---
 
@@ -253,9 +256,11 @@ If you pass a system prompt like "You are a poet. Respond in poems related to li
 
 | File | Role |
 |------|------|
-| `worker/evals.js` | All backend logic: dataset, Anthropic API calls, judge prompt, JSON parsing, HTTP handler |
-| `worker/index.js:138` | Route registration: `POST /api/admin/evals/run` → `runEvals` |
-| `src/pages/Admin.jsx:1505` | Frontend: `EvalsTab`, `EvalResultCard`, score pills, compare cards |
-| `src/pages/Admin.css` | Styles for response expansion and compare grid |
+| `worker/evals.js` | All backend logic: dataset, Anthropic API calls, judge prompt, JSON parsing, KV persistence, HTTP handlers |
+| `worker/index.js:138` | Route: `GET /api/admin/evals/runs` → `getEvalRuns` |
+| `worker/index.js:140` | Route: `DELETE /api/admin/evals/runs` → `deleteEvalRuns` |
+| `worker/index.js:142` | Route: `POST /api/admin/evals/run` → `runEvals` |
+| `src/pages/Admin.jsx` | Frontend: `EvalsTab`, `EvalResultCard`, `EvalTrendChart`, `EvalQuestionTrend`, `EvalRunHistoryRow` |
+| `src/pages/Admin.css` | Styles for response expansion, compare grid, trend chart, history rows |
 | `.dev.vars` | Local API key (gitignored) |
 | `wrangler secret put ANTHROPIC_API_KEY` | Production key storage |

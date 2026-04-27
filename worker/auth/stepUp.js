@@ -41,7 +41,7 @@ export async function consumeStepUpToken(kv, token, expectedUserId) {
 // POST /api/auth/step-up/options
 // Requires active session. Returns passkey auth challenge for the current user.
 export async function stepUpOptions(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
   const creds = await getPasskeyCredsByUserId(env.varun_portfolio_auth, session.userId);
@@ -53,7 +53,7 @@ export async function stepUpOptions(request, env) {
     allowCredentials: creds.map(c => ({ id: c.id, type: 'public-key' })),
   });
 
-  await env.AUTH_KV.put(
+  await env.KV.put(
     `step_up_challenge:${session.userId}`,
     options.challenge,
     { expirationTtl: STEP_UP_TTL },
@@ -65,16 +65,16 @@ export async function stepUpOptions(request, env) {
 // POST /api/auth/step-up/verify
 // Verifies the passkey response, issues a short-lived stepUpToken.
 export async function stepUpVerify(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
   const body = await request.json().catch(() => ({}));
   const { authResponse } = body;
   if (!authResponse) return json({ error: 'Missing authResponse' }, 400);
 
-  const challenge = await env.AUTH_KV.get(`step_up_challenge:${session.userId}`);
+  const challenge = await env.KV.get(`step_up_challenge:${session.userId}`);
   if (!challenge) return json({ error: 'Challenge expired. Please try again.' }, 400);
-  await env.AUTH_KV.delete(`step_up_challenge:${session.userId}`);
+  await env.KV.delete(`step_up_challenge:${session.userId}`);
 
   const cred = await getPasskeyCredById(env.varun_portfolio_auth, authResponse.id);
   if (!cred || cred.user_id !== session.userId) return json({ error: 'Credential not found' }, 400);
@@ -104,7 +104,7 @@ export async function stepUpVerify(request, env) {
   await updateSignCount(env.varun_portfolio_auth, cred.id, verification.authenticationInfo.newCounter);
 
   const stepUpToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
-  await env.AUTH_KV.put(`step_up:${stepUpToken}`, session.userId, { expirationTtl: STEP_UP_TTL });
+  await env.KV.put(`step_up:${stepUpToken}`, session.userId, { expirationTtl: STEP_UP_TTL });
 
   return json({ ok: true, stepUpToken });
 }

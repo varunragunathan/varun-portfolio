@@ -41,7 +41,7 @@ export async function handleAuth(request, env, url) {
   const ip     = request.headers.get('CF-Connecting-IP');
 
   // ── Broad IP limit: 30 req / 10 min across all auth endpoints ───
-  const broad = await checkIpRateLimit(env.AUTH_KV, ip, 'auth', 30, 10 * 60_000);
+  const broad = await checkIpRateLimit(env.KV, ip, 'auth', 30, 10 * 60_000);
   if (!broad.allowed) return tooManyRequests(broad.retryAfter);
 
   // ── Tight IP limit: 5 req / 10 min for OTP and recovery send ────
@@ -51,7 +51,7 @@ export async function handleAuth(request, env, url) {
     path === '/whatsapp/signin/send'
   ));
   if (isSensitive) {
-    const tight = await checkIpRateLimit(env.AUTH_KV, ip, 'otp', 5, 10 * 60_000);
+    const tight = await checkIpRateLimit(env.KV, ip, 'otp', 5, 10 * 60_000);
     if (!tight.allowed) return tooManyRequests(tight.retryAfter);
   }
 

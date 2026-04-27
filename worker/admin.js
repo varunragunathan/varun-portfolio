@@ -47,7 +47,7 @@ export async function requireAdmin(session, env) {
 
 // GET /api/admin/upgrade-requests[?status=pending]
 export async function listUpgradeRequests(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   const guard = await requireAdmin(session, env);
   if (guard) return guard;
 
@@ -83,7 +83,7 @@ export async function listUpgradeRequests(request, env) {
 
 // POST /api/admin/upgrade-requests/:id/approve
 export async function approveUpgrade(request, env, id) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   const guard = await requireAdmin(session, env);
   if (guard) return guard;
 
@@ -110,7 +110,7 @@ export async function approveUpgrade(request, env, id) {
 
 // POST /api/admin/upgrade-requests/:id/reject
 export async function rejectUpgrade(request, env, id) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   const guard = await requireAdmin(session, env);
   if (guard) return guard;
 
@@ -137,7 +137,7 @@ export async function rejectUpgrade(request, env, id) {
 
 // GET /api/admin/users
 export async function listAdminUsers(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   const guard = await requireAdmin(session, env);
   if (guard) return guard;
 
@@ -155,7 +155,7 @@ export async function listAdminUsers(request, env) {
 
 // GET /api/admin/models
 export async function listAdminModels(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   const guard = await requireAdmin(session, env);
   if (guard) return guard;
 
@@ -170,7 +170,7 @@ export async function listAdminModels(request, env) {
 // POST /api/admin/models
 // Body: { model_id, label, tier }
 export async function addAdminModel(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   const guard = await requireAdmin(session, env);
   if (guard) return guard;
 
@@ -206,12 +206,12 @@ export async function addAdminModel(request, env) {
 // POST /api/admin/users/:id/make-admin
 // Body: { stepUpToken }  — step-up verification required
 export async function makeAdminUser(request, env, userId) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   const guard = await requireAdmin(session, env);
   if (guard) return guard;
 
   const { stepUpToken } = await request.json().catch(() => ({}));
-  const valid = await consumeStepUpToken(env.AUTH_KV, stepUpToken, session.userId);
+  const valid = await consumeStepUpToken(env.KV, stepUpToken, session.userId);
   if (!valid) return json({ error: 'Step-up verification required' }, 403);
 
   const db     = env.varun_portfolio_auth;
@@ -227,12 +227,12 @@ export async function makeAdminUser(request, env, userId) {
 // Body: { stepUpToken }  — step-up verification required
 // Only upgrades student → pro (no-ops on other roles).
 export async function makeProUser(request, env, userId) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   const guard = await requireAdmin(session, env);
   if (guard) return guard;
 
   const { stepUpToken } = await request.json().catch(() => ({}));
-  const valid = await consumeStepUpToken(env.AUTH_KV, stepUpToken, session.userId);
+  const valid = await consumeStepUpToken(env.KV, stepUpToken, session.userId);
   if (!valid) return json({ error: 'Step-up verification required' }, 403);
 
   const db     = env.varun_portfolio_auth;
@@ -250,12 +250,12 @@ const PERSONA_ROLES = ['user', 'pro', 'student', 'admin'];
 
 // GET /api/admin/personas
 export async function getPersonas(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   const guard = await requireAdmin(session, env);
   if (guard) return guard;
 
   const entries = await Promise.all(
-    PERSONA_ROLES.map(async role => [role, await env.AUTH_KV.get(`persona:${role}`)])
+    PERSONA_ROLES.map(async role => [role, await env.KV.get(`persona:${role}`)])
   );
   return json(Object.fromEntries(entries));
 }
@@ -263,7 +263,7 @@ export async function getPersonas(request, env) {
 // PUT /api/admin/personas
 // Body: { user?: string, pro?: string, student?: string, admin?: string }
 export async function updatePersonas(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   const guard = await requireAdmin(session, env);
   if (guard) return guard;
 
@@ -272,7 +272,7 @@ export async function updatePersonas(request, env) {
   await Promise.all(
     PERSONA_ROLES
       .filter(role => typeof body[role] === 'string' && body[role].trim())
-      .map(role => env.AUTH_KV.put(`persona:${role}`, body[role].trim()))
+      .map(role => env.KV.put(`persona:${role}`, body[role].trim()))
   );
 
   return json({ ok: true });
@@ -280,7 +280,7 @@ export async function updatePersonas(request, env) {
 
 // PATCH /api/admin/models/:id  — flip enabled 0↔1
 export async function toggleAdminModel(request, env, id) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   const guard = await requireAdmin(session, env);
   if (guard) return guard;
 

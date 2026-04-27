@@ -106,7 +106,7 @@ Users with `role = 'user'` have a "Make Admin" button. Clicking it triggers a st
 ```js
 // worker/admin.js — makeAdminUser
 const { stepUpToken } = await request.json().catch(() => ({}));
-const valid = await consumeStepUpToken(env.AUTH_KV, stepUpToken, session.userId);
+const valid = await consumeStepUpToken(env.KV, stepUpToken, session.userId);
 if (!valid) return json({ error: 'Step-up required' }, 403);
 
 await db.prepare('UPDATE users SET role = ? WHERE id = ?').bind('admin', userId).run();
@@ -119,7 +119,7 @@ Users with `role = 'student'` have a "Make Pro" button. Like "Make Admin", it re
 ```js
 // worker/admin.js — makeProUser
 const { stepUpToken } = await request.json().catch(() => ({}));
-const valid = await consumeStepUpToken(env.AUTH_KV, stepUpToken, session.userId);
+const valid = await consumeStepUpToken(env.KV, stepUpToken, session.userId);
 if (!valid) return json({ error: 'Step-up required' }, 403);
 if (target.role !== 'student') return json({ error: 'User is not a student' }, 400);
 await db.prepare('UPDATE users SET role = ? WHERE id = ?').bind('pro', userId).run();
@@ -153,7 +153,7 @@ Saving calls `PUT /api/admin/personas` with the updated prompts. The handler wri
 // worker/admin.js — updatePersonas
 for (const role of ['user', 'pro', 'student', 'admin']) {
   if (body[role]?.systemPrompt !== undefined) {
-    await env.AUTH_KV.put(`persona:${role}`, JSON.stringify({ systemPrompt: body[role].systemPrompt }));
+    await env.KV.put(`persona:${role}`, JSON.stringify({ systemPrompt: body[role].systemPrompt }));
   }
 }
 ```

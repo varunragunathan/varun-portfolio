@@ -38,11 +38,11 @@ export async function finaliseSession(request, env) {
   const { token, trusted, deviceName } = body;
   if (!token) return json({ error: 'Missing token' }, 400);
 
-  const raw = await env.AUTH_KV.get(`session_pending:${token}`);
+  const raw = await env.KV.get(`session_pending:${token}`);
   if (!raw) return json({ error: 'Session expired or invalid' }, 400);
 
   const { userId, email } = JSON.parse(raw);
-  await env.AUTH_KV.delete(`session_pending:${token}`);
+  await env.KV.delete(`session_pending:${token}`);
 
   const isTrusted = trusted === true;
   const TTL = isTrusted ? 30 * 86400 : 86400;
@@ -53,7 +53,7 @@ export async function finaliseSession(request, env) {
   const tokenHash = await sha256Hex(token);
   const expiresAt = Date.now() + TTL * 1000;
 
-  await env.AUTH_KV.put(
+  await env.KV.put(
     `session:${tokenHash}`,
     JSON.stringify({ userId, email, sessionId }),
     { expirationTtl: TTL }
@@ -179,7 +179,7 @@ export async function revokeSession(request, env, sessionId) {
     .bind(sessionId, session.userId)
     .first();
   if (record) {
-    await env.AUTH_KV.delete(`session:${record.token_hash}`);
+    await env.KV.delete(`session:${record.token_hash}`);
   }
 
   await deleteSessionById(db, sessionId, session.userId);
@@ -198,7 +198,7 @@ const others = await db
   .prepare('SELECT token_hash FROM sessions WHERE user_id = ? AND id != ?')
   .bind(session.userId, currentSession.id)
   .all();
-await Promise.all((others.results ?? []).map(r => env.AUTH_KV.delete(`session:${r.token_hash}`)));
+await Promise.all((others.results ?? []).map(r => env.KV.delete(`session:${r.token_hash}`)));
 await deleteAllSessionsByUserIdExcept(db, session.userId, currentSession.id);
 ```
 

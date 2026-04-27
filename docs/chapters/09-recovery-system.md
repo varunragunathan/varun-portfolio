@@ -46,7 +46,7 @@ export async function recoverySignIn(request, env) {
   await logSecurityEvent(db, { userId: user.id, type: 'recovery_signin', ... });
 
   // Issue pending session — passkeys and existing sessions untouched
-  const pendingToken = await createPendingSession(env.AUTH_KV, { userId: user.id, email });
+  const pendingToken = await createPendingSession(env.KV, { userId: user.id, email });
   return json({ ok: true, pendingToken });
 }
 ```
@@ -100,7 +100,7 @@ await deleteAllSessionsByUserId(db, user.id);
 await logSecurityEvent(db, { userId: user.id, type: 'account_recovery', ... });
 
 const recoveryToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
-await env.AUTH_KV.put(
+await env.KV.put(
   `recovery_gate:${recoveryToken}`,
   JSON.stringify({ userId: user.id, email }),
   { expirationTtl: 300 },
@@ -117,7 +117,7 @@ The `recoveryToken` is passed to `POST /passkey/register/options`. The endpoint 
 ```js
 // worker/auth/passkey.js lines 47-49
 if (recoveryToken) {
-  const gate = await env.AUTH_KV.get(`recovery_gate:${recoveryToken}`);
+  const gate = await env.KV.get(`recovery_gate:${recoveryToken}`);
   if (!gate) return json({ error: 'Recovery session expired. Please start again.' }, 403);
 }
 ```

@@ -47,14 +47,14 @@ export async function recoveryStart(request, env) {
 
   // Rate limit by IP + email
   const rateLimitKey = `recovery_rate:${email}`;
-  const rateLimitRaw = await env.AUTH_KV.get(rateLimitKey);
+  const rateLimitRaw = await env.KV.get(rateLimitKey);
   const rateData = rateLimitRaw ? JSON.parse(rateLimitRaw) : { count: 0, first: Date.now() };
 
   if (rateData.count >= RATE_LIMIT) {
     return json({ error: 'Too many recovery attempts. Please wait 10 minutes.' }, 429);
   }
 
-  await env.AUTH_KV.put(
+  await env.KV.put(
     rateLimitKey,
     JSON.stringify({ count: rateData.count + 1, first: rateData.first }),
     { expirationTtl: RATE_WINDOW },
@@ -99,7 +99,7 @@ export async function recoveryStart(request, env) {
   let hasTOTP = false;
   if (user.totp_enabled && user.totp_secret && env.TOTP_ENCRYPTION_KEY) {
     hasTOTP = true;
-    await env.AUTH_KV.put(
+    await env.KV.put(
       `recovery_totp_pending:${email}`,
       JSON.stringify({ userId: user.id }),
       { expirationTtl: 600 },
@@ -110,7 +110,7 @@ export async function recoveryStart(request, env) {
   const arr = new Uint32Array(1);
   crypto.getRandomValues(arr);
   const otp = String(100000 + (arr[0] % 900000));
-  await env.AUTH_KV.put(`recovery_otp:${email}`, otp, { expirationTtl: 600 });
+  await env.KV.put(`recovery_otp:${email}`, otp, { expirationTtl: 600 });
 
   const { Resend } = await import('resend');
   const resend = new Resend(env.RESEND_API_KEY);
@@ -147,12 +147,12 @@ export async function recoverySignIn(request, env) {
 
   // Rate limit by email
   const rateLimitKey = `recovery_signin_rate:${email}`;
-  const rateLimitRaw = await env.AUTH_KV.get(rateLimitKey);
+  const rateLimitRaw = await env.KV.get(rateLimitKey);
   const rateData = rateLimitRaw ? JSON.parse(rateLimitRaw) : { count: 0 };
   if (rateData.count >= RATE_LIMIT) {
     return json({ error: 'Too many attempts. Please wait 10 minutes.' }, 429);
   }
-  await env.AUTH_KV.put(
+  await env.KV.put(
     rateLimitKey,
     JSON.stringify({ count: rateData.count + 1 }),
     { expirationTtl: RATE_WINDOW },
@@ -181,7 +181,7 @@ export async function recoverySignIn(request, env) {
   });
 
   // Issue pending session — passkeys and existing sessions untouched
-  const pendingToken = await createPendingSession(env.AUTH_KV, { userId: user.id, email, method: 'recovery_code' });
+  const pendingToken = await createPendingSession(env.KV, { userId: user.id, email, method: 'recovery_code' });
   return json({ ok: true, pendingToken });
 }
 
@@ -194,7 +194,7 @@ export async function recoveryVerifyTOTP(request, env) {
   const { email, totpCode } = body;
   if (!email || !totpCode) return json({ error: 'Missing fields' }, 400);
 
-  const pendingRaw = await env.AUTH_KV.get(`recovery_totp_pending:${email}`);
+  const pendingRaw = await env.KV.get(`recovery_totp_pending:${email}`);
   if (!pendingRaw) return json({ error: 'No recovery in progress or session expired.' }, 400);
 
   const { userId } = JSON.parse(pendingRaw);
@@ -217,10 +217,10 @@ export async function recoveryVerifyTOTP(request, env) {
 
   if (!await verifyTotp(secret, totpCode)) return json({ error: 'Invalid code.' }, 400);
 
-  await env.AUTH_KV.delete(`recovery_totp_pending:${email}`);
+  await env.KV.delete(`recovery_totp_pending:${email}`);
 
   await deleteAllPasskeyCredsByUserId(db, userId);
-  await deleteAllSessionsByUserId(db, env.AUTH_KV, userId);
+  await deleteAllSessionsByUserId(db, env.KV, userId);
 
   await logSecurityEvent(db, {
     userId, type: 'account_recovery',
@@ -229,7 +229,7 @@ export async function recoveryVerifyTOTP(request, env) {
   });
 
   const recoveryToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
-  await env.AUTH_KV.put(
+  await env.KV.put(
     `recovery_gate:${recoveryToken}`,
     JSON.stringify({ userId, email }),
     { expirationTtl: 300 },
@@ -246,11 +246,11 @@ export async function recoveryVerify(request, env) {
   const { email, otp } = body;
   if (!email || !otp) return json({ error: 'Missing fields' }, 400);
 
-  const stored = await env.AUTH_KV.get(`recovery_otp:${email}`);
+  const stored = await env.KV.get(`recovery_otp:${email}`);
   if (!stored || stored !== String(otp)) {
     return json({ error: 'Invalid or expired OTP.' }, 400);
   }
-  await env.AUTH_KV.delete(`recovery_otp:${email}`);
+  await env.KV.delete(`recovery_otp:${email}`);
 
   const db = env.varun_portfolio_auth;
   const user = await getUserByEmail(db, email);
@@ -258,7 +258,7 @@ export async function recoveryVerify(request, env) {
 
   // Wipe all existing passkeys and sessions — clean slate for re-registration
   await deleteAllPasskeyCredsByUserId(db, user.id);
-  await deleteAllSessionsByUserId(db, env.AUTH_KV, user.id);
+  await deleteAllSessionsByUserId(db, env.KV, user.id);
 
   await logSecurityEvent(db, {
     userId: user.id, type: 'account_recovery',
@@ -268,7 +268,7 @@ export async function recoveryVerify(request, env) {
 
   // Issue a recovery gate token (used as recoveryToken in register options)
   const recoveryToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
-  await env.AUTH_KV.put(
+  await env.KV.put(
     `recovery_gate:${recoveryToken}`,
     JSON.stringify({ userId: user.id, email }),
     { expirationTtl: 300 },

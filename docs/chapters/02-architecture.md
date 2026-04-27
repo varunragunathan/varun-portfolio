@@ -38,7 +38,7 @@ The system has two fundamental pieces: a React [SPA](../glossary/README.md#spa) 
        ┌──────────────┬──────────────┤              ┌─────────┴────────────┐
        ▼              ▼              ▼              ▼                      ▼
 ┌────────────┐ ┌────────────┐ ┌──────────────┐ ┌──────────────┐  ┌──────────────┐
-│ D1 (SQLite)│ │ KV (AUTH_KV│ │Durable Objects│ │  Vectorize   │  │ Workers AI   │
+│ D1 (SQLite)│ │ KV (env.KV)│ │Durable Objects│ │  Vectorize   │  │ Workers AI   │
 │ Persistent │ │ Ephemeral, │ │NUM_MATCH_DO  │ │varun-portfolio│  │ env.AI       │
 │ structured │ │ fast:      │ │One/userId    │ │-rag index    │  │ bge-base-en  │
 │ data:      │ │ OTP codes  │ │WebSocket     │ │768-dim cosine│  │ (embeddings) │
@@ -87,7 +87,7 @@ The D1 binding in this project is named `varun_portfolio_auth` (the name used in
 
 [KV](../glossary/README.md#kv-store) is a globally-distributed, eventually-consistent key-value store. Reads are fast (served from the nearest edge cache). Writes propagate to the global network within 60 seconds in the worst case. KV supports TTL (automatic key expiration), which makes it ideal for tokens and codes that should expire.
 
-**What lives in KV:** Everything ephemeral with a TTL. OTP codes, WebAuthn challenges, pending sessions, active session tokens (for fast auth lookup), number-match state, step-up tokens, and rate limit counters. The KV binding is named `AUTH_KV`.
+**What lives in KV:** Everything ephemeral with a TTL. OTP codes, WebAuthn challenges, pending sessions, active session tokens (for fast auth lookup), number-match state, step-up tokens, and rate limit counters. The KV binding is named `KV` (accessed as `env.KV`).
 
 The key naming conventions are described in detail in [Chapter 3](./03-database-schema.md).
 

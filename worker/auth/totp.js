@@ -121,7 +121,7 @@ function buildOtpUri(secret, email) {
 
 // GET /api/auth/totp/status
 export async function totpStatus(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
   const row = await env.varun_portfolio_auth
@@ -135,14 +135,14 @@ export async function totpStatus(request, env) {
 // POST /api/auth/totp/setup
 // Generates a secret, stores it pending in KV (10 min), returns URI for QR.
 export async function totpSetup(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
   // Generate 20-byte random secret
   const secretBytes = crypto.getRandomValues(new Uint8Array(20));
   const secret      = base32Encode(secretBytes);
 
-  await env.AUTH_KV.put(
+  await env.KV.put(
     `totp_pending:${session.userId}`,
     secret,
     { expirationTtl: 600 },
@@ -159,7 +159,7 @@ export async function totpSetup(request, env) {
 // POST /api/auth/totp/enable
 // Body: { code }  — verifies first TOTP code, encrypts + saves secret.
 export async function totpEnable(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
   if (!env.TOTP_ENCRYPTION_KEY) return json({ error: 'TOTP not configured' }, 503);
@@ -167,7 +167,7 @@ export async function totpEnable(request, env) {
   const { code } = await request.json().catch(() => ({}));
   if (!code) return json({ error: 'code required' }, 400);
 
-  const secret = await env.AUTH_KV.get(`totp_pending:${session.userId}`);
+  const secret = await env.KV.get(`totp_pending:${session.userId}`);
   if (!secret) return json({ error: 'Setup session expired. Please start over.' }, 400);
 
   const valid = await verifyTotp(secret, code);
@@ -180,7 +180,7 @@ export async function totpEnable(request, env) {
     .bind(encrypted, session.userId)
     .run();
 
-  await env.AUTH_KV.delete(`totp_pending:${session.userId}`);
+  await env.KV.delete(`totp_pending:${session.userId}`);
 
   await logSecurityEvent(env.varun_portfolio_auth, {
     userId: session.userId, type: 'totp_enabled',
@@ -193,11 +193,11 @@ export async function totpEnable(request, env) {
 // POST /api/auth/totp/disable
 // Body: { stepUpToken }
 export async function totpDisable(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
   const { stepUpToken } = await request.json().catch(() => ({}));
-  const valid = await consumeStepUpToken(env.AUTH_KV, stepUpToken, session.userId);
+  const valid = await consumeStepUpToken(env.KV, stepUpToken, session.userId);
   if (!valid) return json({ error: 'Step-up verification required' }, 403);
 
   await env.varun_portfolio_auth
@@ -239,7 +239,7 @@ export async function totpSignin(request, env) {
   const valid = await verifyTotp(secret, code);
   if (!valid) return deny();
 
-  const pendingToken = await createPendingSession(env.AUTH_KV, {
+  const pendingToken = await createPendingSession(env.KV, {
     userId: user.id,
     email:  user.email,
     method: 'totp',

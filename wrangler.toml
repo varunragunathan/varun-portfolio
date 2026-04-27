@@ -1,56 +1,44 @@
-name = "varun-portfolio"
+name = "varun-portfolio-dev"
 compatibility_date = "2025-09-27"
 compatibility_flags = ["nodejs_compat"]
 main = "worker/index.js"
 
-# ── Public vars ───────────────────────────────────────────────────
-# Safe to commit. Override locally via .dev.vars.
+# ── Development environment (default) ────────────────────────────
+# Used by `wrangler dev` and `wrangler deploy` (no --env flag).
+# `wrangler dev` runs KV and D1 in local in-process simulation —
+# no production data is ever touched during local development.
+
 [vars]
 ENABLE_AUTH = "true"
-RP_ID = "varunr.dev"         # Change to your domain
-ORIGIN = "https://varunr.dev" # Change to your domain
-
-# ── Twilio WhatsApp Sandbox ───────────────────────────────────────
-# From number only — not a secret. Replace with your own sandbox number.
+RP_ID = "localhost"
+ORIGIN = "http://localhost:8787"
 TWILIO_WHATSAPP_FROM = "whatsapp:+14155238886"
-
-# ── Required secrets (set once, never committed) ──────────────────
-# Run these commands to configure secrets in Cloudflare:
-#
-#   wrangler secret put ADMIN_EMAIL          # email address for the admin account
-#   wrangler secret put RESEND_API_KEY       # from resend.com — used for OTP emails
-#   wrangler secret put TOTP_ENCRYPTION_KEY  # 32-byte hex key, generate with:
-#                                            #   openssl rand -hex 32
-#   wrangler secret put TWILIO_ACCOUNT_SID   # from console.twilio.com
-#   wrangler secret put TWILIO_AUTH_TOKEN    # from console.twilio.com
-#   wrangler secret put ANTHROPIC_API_KEY    # from console.anthropic.com — LLM eval pipeline
-
-
 
 [assets]
 directory = "./dist"
 
-# ── D1 (SQLite) ── permanent storage: users, passkey credentials
+# D1 — wrangler dev uses a local SQLite file at .wrangler/state/v3/d1/
 [[d1_databases]]
 binding = "varun_portfolio_auth"
 database_name = "varun-portfolio-auth"
 database_id = "329e850c-713c-49fa-93bc-671ef8ced36d"
 
-# ── KV ── ephemeral storage: OTP codes, WebAuthn challenges, sessions
+# KV — wrangler dev uses in-process simulation (id/preview_id not accessed locally).
+# preview_id is used only when running `wrangler dev --remote`.
+# Create a dev namespace with: npx wrangler kv namespace create KV-dev
+# then paste the resulting id below.
 [[kv_namespaces]]
-binding = "AUTH_KV"
+binding = "KV"
 id = "050acce2056d4c2883fea6f6f3b32ee2"
+preview_id = ""
 
-# ── Vectorize ── vector store for RAG
 [[vectorize]]
 binding = "VECTORIZE"
 index_name = "varun-portfolio-rag"
 
-# ── Workers AI ── embeddings + optional local generation
 [ai]
 binding = "AI"
 
-# ── Durable Objects ── WebSocket broker for number-match approval
 [[durable_objects.bindings]]
 name = "NUM_MATCH_DO"
 class_name = "NumMatchDO"
@@ -58,3 +46,45 @@ class_name = "NumMatchDO"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["NumMatchDO"]
+
+
+# ── Production environment ────────────────────────────────────────
+# Deploy:  npx wrangler deploy --env production
+# Secrets: npx wrangler secret put <KEY> --env production
+#
+# Required secrets (set once per environment, never committed):
+#   npx wrangler secret put ADMIN_EMAIL         --env production
+#   npx wrangler secret put RESEND_API_KEY      --env production
+#   npx wrangler secret put TOTP_ENCRYPTION_KEY --env production
+#   npx wrangler secret put TWILIO_ACCOUNT_SID  --env production
+#   npx wrangler secret put TWILIO_AUTH_TOKEN   --env production
+#   npx wrangler secret put ANTHROPIC_API_KEY   --env production
+
+[env.production]
+name = "varun-portfolio"
+
+[env.production.vars]
+ENABLE_AUTH = "true"
+RP_ID = "varunr.dev"
+ORIGIN = "https://varunr.dev"
+TWILIO_WHATSAPP_FROM = "whatsapp:+14155238886"
+
+[[env.production.d1_databases]]
+binding = "varun_portfolio_auth"
+database_name = "varun-portfolio-auth"
+database_id = "329e850c-713c-49fa-93bc-671ef8ced36d"
+
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "050acce2056d4c2883fea6f6f3b32ee2"
+
+[[env.production.vectorize]]
+binding = "VECTORIZE"
+index_name = "varun-portfolio-rag"
+
+[env.production.ai]
+binding = "AI"
+
+[[env.production.durable_objects.bindings]]
+name = "NUM_MATCH_DO"
+class_name = "NumMatchDO"

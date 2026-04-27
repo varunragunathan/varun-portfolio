@@ -54,7 +54,7 @@ function attachSparklines(endpointRows, sparkMap) {
 }
 
 export async function getEndpointMetrics(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   const guard   = await requireAdmin(session, env);
   if (guard) return guard;
 

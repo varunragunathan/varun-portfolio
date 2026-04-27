@@ -45,10 +45,10 @@ When an OTP is sent, two KV entries are created:
 
 ```js
 // worker/auth/otp.js lines 47-51
-await env.AUTH_KV.put(`otp:${email}`, JSON.stringify({ code: otp, used: false }), {
+await env.KV.put(`otp:${email}`, JSON.stringify({ code: otp, used: false }), {
   expirationTtl: OTP_TTL, // 600 seconds = 10 minutes
 });
-await env.AUTH_KV.put(rateLimitKey, String(attempts + 1), { expirationTtl: OTP_TTL });
+await env.KV.put(rateLimitKey, String(attempts + 1), { expirationTtl: OTP_TTL });
 ```
 
 The `otp:{email}` key stores the code with a `used` flag. The `otp_rate:{email}` key stores the send count for rate limiting.
@@ -59,7 +59,7 @@ After marking a code as used, the key is kept with a short TTL (60 seconds) rath
 
 ```js
 // worker/auth/otp.js lines 88-93
-await env.AUTH_KV.put(
+await env.KV.put(
   `otp:${email}`,
   JSON.stringify({ code: savedCode, used: true }),
   { expirationTtl: 60 } // keep briefly so the key exists, then auto-expire
@@ -79,7 +79,7 @@ export async function verifyOTP(request, env) {
   const { email, code } = body;
   if (!email || !code) return json({ error: 'Missing fields' }, 400);
 
-  const raw = await env.AUTH_KV.get(`otp:${email}`);
+  const raw = await env.KV.get(`otp:${email}`);
   if (!raw) return json({ error: 'Invalid or expired code' }, 400);
 
   const { code: savedCode, used } = JSON.parse(raw);
@@ -89,10 +89,10 @@ export async function verifyOTP(request, env) {
   }
 
   // Mark as used immediately...
-  await env.AUTH_KV.put(`otp:${email}`, JSON.stringify({ code: savedCode, used: true }), { expirationTtl: 60 });
+  await env.KV.put(`otp:${email}`, JSON.stringify({ code: savedCode, used: true }), { expirationTtl: 60 });
 
   // Grant a 5-minute window to complete passkey registration
-  await env.AUTH_KV.put(`email_verified:${email}`, '1', { expirationTtl: 300 });
+  await env.KV.put(`email_verified:${email}`, '1', { expirationTtl: 300 });
 
   return json({ ok: true });
 }
@@ -102,7 +102,7 @@ On success, an `email_verified:{email}` key is written with a 5-minute TTL. The 
 
 ```js
 // worker/auth/passkey.js lines 52-53
-const verified = await env.AUTH_KV.get(`email_verified:${email}`);
+const verified = await env.KV.get(`email_verified:${email}`);
 if (!verified) return json({ error: 'Email not verified. Please complete OTP verification first.' }, 403);
 ```
 
@@ -117,7 +117,7 @@ The rate limit is 3 OTP sends per email per 10 minutes:
 ```js
 // worker/auth/otp.js lines 37-42
 const rateLimitKey = `otp_rate:${email}`;
-const attempts = parseInt((await env.AUTH_KV.get(rateLimitKey)) || '0');
+const attempts = parseInt((await env.KV.get(rateLimitKey)) || '0');
 if (attempts >= 3) {
   return json({ error: 'Too many attempts. Please wait 10 minutes.' }, 429);
 }

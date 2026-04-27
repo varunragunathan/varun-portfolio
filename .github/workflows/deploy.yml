@@ -48,7 +48,7 @@ jobs:
           VITE_APP_VERSION: ${{ env.APP_VERSION }}
 
       - name: Deploy Worker + Assets
-        run: npx wrangler deploy
+        run: npx wrangler deploy --env production
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

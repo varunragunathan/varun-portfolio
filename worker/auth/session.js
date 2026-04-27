@@ -53,11 +53,11 @@ export async function finaliseSession(request, env) {
   const { token, trusted, deviceName, preTrusted, fingerprint } = body;
   if (!token) return json({ error: 'Missing token' }, 400);
 
-  const raw = await env.AUTH_KV.get(`session_pending:${token}`);
+  const raw = await env.KV.get(`session_pending:${token}`);
   if (!raw) return json({ error: 'Session expired or invalid' }, 400);
 
   const { userId, email, method } = JSON.parse(raw);
-  await env.AUTH_KV.delete(`session_pending:${token}`);
+  await env.KV.delete(`session_pending:${token}`);
 
   const isTrusted = trusted === true;
   const TTL = isTrusted ? 30 * 86400 : 86400;
@@ -71,7 +71,7 @@ export async function finaliseSession(request, env) {
   // Write real session to KV (fast lookup) and D1 (metadata/security page).
   // KV is keyed by tokenHash (not raw token) so revocation can purge it using
   // only the hash stored in D1 — no need to ever store the raw token server-side.
-  await env.AUTH_KV.put(`session:${tokenHash}`, JSON.stringify({ userId, email, sessionId }), { expirationTtl: TTL });
+  await env.KV.put(`session:${tokenHash}`, JSON.stringify({ userId, email, sessionId }), { expirationTtl: TTL });
   await createSessionRecord(env.varun_portfolio_auth, {
     id: sessionId, userId, tokenHash, deviceName: name,
     userAgent: ua, ip, trusted: isTrusted, expiresAt,
@@ -127,7 +127,7 @@ export async function touchSession(db, token) {
 
 // GET /api/auth/me
 export async function getMe(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ user: null });
   touchSession(env.varun_portfolio_auth, session.token).catch(() => {});
 
@@ -151,7 +151,7 @@ export async function getMe(request, env) {
   const tokenHash = await sha256Hex(session.token);
   const [sessionRecord, rawPrefs] = await Promise.all([
     db.prepare('SELECT trusted FROM sessions WHERE token_hash = ? LIMIT 1').bind(tokenHash).first(),
-    env.AUTH_KV.get(`prefs:${session.userId}`, { cacheTtl: 300 }),
+    env.KV.get(`prefs:${session.userId}`, { cacheTtl: 300 }),
   ]);
   const trusted = sessionRecord?.trusted === 1;
   const preferences = rawPrefs
@@ -175,10 +175,10 @@ export async function logout(request, env) {
   const token = getTokenFromRequest(request);
   if (token) {
     const tokenHash = await sha256Hex(token);
-    const raw = await env.AUTH_KV.get(`session:${tokenHash}`);
+    const raw = await env.KV.get(`session:${tokenHash}`);
     if (raw) {
       const { userId } = JSON.parse(raw);
-      await env.AUTH_KV.delete(`session:${tokenHash}`);
+      await env.KV.delete(`session:${tokenHash}`);
       const db = env.varun_portfolio_auth;
       await db.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(tokenHash).run();
       await logSecurityEvent(db, { userId, type: 'logout',

@@ -71,11 +71,11 @@ export class NumMatchDO {
       let toSend = this.pending;
       if (!toSend && this.userId) {
         // DO may have restarted; fall back to KV
-        const raw = await this.env.AUTH_KV.get(`num_match_for_user:${this.userId}`);
+        const raw = await this.env.KV.get(`num_match_for_user:${this.userId}`);
         if (raw) {
           const { approvalToken: at, code, userAgent, deviceNames } = JSON.parse(raw);
           // Verify it hasn't already been resolved
-          const still = await this.env.AUTH_KV.get(`num_match:${at}`);
+          const still = await this.env.KV.get(`num_match:${at}`);
           if (still) {
             toSend = { approvalToken: at, code, userAgent, deviceNames };
             this.pending = toSend;
@@ -106,18 +106,18 @@ export class NumMatchDO {
   }
 
   async handleResponse(approvalToken, approved) {
-    const raw = await this.env.AUTH_KV.get(`num_match:${approvalToken}`);
+    const raw = await this.env.KV.get(`num_match:${approvalToken}`);
     if (!raw) return; // already handled or expired
 
     const { userId, email } = JSON.parse(raw);
 
     // Clean up KV
-    await this.env.AUTH_KV.delete(`num_match:${approvalToken}`);
-    await this.env.AUTH_KV.delete(`num_match_for_user:${userId}`);
+    await this.env.KV.delete(`num_match:${approvalToken}`);
+    await this.env.KV.delete(`num_match_for_user:${userId}`);
 
     let pendingToken = null;
     if (approved) {
-      pendingToken = await createPendingSession(this.env.AUTH_KV, { userId, email, method: 'passkey+number_match' });
+      pendingToken = await createPendingSession(this.env.KV, { userId, email, method: 'passkey+number_match' });
     }
 
     this.pending = null;

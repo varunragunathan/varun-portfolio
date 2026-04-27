@@ -47,10 +47,10 @@ export async function getRegisterOptions(request, env) {
 
   // Accept either email_verified (normal registration) or recovery_gate (recovery flow)
   if (recoveryToken) {
-    const gate = await env.AUTH_KV.get(`recovery_gate:${recoveryToken}`);
+    const gate = await env.KV.get(`recovery_gate:${recoveryToken}`);
     if (!gate) return json({ error: 'Recovery session expired. Please start again.' }, 403);
   } else {
-    const verified = await env.AUTH_KV.get(`email_verified:${email}`);
+    const verified = await env.KV.get(`email_verified:${email}`);
     if (!verified) return json({ error: 'Email not verified. Please complete OTP verification first.' }, 403);
   }
 
@@ -76,7 +76,7 @@ export async function getRegisterOptions(request, env) {
     },
   });
 
-  await env.AUTH_KV.put(`reg_challenge:${user.id}`, options.challenge, { expirationTtl: 60 });
+  await env.KV.put(`reg_challenge:${user.id}`, options.challenge, { expirationTtl: 60 });
   return json({ options, userId: user.id });
 }
 
@@ -85,9 +85,9 @@ export async function verifyRegistration(request, env) {
   const { email, userId, registrationResponse, recoveryToken } = body;
   if (!email || !userId || !registrationResponse) return json({ error: 'Missing fields' }, 400);
 
-  const challenge = await env.AUTH_KV.get(`reg_challenge:${userId}`);
+  const challenge = await env.KV.get(`reg_challenge:${userId}`);
   if (!challenge) return json({ error: 'Registration challenge expired. Please try again.' }, 400);
-  await env.AUTH_KV.delete(`reg_challenge:${userId}`);
+  await env.KV.delete(`reg_challenge:${userId}`);
 
   let verification;
   try {
@@ -128,8 +128,8 @@ export async function verifyRegistration(request, env) {
   }
 
   // Clean up verification gates
-  await env.AUTH_KV.delete(`email_verified:${email}`);
-  if (recoveryToken) await env.AUTH_KV.delete(`recovery_gate:${recoveryToken}`);
+  await env.KV.delete(`email_verified:${email}`);
+  if (recoveryToken) await env.KV.delete(`recovery_gate:${recoveryToken}`);
 
   // Generate recovery codes (8 codes, shown once to user)
   const recoveryCodes = await generateAndStoreRecoveryCodes(env.varun_portfolio_auth, userId);
@@ -142,7 +142,7 @@ export async function verifyRegistration(request, env) {
   });
 
   // Issue a pending session — user must complete trust prompt before cookie is set
-  const pendingToken = await createPendingSession(env.AUTH_KV, { userId, email });
+  const pendingToken = await createPendingSession(env.KV, { userId, email });
 
   return json({
     ok: true,
@@ -171,7 +171,7 @@ export async function getAuthOptions(request, env) {
       allowCredentials: [],
     });
     const condToken = crypto.randomUUID();
-    await env.AUTH_KV.put(`cond_challenge:${condToken}`, options.challenge, { expirationTtl: 120 });
+    await env.KV.put(`cond_challenge:${condToken}`, options.challenge, { expirationTtl: 120 });
     return json({ options, userId: null, condToken });
   }
 
@@ -197,7 +197,7 @@ export async function getAuthOptions(request, env) {
     allowCredentials: creds.map(c => ({ id: c.id, type: 'public-key' })),
   });
 
-  await env.AUTH_KV.put(`auth_challenge:${user.id}`, options.challenge, { expirationTtl: 60 });
+  await env.KV.put(`auth_challenge:${user.id}`, options.challenge, { expirationTtl: 60 });
   return json({ options, userId: user.id, hasWhatsApp: user.phone_verified === 1 });
 }
 
@@ -212,18 +212,18 @@ export async function verifyAuth(request, env) {
 
   if (condToken) {
     // Conditional mediation path — challenge keyed by condToken, userId unknown upfront
-    challenge = await env.AUTH_KV.get(`cond_challenge:${condToken}`);
+    challenge = await env.KV.get(`cond_challenge:${condToken}`);
     if (!challenge) return json({ error: 'Challenge expired. Please try again.' }, 400);
-    await env.AUTH_KV.delete(`cond_challenge:${condToken}`);
+    await env.KV.delete(`cond_challenge:${condToken}`);
     // Derive userId from the credential that was used
     const credRow = await db.prepare('SELECT user_id FROM passkey_creds WHERE id = ?').bind(authResponse.id).first();
     if (!credRow) return json({ error: 'Credential not found' }, 400);
     userId = credRow.user_id;
   } else {
     if (!userId) return json({ error: 'Missing fields' }, 400);
-    challenge = await env.AUTH_KV.get(`auth_challenge:${userId}`);
+    challenge = await env.KV.get(`auth_challenge:${userId}`);
     if (!challenge) return json({ error: 'Challenge expired. Please try again.' }, 400);
-    await env.AUTH_KV.delete(`auth_challenge:${userId}`);
+    await env.KV.delete(`auth_challenge:${userId}`);
   }
 
   const cred = await getPasskeyCredById(db, authResponse.id);
@@ -269,7 +269,7 @@ export async function verifyAuth(request, env) {
     const trustRecord = await getTrustedDeviceByHash(db, trustHash);
     if (trustRecord && trustRecord.user_id === userId && trustRecord.user_agent === ua) {
       await updateTrustedDeviceLastUsed(db, trustRecord.id);
-      const pendingToken = await createPendingSession(env.AUTH_KV, { userId, email: user.email, method: 'passkey' });
+      const pendingToken = await createPendingSession(env.KV, { userId, email: user.email, method: 'passkey' });
       return json({ ok: true, pendingToken, preTrusted: true, trustedDeviceName: trustRecord.device_name });
     }
   }
@@ -285,12 +285,12 @@ export async function verifyAuth(request, env) {
     const tempToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
     const TTL = 300;
 
-    await env.AUTH_KV.put(
+    await env.KV.put(
       `num_match:${approvalToken}`,
       JSON.stringify({ userId, email: user.email, code: displayCode, approved: false, denied: false }),
       { expirationTtl: TTL },
     );
-    await env.AUTH_KV.put(
+    await env.KV.put(
       `num_match_pending:${tempToken}`,
       JSON.stringify({ code: displayCode, approvalToken, userId, email: user.email }),
       { expirationTtl: TTL },
@@ -300,7 +300,7 @@ export async function verifyAuth(request, env) {
     const deviceNames = trustedDevices.map(d => d.device_name).filter(Boolean);
 
     // Allows any trusted session for this user to discover the pending approval
-    await env.AUTH_KV.put(
+    await env.KV.put(
       `num_match_for_user:${userId}`,
       JSON.stringify({ approvalToken, code: displayCode, userAgent: ua, deviceNames }),
       { expirationTtl: TTL },
@@ -325,7 +325,7 @@ export async function verifyAuth(request, env) {
   }
 
   // Known device — issue pending session for trust prompt
-  const pendingToken = await createPendingSession(env.AUTH_KV, { userId, email: user.email, method: 'passkey' });
+  const pendingToken = await createPendingSession(env.KV, { userId, email: user.email, method: 'passkey' });
   return json({ ok: true, pendingToken });
 }
 
@@ -334,7 +334,7 @@ export async function verifyAuth(request, env) {
 // additional passkey from the Settings page.
 
 export async function addPasskeyOptions(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
   const body = await request.json().catch(() => ({}));
@@ -362,20 +362,20 @@ export async function addPasskeyOptions(request, env) {
     authenticatorSelection,
   });
 
-  await env.AUTH_KV.put(`reg_challenge:${session.userId}`, options.challenge, { expirationTtl: 120 });
+  await env.KV.put(`reg_challenge:${session.userId}`, options.challenge, { expirationTtl: 120 });
   return json(options);
 }
 
 export async function addPasskeyVerify(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
   const body = await request.json().catch(() => ({}));
   if (!body.id) return json({ error: 'Missing registration response' }, 400);
 
-  const challenge = await env.AUTH_KV.get(`reg_challenge:${session.userId}`);
+  const challenge = await env.KV.get(`reg_challenge:${session.userId}`);
   if (!challenge) return json({ error: 'Challenge expired. Please try again.' }, 400);
-  await env.AUTH_KV.delete(`reg_challenge:${session.userId}`);
+  await env.KV.delete(`reg_challenge:${session.userId}`);
 
   let verification;
   try {

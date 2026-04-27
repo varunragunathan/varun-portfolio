@@ -25,7 +25,7 @@ export async function numMatchSubscribe(request, env) {
     return json({ error: 'WebSocket upgrade required' }, 426);
   }
 
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
   // Only trusted sessions can approve sign-ins
@@ -56,7 +56,7 @@ export async function numMatchWait(request, env) {
   const tempToken = url.searchParams.get('token');
   if (!tempToken) return json({ error: 'Missing token' }, 400);
 
-  const raw = await env.AUTH_KV.get(`num_match_pending:${tempToken}`);
+  const raw = await env.KV.get(`num_match_pending:${tempToken}`);
   if (!raw) return json({ error: 'Invalid or expired token' }, 400);
 
   const { approvalToken, userId } = JSON.parse(raw);

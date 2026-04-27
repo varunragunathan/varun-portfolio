@@ -27,7 +27,7 @@ function json(data, status = 200) {
 }
 
 async function requireSession(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return { error: json({ error: 'Unauthorized' }, 401) };
   return { session };
 }
@@ -120,12 +120,12 @@ export async function sendVerifyOTP(request, env) {
     return json({ error: 'Invalid number. Include country code, e.g. +1 415 555 0100' }, 400);
   }
 
-  if (!(await checkRate(env.AUTH_KV, session.userId))) {
+  if (!(await checkRate(env.KV, session.userId))) {
     return json({ error: 'Too many attempts. Try again in 10 minutes.' }, 429);
   }
 
   const code = generateOTP();
-  await env.AUTH_KV.put(
+  await env.KV.put(
     `wa_otp:${session.userId}`,
     JSON.stringify({ code, phone, used: false }),
     { expirationTtl: OTP_TTL }
@@ -149,7 +149,7 @@ export async function confirmPhone(request, env) {
   const { code } = await request.json().catch(() => ({}));
   if (!code) return json({ error: 'Missing code' }, 400);
 
-  const raw = await env.AUTH_KV.get(`wa_otp:${session.userId}`);
+  const raw = await env.KV.get(`wa_otp:${session.userId}`);
   if (!raw) return json({ error: 'Code expired. Request a new one.' }, 400);
 
   const stored = JSON.parse(raw);
@@ -157,7 +157,7 @@ export async function confirmPhone(request, env) {
     return json({ error: 'Invalid or expired code' }, 400);
   }
 
-  await env.AUTH_KV.put(
+  await env.KV.put(
     `wa_otp:${session.userId}`,
     JSON.stringify({ ...stored, used: true }),
     { expirationTtl: 60 }
@@ -213,12 +213,12 @@ export async function sendSigninOTP(request, env) {
     return json({ error: 'WhatsApp backup not available for this account' }, 400);
   }
 
-  if (!(await checkRate(env.AUTH_KV, userId))) {
+  if (!(await checkRate(env.KV, userId))) {
     return json({ error: 'Too many attempts. Try again in 10 minutes.' }, 429);
   }
 
   const code = generateOTP();
-  await env.AUTH_KV.put(
+  await env.KV.put(
     `wa_signin:${userId}`,
     JSON.stringify({ code, phone: user.phone_number, email: user.email, used: false }),
     { expirationTtl: OTP_TTL }
@@ -239,7 +239,7 @@ export async function verifySigninOTP(request, env) {
   const { userId, code } = await request.json().catch(() => ({}));
   if (!userId || !code) return json({ error: 'Missing fields' }, 400);
 
-  const raw = await env.AUTH_KV.get(`wa_signin:${userId}`);
+  const raw = await env.KV.get(`wa_signin:${userId}`);
   if (!raw) return json({ error: 'Code expired. Request a new one.' }, 400);
 
   const stored = JSON.parse(raw);
@@ -248,13 +248,13 @@ export async function verifySigninOTP(request, env) {
   }
 
   // Single-use: mark used immediately
-  await env.AUTH_KV.put(
+  await env.KV.put(
     `wa_signin:${userId}`,
     JSON.stringify({ ...stored, used: true }),
     { expirationTtl: 60 }
   );
 
-  const pendingToken = await createPendingSession(env.AUTH_KV, {
+  const pendingToken = await createPendingSession(env.KV, {
     userId,
     email: stored.email,
     method: 'whatsapp',

@@ -1507,16 +1507,6 @@ function EndpointsTab({ t }) {
 const EVAL_SCORE_KEYS   = ['accuracy', 'hallucination_risk', 'relevance', 'tone'];
 const EVAL_SCORE_LABELS = { accuracy: 'Accuracy', hallucination_risk: 'No Halluc.', relevance: 'Relevance', tone: 'Tone' };
 const EVAL_TREND_COLORS = { accuracy: '#64ffda', hallucination_risk: '#6366f1', relevance: '#f5a623', tone: '#34c759' };
-const EVAL_STORAGE_KEY  = 'eval_runs_v1';
-
-function loadStoredRuns() {
-  try { return JSON.parse(localStorage.getItem(EVAL_STORAGE_KEY) ?? '[]'); }
-  catch { return []; }
-}
-function persistRuns(runs) {
-  try { localStorage.setItem(EVAL_STORAGE_KEY, JSON.stringify(runs.slice(-50))); }
-  catch { /* storage unavailable */ }
-}
 
 function evalScoreColor(score) {
   if (score >= 4.5) return '#34c759';
@@ -1810,16 +1800,29 @@ function EvalResultCard({ result, compareResult, allRuns, t }) {
 }
 
 function EvalsTab({ t }) {
-  const [runs,       setRuns]       = useState(loadStoredRuns);
-  const [primaryId,  setPrimaryId]  = useState(() => { const s = loadStoredRuns(); return s.length ? s[s.length - 1].version : null; });
-  const [compareId,  setCompareId]  = useState(null);
-  const [running,    setRunning]    = useState(false);
+  const [runs,         setRuns]         = useState([]);
+  const [loadingRuns,  setLoadingRuns]  = useState(true);
+  const [primaryId,    setPrimaryId]    = useState(null);
+  const [compareId,    setCompareId]    = useState(null);
+  const [running,      setRunning]      = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
-  const [error,      setError]      = useState(null);
+  const [error,        setError]        = useState(null);
 
-  const primary  = runs.find(r => r.version === primaryId)  ?? null;
-  const compare  = runs.find(r => r.version === compareId)  ?? null;
+  const primary     = runs.find(r => r.version === primaryId) ?? null;
+  const compare     = runs.find(r => r.version === compareId) ?? null;
   const showCompare = !!(primary && compare);
+
+  // Load run history from server on mount
+  useEffect(() => {
+    fetch('/api/admin/evals/runs', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : { runs: [] })
+      .then(({ runs: loaded }) => {
+        setRuns(loaded);
+        if (loaded.length) setPrimaryId(loaded[loaded.length - 1].version);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingRuns(false));
+  }, []);
 
   const doRun = useCallback(async (promptOverride) => {
     setRunning(true);
@@ -1835,15 +1838,10 @@ function EvalsTab({ t }) {
         throw new Error(d.error ?? `HTTP ${res.status}`);
       }
       const data = await res.json();
-      setRuns(prev => {
-        const version = `v${prev.length + 1}`;
-        const newRun  = { version, runAt: data.runAt, systemPrompt: data.systemPrompt, averages: data.averages, results: data.results };
-        const updated = [...prev, newRun];
-        persistRuns(updated);
-        setPrimaryId(version);
-        setCompareId(null);
-        return updated;
-      });
+      const newRun = { version: data.version, runAt: data.runAt, systemPrompt: data.systemPrompt, averages: data.averages, results: data.results };
+      setRuns(prev => [...prev, newRun]);
+      setPrimaryId(data.version);
+      setCompareId(null);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -1851,9 +1849,9 @@ function EvalsTab({ t }) {
     }
   }, []);
 
-  const clearHistory = useCallback(() => {
+  const clearHistory = useCallback(async () => {
     if (!confirm('Clear all eval run history? This cannot be undone.')) return;
-    localStorage.removeItem(EVAL_STORAGE_KEY);
+    await fetch('/api/admin/evals/runs', { method: 'DELETE', credentials: 'include' });
     setRuns([]);
     setPrimaryId(null);
     setCompareId(null);
@@ -1868,7 +1866,7 @@ function EvalsTab({ t }) {
           Tests how well Claude (claude-sonnet-4-20250514) answers 10 financial questions across
           investing, markets, bonds, taxes, and more. Each response is scored by a second Claude
           call acting as judge across accuracy, hallucination risk, relevance, and tone (1–5).
-          Every run is versioned and saved locally — select any two to compare.
+          Every run is versioned and persisted server-side — select any two to compare.
         </div>
         <button
           onClick={() => doRun(null)}

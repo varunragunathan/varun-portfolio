@@ -167,7 +167,7 @@ TTL:    600s (10 minutes)
 - Logs a `whatsapp_signin` security event
 
 ```js
-const pendingToken = await createPendingSession(env.AUTH_KV, {
+const pendingToken = await createPendingSession(env.KV, {
   userId,
   email: stored.email,
 });

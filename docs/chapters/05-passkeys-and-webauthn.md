@@ -133,7 +133,7 @@ if (!email) {
     allowCredentials: [],
   });
   const condToken = crypto.randomUUID();
-  await env.AUTH_KV.put(`cond_challenge:${condToken}`, options.challenge, { expirationTtl: 120 });
+  await env.KV.put(`cond_challenge:${condToken}`, options.challenge, { expirationTtl: 120 });
   return json({ options, userId: null, condToken });
 }
 ```
@@ -149,7 +149,7 @@ const options = await generateAuthenticationOptions({
   userVerification: 'preferred',
   allowCredentials: creds.map(c => ({ id: c.id, type: 'public-key' })),
 });
-await env.AUTH_KV.put(`auth_challenge:${user.id}`, options.challenge, { expirationTtl: 60 });
+await env.KV.put(`auth_challenge:${user.id}`, options.challenge, { expirationTtl: 60 });
 ```
 
 **Anti-enumeration:** For an unknown email, the server returns a fake set of auth options with a real-looking challenge but no `allowCredentials`. The response is structurally identical to a valid response. An attacker probing for valid email addresses gets no signal from the response format.
@@ -163,9 +163,9 @@ For conditional mediation, the server must discover which user authenticated:
 ```js
 // worker/auth/passkey.js lines 211-219
 if (condToken) {
-  challenge = await env.AUTH_KV.get(`cond_challenge:${condToken}`);
+  challenge = await env.KV.get(`cond_challenge:${condToken}`);
   if (!challenge) return json({ error: 'Challenge expired. Please try again.' }, 400);
-  await env.AUTH_KV.delete(`cond_challenge:${condToken}`);
+  await env.KV.delete(`cond_challenge:${condToken}`);
   // Derive userId from the credential that was used
   const credRow = await db.prepare('SELECT user_id FROM passkey_creds WHERE id = ?').bind(authResponse.id).first();
   if (!credRow) return json({ error: 'Credential not found' }, 400);
@@ -204,7 +204,7 @@ The mechanism works as follows:
 
 ```js
 const condToken = crypto.randomUUID();
-await env.AUTH_KV.put(`cond_challenge:${condToken}`, options.challenge, { expirationTtl: 120 });
+await env.KV.put(`cond_challenge:${condToken}`, options.challenge, { expirationTtl: 120 });
 return json({ options, userId: null, condToken });
 ```
 

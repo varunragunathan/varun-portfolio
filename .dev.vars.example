@@ -1,11 +1,9 @@
-# Local development environment variables.
+# Local development secrets.
 # Copy this file to .dev.vars and fill in real values.
-# .dev.vars is gitignored — never commit it.
-
-# Override RP_ID and ORIGIN for localhost WebAuthn
-ENABLE_AUTH=true
-RP_ID=localhost
-ORIGIN=http://localhost:8787
+# .dev.vars is gitignored — never committed.
+#
+# Non-sensitive dev vars (RP_ID, ORIGIN, ENABLE_AUTH) are set in wrangler.toml [vars].
+# Only secrets that differ from production need to be listed here.
 
 # Admin account email
 ADMIN_EMAIL=you@example.com
@@ -17,12 +15,11 @@ RESEND_API_KEY=re_your_key_here
 # Generate with: openssl rand -hex 32
 TOTP_ENCRYPTION_KEY=your_64_char_hex_key_here
 
-# Anthropic API key — https://console.anthropic.com
-# Required for the LLM Eval Pipeline tab in the admin dashboard.
-# Production: wrangler secret put ANTHROPIC_API_KEY
-ANTHROPIC_API_KEY=sk-ant-your_key_here
-
 # Twilio credentials — https://console.twilio.com
 TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=your_auth_token_here
-TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
+
+# Anthropic API key — https://console.anthropic.com
+# Required for the LLM Eval Pipeline tab in the admin dashboard.
+# Production: npx wrangler secret put ANTHROPIC_API_KEY --env production
+ANTHROPIC_API_KEY=sk-ant-your_key_here

@@ -329,7 +329,7 @@ async function saveMessages(db, conversationId, userContent, assistantContent) {
 
 // POST /api/chat
 export async function postChat(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
   const db = env.varun_portfolio_auth;
@@ -340,7 +340,7 @@ export async function postChat(request, env) {
     : await getUserRole(db, session.userId);
 
   // Rate limit check
-  const rl = await checkRateLimit(env.AUTH_KV, session.userId, role);
+  const rl = await checkRateLimit(env.KV, session.userId, role);
   if (!rl.allowed) {
     return json(
       { error: 'Rate limit exceeded', retryAfter: rl.retryAfter, reason: rl.reason },
@@ -397,7 +397,7 @@ export async function postChat(request, env) {
   // Embed + retrieve context
   const vector = await embedQuery(env.AI, message);
   const chunks  = await retrieveChunks(env.VECTORIZE, vector);
-  const systemPrompt = await buildSystemPrompt(env.AUTH_KV, role, chunks);
+  const systemPrompt = await buildSystemPrompt(env.KV, role, chunks);
 
   // Build messages array (history + current user turn)
   const aiMessages = [
@@ -431,7 +431,7 @@ export async function postChat(request, env) {
 
 // GET /api/chat/conversations
 export async function listConversations(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
   const result = await env.varun_portfolio_auth
@@ -446,7 +446,7 @@ export async function listConversations(request, env) {
 
 // GET /api/chat/conversations/:id
 export async function getConversation(request, env, id) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
   const db = env.varun_portfolio_auth;
@@ -466,7 +466,7 @@ export async function getConversation(request, env, id) {
 
 // DELETE /api/chat/conversations/:id
 export async function deleteConversation(request, env, id) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
   const db = env.varun_portfolio_auth;
@@ -486,7 +486,7 @@ export async function deleteConversation(request, env, id) {
 
 // GET /api/chat/models — returns enabled models for pro/admin users
 export async function listChatModels(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
   const db   = env.varun_portfolio_auth;

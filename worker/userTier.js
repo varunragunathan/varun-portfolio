@@ -39,7 +39,7 @@ export async function getApprovedModels(db) {
 // POST /api/user/upgrade-request
 // Body: { note? }
 export async function submitUpgradeRequest(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
   const db   = env.varun_portfolio_auth;
@@ -80,7 +80,7 @@ export async function submitUpgradeRequest(request, env) {
 
 // GET /api/user/upgrade-request
 export async function getUpgradeRequest(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
   const db = env.varun_portfolio_auth;

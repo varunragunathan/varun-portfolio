@@ -140,7 +140,7 @@ function parseJudgeJson(text) {
 
 // ── POST /api/admin/evals/run ─────────────────────────────────────
 export async function runEvals(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   const guard   = await requireAdmin(session, env);
   if (guard) return guard;
 
@@ -210,15 +210,40 @@ export async function runEvals(request, env) {
     return vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null;
   };
 
-  return json({
-    results,
-    systemPrompt: effectiveSystem,
-    averages: {
-      accuracy:          avg('accuracy'),
-      hallucination_risk: avg('hallucination_risk'),
-      relevance:         avg('relevance'),
-      tone:              avg('tone'),
-    },
-    runAt: Date.now(),
-  });
+  const averages = {
+    accuracy:           avg('accuracy'),
+    hallucination_risk: avg('hallucination_risk'),
+    relevance:          avg('relevance'),
+    tone:               avg('tone'),
+  };
+
+  // Persist run to KV
+  const stored  = await env.KV.get('eval:runs');
+  const allRuns = stored ? JSON.parse(stored) : [];
+  const version = `v${allRuns.length + 1}`;
+  const runAt   = Date.now();
+  allRuns.push({ version, runAt, systemPrompt: effectiveSystem, averages, results });
+  await env.KV.put('eval:runs', JSON.stringify(allRuns.slice(-50)));
+
+  return json({ version, results, systemPrompt: effectiveSystem, averages, runAt });
+}
+
+// ── GET /api/admin/evals/runs ─────────────────────────────────────
+export async function getEvalRuns(request, env) {
+  const session = await getSession(env.KV, request);
+  const guard   = await requireAdmin(session, env);
+  if (guard) return guard;
+
+  const stored = await env.KV.get('eval:runs');
+  return json({ runs: stored ? JSON.parse(stored) : [] });
+}
+
+// ── DELETE /api/admin/evals/runs ──────────────────────────────────
+export async function deleteEvalRuns(request, env) {
+  const session = await getSession(env.KV, request);
+  const guard   = await requireAdmin(session, env);
+  if (guard) return guard;
+
+  await env.KV.delete('eval:runs');
+  return json({ ok: true });
 }

@@ -17,7 +17,7 @@ import {
   getPersonas,
   updatePersonas,
 } from './admin.js';
-import { runEvals } from './evals.js';
+import { runEvals, getEvalRuns, deleteEvalRuns } from './evals.js';
 import { submitUpgradeRequest, getUpgradeRequest } from './userTier.js';
 import { submitFeedbackHandler } from './feedback.js';
 import { checkIpRateLimit } from './rateLimit.js';
@@ -135,6 +135,10 @@ async function handleRequest(request, env) {
         response = await getPersonas(request, env);
       } else if (path === '/api/admin/personas' && method === 'PUT') {
         response = await updatePersonas(request, env);
+      } else if (path === '/api/admin/evals/runs' && method === 'GET') {
+        response = await getEvalRuns(request, env);
+      } else if (path === '/api/admin/evals/runs' && method === 'DELETE') {
+        response = await deleteEvalRuns(request, env);
       } else if (path === '/api/admin/evals/run' && method === 'POST') {
         response = await runEvals(request, env);
       } else {
@@ -158,7 +162,7 @@ async function handleRequest(request, env) {
   if (url.pathname === '/api/feedback' && request.method === 'POST') {
     try {
       const ip = request.headers.get('CF-Connecting-IP');
-      const fbLimit = await checkIpRateLimit(env.AUTH_KV, ip, 'feedback', 5, 3_600_000);
+      const fbLimit = await checkIpRateLimit(env.KV, ip, 'feedback', 5, 3_600_000);
       if (!fbLimit.allowed) {
         return withCors(new Response(JSON.stringify({ error: 'Too many requests', retryAfter: fbLimit.retryAfter }), {
           status: 429,

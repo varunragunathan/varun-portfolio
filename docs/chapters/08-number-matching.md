@@ -160,12 +160,12 @@ The KV entries written during `verifyAuth` serve as the fallback:
 
 ```js
 // worker/auth/passkey.js lines 271-286
-await env.AUTH_KV.put(
+await env.KV.put(
   `num_match:${approvalToken}`,
   JSON.stringify({ userId, email: user.email, code: displayCode, approved: false, denied: false }),
   { expirationTtl: TTL },
 );
-await env.AUTH_KV.put(
+await env.KV.put(
   `num_match_for_user:${userId}`,
   JSON.stringify({ approvalToken, code: displayCode, userAgent: ua }),
   { expirationTtl: TTL },
@@ -179,11 +179,11 @@ When a trusted device connects via WebSocket, the DO checks for in-memory state 
 let toSend = this.pending;
 if (!toSend && this.userId) {
   // DO may have restarted; fall back to KV
-  const raw = await this.env.AUTH_KV.get(`num_match_for_user:${this.userId}`);
+  const raw = await this.env.KV.get(`num_match_for_user:${this.userId}`);
   if (raw) {
     const { approvalToken: at, code, userAgent } = JSON.parse(raw);
     // Verify it hasn't already been resolved
-    const still = await this.env.AUTH_KV.get(`num_match:${at}`);
+    const still = await this.env.KV.get(`num_match:${at}`);
     if (still) {
       toSend = { approvalToken: at, code, userAgent };
       this.pending = toSend;

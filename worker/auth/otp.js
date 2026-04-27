@@ -36,7 +36,7 @@ export async function sendOTP(request, env) {
 
   // Rate limit: max 3 OTP requests per email per 10 minutes
   const rateLimitKey = `otp_rate:${email}`;
-  const attempts = parseInt((await env.AUTH_KV.get(rateLimitKey)) || '0');
+  const attempts = parseInt((await env.KV.get(rateLimitKey)) || '0');
   if (attempts >= 3) {
     return json({ error: 'Too many attempts. Please wait 10 minutes.' }, 429);
   }
@@ -44,10 +44,10 @@ export async function sendOTP(request, env) {
   const otp = generateOTP();
   const OTP_TTL = 600; // 10 minutes
 
-  await env.AUTH_KV.put(`otp:${email}`, JSON.stringify({ code: otp, used: false }), {
+  await env.KV.put(`otp:${email}`, JSON.stringify({ code: otp, used: false }), {
     expirationTtl: OTP_TTL,
   });
-  await env.AUTH_KV.put(rateLimitKey, String(attempts + 1), { expirationTtl: OTP_TTL });
+  await env.KV.put(rateLimitKey, String(attempts + 1), { expirationTtl: OTP_TTL });
 
   const resend = new Resend(env.RESEND_API_KEY);
   await resend.emails.send({
@@ -75,7 +75,7 @@ export async function verifyOTP(request, env) {
   const { email, code } = body;
   if (!email || !code) return json({ error: 'Missing fields' }, 400);
 
-  const raw = await env.AUTH_KV.get(`otp:${email}`);
+  const raw = await env.KV.get(`otp:${email}`);
   if (!raw) return json({ error: 'Invalid or expired code' }, 400);
 
   const { code: savedCode, used } = JSON.parse(raw);
@@ -86,14 +86,14 @@ export async function verifyOTP(request, env) {
   }
 
   // Mark as used immediately — a second attempt with the same code will fail
-  await env.AUTH_KV.put(
+  await env.KV.put(
     `otp:${email}`,
     JSON.stringify({ code: savedCode, used: true }),
     { expirationTtl: 60 } // keep briefly so the key exists, then auto-expire
   );
 
   // Grant a 5-minute window to complete passkey registration
-  await env.AUTH_KV.put(`email_verified:${email}`, '1', { expirationTtl: 300 });
+  await env.KV.put(`email_verified:${email}`, '1', { expirationTtl: 300 });
 
   return json({ ok: true });
 }

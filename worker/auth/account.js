@@ -31,7 +31,7 @@ function json(data, status = 200) {
 }
 
 async function requireSession(request, env) {
-  const session = await getSession(env.AUTH_KV, request);
+  const session = await getSession(env.KV, request);
   if (!session) return { error: json({ error: 'Unauthorized' }, 401) };
   return { session };
 }
@@ -73,7 +73,7 @@ export async function revokeSession(request, env, sessionId) {
     .bind(sessionId, session.userId)
     .first();
   if (record) {
-    await env.AUTH_KV.delete(`session:${record.token_hash}`);
+    await env.KV.delete(`session:${record.token_hash}`);
   }
 
   await deleteSessionById(db, sessionId, session.userId);
@@ -104,7 +104,7 @@ export async function revokeOtherSessions(request, env) {
       .prepare('SELECT token_hash FROM sessions WHERE user_id = ? AND id != ?')
       .bind(session.userId, currentSession.id)
       .all();
-    await Promise.all((others.results ?? []).map(r => env.AUTH_KV.delete(`session:${r.token_hash}`)));
+    await Promise.all((others.results ?? []).map(r => env.KV.delete(`session:${r.token_hash}`)));
     await deleteAllSessionsByUserIdExcept(db, session.userId, currentSession.id);
   }
 
@@ -263,7 +263,7 @@ export async function deleteAccount(request, env) {
 
   const body = await request.json().catch(() => ({}));
 
-  const valid = await consumeStepUpToken(env.AUTH_KV, body.stepUpToken, session.userId);
+  const valid = await consumeStepUpToken(env.KV, body.stepUpToken, session.userId);
   if (!valid) return json({ error: 'Step-up authentication required or expired. Please verify your passkey again.' }, 403);
 
   const db = env.varun_portfolio_auth;
@@ -276,7 +276,7 @@ export async function deleteAccount(request, env) {
 
   // Delete everything — KV session first, then all D1 records
   const currentHash = await sha256(session.token);
-  await env.AUTH_KV.delete(`session:${currentHash}`);
+  await env.KV.delete(`session:${currentHash}`);
   await deleteUser(db, session.userId);
 
   return json({ ok: true }, 200, { 'Set-Cookie': sessionCookie('', 0) });

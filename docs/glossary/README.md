@@ -46,7 +46,7 @@ A 109-million-parameter bi-encoder embedding model from the Beijing Academy of A
 
 ## Binding
 
-In the Cloudflare Workers context, a binding is a configuration that gives a Worker access to a resource — a D1 database, a KV namespace, a Durable Object class, or an ASSETS directory. Bindings are declared in `wrangler.toml` and accessible in Worker code as properties of the `env` parameter. Example: `env.AUTH_KV` (KV binding), `env.varun_portfolio_auth` (D1 binding).
+In the Cloudflare Workers context, a binding is a configuration that gives a Worker access to a resource — a D1 database, a KV namespace, a Durable Object class, or an ASSETS directory. Bindings are declared in `wrangler.toml` and accessible in Worker code as properties of the `env` parameter. Example: `env.KV` (KV binding), `env.varun_portfolio_auth` (D1 binding).
 
 *See also:* [Cloudflare Workers Bindings](https://developers.cloudflare.com/workers/runtime-apis/bindings/)
 
