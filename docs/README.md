@@ -40,6 +40,7 @@ The documentation is written for a competent developer who may not yet know WebA
 | [22](./chapters/22-database-migrations.md) | Database Migrations | Migration file conventions, history, how to apply to prod, how to write new migrations |
 | [23](./chapters/23-accessibility.md) | Accessibility | Three-layer a11y system: ESLint jsx-a11y, axe-core/playwright pre-push gate, Lighthouse CI post-deploy trend tracking |
 | [26](./chapters/26-llm-eval-pipeline.md) | LLM Eval Pipeline | Two-phase generate-then-judge pipeline, financial Q&A dataset, scoring dimensions, baseline/comparison workflow, secret management |
+| [27](./chapters/27-agent-fix.md) | Agent Fix Workflow | Automated bug-fixing pipeline: issue label trigger, Gemini-powered file discovery and code generation, safety guards, full test gate, PR creation |
 
 ### Glossary
 

@@ -1,0 +1,159 @@
+name: Agent Fix
+
+# Triggers when the 'agent-fix' label is added to any issue.
+# Calls Gemini to generate a fix, runs the full test suite, and opens a PR.
+# The label can be re-applied to trigger a fresh attempt.
+
+on:
+  issues:
+    types: [labeled]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write        # push branch
+  pull-requests: write   # open PR
+  issues: write          # comment on issue
+
+jobs:
+  fix:
+    if: github.event.label.name == 'agent-fix'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: 22
+          cache: yarn
+
+      - run: yarn install --frozen-lockfile
+
+      - name: Install Playwright + Chromium
+        run: npx playwright install chromium --with-deps
+
+      # Write issue body to a file to avoid shell quoting issues with
+      # multi-line / special-character content in env vars.
+      - name: Write issue body to file
+        run: |
+          cat > /tmp/issue-body.txt << 'ISSUE_BODY_EOF'
+          ${{ github.event.issue.body }}
+          ISSUE_BODY_EOF
+
+      - name: Run agent fix script
+        id: agent
+        env:
+          GEMINI_API_KEY:   ${{ secrets.GEMINI_API_KEY }}
+          ISSUE_NUMBER:     ${{ github.event.issue.number }}
+          ISSUE_TITLE:      ${{ github.event.issue.title }}
+          ISSUE_BODY_FILE:  /tmp/issue-body.txt
+        run: node scripts/agent-fix.js
+
+      # ── Test gate — only runs if the script applied at least one fix ──
+
+      - name: Lint
+        id: lint
+        if: steps.agent.outputs.has_changes == 'true'
+        run: yarn lint
+        continue-on-error: true
+
+      - name: Storybook component tests
+        id: storybook
+        if: steps.agent.outputs.has_changes == 'true' && steps.lint.outcome == 'success'
+        run: yarn test:storybook
+        continue-on-error: true
+
+      - name: Playwright e2e tests
+        id: e2e
+        if: steps.agent.outputs.has_changes == 'true' && steps.storybook.outcome == 'success'
+        run: yarn test
+        continue-on-error: true
+
+      # ── Commit, push branch, open PR — only if all tests pass ────────
+
+      - name: Commit, push branch, open PR
+        id: pr
+        if: |
+          steps.agent.outputs.has_changes == 'true' &&
+          steps.lint.outcome     == 'success'       &&
+          steps.storybook.outcome == 'success'      &&
+          steps.e2e.outcome      == 'success'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="${{ steps.agent.outputs.branch }}"
+          ISSUE="${{ github.event.issue.number }}"
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Delete stale branch from a previous attempt, if any
+          git push origin --delete "$BRANCH" 2>/dev/null || true
+
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "$(cat /tmp/agent-fix-title.txt)
+
+          Co-Authored-By: Gemini 2.5 Flash <gemini@google.com>"
+          git push origin "$BRANCH"
+
+          # Close any stale PR for this branch before opening a fresh one
+          STALE=$(gh pr list --head "$BRANCH" --json number -q '.[0].number' 2>/dev/null || true)
+          [ -n "$STALE" ] && gh pr close "$STALE" --comment "Superseded by a new agent-fix attempt." || true
+
+          PR_URL=$(gh pr create \
+            --title "$(cat /tmp/agent-fix-title.txt)" \
+            --body  "$(cat /tmp/agent-fix-pr-body.md)" \
+            --base  main)
+          echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+
+      # Append PR link to the comment on success
+      - name: Append PR link to comment
+        if: steps.pr.outcome == 'success'
+        run: |
+          printf '\n\n➡️ **PR:** %s' "${{ steps.pr.outputs.pr_url }}" >> /tmp/agent-fix-comment.md
+
+      # Overwrite comment when tests failed
+      - name: Update comment for test failure
+        if: |
+          steps.agent.outputs.has_changes == 'true' && (
+            steps.lint.outcome      == 'failure' ||
+            steps.storybook.outcome == 'failure' ||
+            steps.e2e.outcome       == 'failure'
+          )
+        run: |
+          FAILED_STEP="unknown"
+          [ "${{ steps.lint.outcome }}"      = "failure" ] && FAILED_STEP="lint"
+          [ "${{ steps.storybook.outcome }}" = "failure" ] && FAILED_STEP="Storybook component tests"
+          [ "${{ steps.e2e.outcome }}"       = "failure" ] && FAILED_STEP="Playwright e2e tests"
+
+          cat > /tmp/agent-fix-comment.md << EOF
+          🤖 I applied a fix but **${FAILED_STEP} failed** — the changes didn't pass the test suite so no PR was opened.
+
+          **Branch:** \`${{ steps.agent.outputs.branch }}\` (pushed for your review)
+          **What I tried:** $(cat /tmp/agent-fix-title.txt 2>/dev/null || echo 'see branch')
+
+          You can check out the branch, inspect the diff, fix the remaining issue, and open a PR manually.
+          EOF
+
+          # Push the failing branch anyway so it's inspectable
+          BRANCH="${{ steps.agent.outputs.branch }}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git push origin --delete "$BRANCH" 2>/dev/null || true
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "wip: agent fix attempt for issue #${{ github.event.issue.number }} (tests failed)"
+          git push origin "$BRANCH"
+
+      # Always post a comment on the issue
+      - name: Comment on issue
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          [ -f /tmp/agent-fix-comment.md ] || exit 0
+          gh issue comment ${{ github.event.issue.number }} \
+            --body "$(cat /tmp/agent-fix-comment.md)"
