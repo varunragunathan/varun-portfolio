@@ -1857,6 +1857,8 @@ function EvalsTab({ t }) {
     setCompareId(null);
   }, []);
 
+  if (loadingRuns) return <TabSpinner t={t} />;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
 
