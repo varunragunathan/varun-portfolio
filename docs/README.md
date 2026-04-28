@@ -42,6 +42,12 @@ The documentation is written for a competent developer who may not yet know WebA
 | [26](./chapters/26-llm-eval-pipeline.md) | LLM Eval Pipeline | Two-phase generate-then-judge pipeline, financial Q&A dataset, scoring dimensions, baseline/comparison workflow, secret management |
 | [27](./chapters/27-agent-fix.md) | Agent Fix Workflow | Automated bug-fixing pipeline: issue label trigger, Gemini-powered file discovery and code generation, safety guards, full test gate, PR creation |
 
+### Ops Notes
+
+[NOTES.md](./NOTES.md) — Dated log of one-off fixes, dashboard actions, and operational decisions that don't belong in a chapter.
+
+---
+
 ### Glossary
 
 [Master Glossary](./glossary/README.md) — Alphabetical reference for every technical term in the book.
