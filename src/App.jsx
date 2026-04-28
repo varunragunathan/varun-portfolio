@@ -3,6 +3,7 @@ import { Routes, Route, useLocation, matchPath } from 'react-router-dom';
 import { ThemeProvider, useTheme } from './hooks/useTheme';
 import { SkipLink, ThemeToggle } from './components/UI';
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
+import { VCoinsProvider } from './hooks/useVCoins.jsx';
 import Nav from './components/Nav';
 import PixelOwl from './components/PixelOwl';
 import VersionBadge from './components/VersionBadge.jsx';
@@ -49,6 +50,8 @@ const ChatPage       = lazy(() => import('./pages/Chat'));
 const AdminPage      = lazy(() => import('./pages/Admin'));
 const EngineeringPage    = lazy(() => import('./pages/Engineering'));
 const TransparencyPage   = lazy(() => import('./pages/Transparency'));
+const LearnPage          = lazy(() => import('./pages/Learn'));
+const CourseViewerPage   = lazy(() => import('./pages/CourseViewer'));
 
 function Loading() {
   return (
@@ -103,6 +106,7 @@ function Footer({ onShakeEnable, shakeState }) {
           <VersionBadge />
           <a href="/engineering" className="footer__engineering-link">engineering</a>
           <a href="/transparency" className="footer__engineering-link">transparency</a>
+          <a href="/learn" className="footer__engineering-link">learn</a>
         </div>
         <ThemeToggle />
       </div>
@@ -145,6 +149,8 @@ function Shell() {
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/engineering" element={<EngineeringPage />} />
             <Route path="/transparency" element={<TransparencyPage />} />
+            <Route path="/learn" element={<LearnPage />} />
+            <Route path="/learn/:courseId/:moduleId" element={<CourseViewerPage />} />
           </Routes>
         </Suspense>
       </main>
@@ -161,11 +167,13 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
-        <AuthProvider>
-          <ErrorBoundary>
-            <Shell />
-          </ErrorBoundary>
-        </AuthProvider>
+        <VCoinsProvider>
+          <AuthProvider>
+            <ErrorBoundary>
+              <Shell />
+            </ErrorBoundary>
+          </AuthProvider>
+        </VCoinsProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );
