@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth.jsx';
+import { useVCoins } from '../hooks/useVCoins.jsx';
 import './Nav.css';
 
 // ── Identicon ─────────────────────────────────────────────────────
@@ -133,6 +134,7 @@ function Identicon({ email, size = 32 }) {
 // ── Avatar button + dropdown ──────────────────────────────────────
 function AvatarMenu({ user, onLogout }) {
   const { setUser } = useAuth();
+  const { balance } = useVCoins();
   const [open, setOpen]           = useState(false);
   const [editingNick, setEditingNick] = useState(false);
   const [nickDraft, setNickDraft] = useState('');
@@ -218,6 +220,23 @@ function AvatarMenu({ user, onLogout }) {
               </div>
             )}
           </div>
+
+          {/* vCoins Balance */}
+          <div className="avatar-menu__balance">
+            <span className="avatar-menu__balance-label">Your Balance</span>
+            <span className="avatar-menu__balance-value">🪙 {balance}</span>
+          </div>
+
+          <div className="avatar-menu__divider" />
+
+          {/* Learning Lab Link */}
+          <Link
+            to="/learn"
+            onClick={() => setOpen(false)}
+            className="avatar-menu__link avatar-menu__link--primary"
+          >
+            Learning Lab
+          </Link>
 
           {/* Settings */}
           <Link
@@ -360,6 +379,7 @@ export default function Nav() {
         <div className="nav__spacer" />
         <LogoMark />
         <div className="nav__actions">
+          <Link to="/learn" className="nav__action-link">learn</Link>
           {enabled && !loading && user && (
             <AvatarMenu user={user} onLogout={handleLogout} />
           )}

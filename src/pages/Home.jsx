@@ -14,7 +14,7 @@ const WelcomeTour = lazy(() => import('../components/WelcomeTour'));
 // ─── Guest view (unauthenticated) ─────────────────────────────────
 const GUEST_FEATURES = [
   { tag: 'timeline',  text: '11 years shipping at scale — including identity systems used by 135M+ people' },
-  { tag: 'ai chat',   text: 'Ask the AI assistant anything about how this site was built' },
+  { tag: 'learning',  text: 'Deep-dive courses on AI, LLMs, and architecture with interactive simulations' },
   { tag: 'passkeys',  text: 'Zero-password auth — your device is the credential' },
 ];
 
@@ -144,6 +144,33 @@ function StatsBar() {
       <div className="stats-bar__grid">
         {STATS.map((s, i) => <Stat key={s.label} {...s} delay={i * 80} />)}
       </div>
+    </section>
+  );
+}
+
+// ─── Learning Promo ───────────────────────────────────────────────
+function LearningPromo() {
+  return (
+    <section className="learning-promo">
+      <Fade>
+        <Link to="/learn" className="learning-promo__card">
+          <div className="learning-promo__content">
+            <div className="learning-promo__eyebrow">NEW: Learning Lab</div>
+            <h2 className="learning-promo__title">Master AI Fundamentals</h2>
+            <p className="learning-promo__text">
+              Deep-dive into LLMs, Transformers, and Vector Spaces with custom interactive simulations.
+            </p>
+            <div className="learning-promo__action">
+              Explore Courses 🪙
+            </div>
+          </div>
+          <div className="learning-promo__visual" aria-hidden="true">
+            <div className="learning-promo__node" />
+            <div className="learning-promo__node" />
+            <div className="learning-promo__node" />
+          </div>
+        </Link>
+      </Fade>
     </section>
   );
 }
@@ -349,6 +376,7 @@ export default function Home() {
           {authenticated && (
             <>
               <StatsBar />
+              <LearningPromo />
               <ProjectsSection />
               <SkillsSection />
               <PhilosophySection />

@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect, useState, useCallback, Component } from 'react';
-import { Routes, Route, useLocation, matchPath } from 'react-router-dom';
+import { Routes, Route, useLocation, matchPath, Link } from 'react-router-dom';
 import { ThemeProvider, useTheme } from './hooks/useTheme';
 import { SkipLink, ThemeToggle } from './components/UI';
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
@@ -106,7 +106,7 @@ function Footer({ onShakeEnable, shakeState }) {
           <VersionBadge />
           <a href="/engineering" className="footer__engineering-link">engineering</a>
           <a href="/transparency" className="footer__engineering-link">transparency</a>
-          <a href="/learn" className="footer__engineering-link">learn</a>
+          <Link to="/learn" className="footer__engineering-link">learn</Link>
         </div>
         <ThemeToggle />
       </div>
