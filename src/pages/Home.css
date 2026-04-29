@@ -131,6 +131,56 @@
   letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-3); margin-top: 4px;
 }
 
+/* ── LearningPromo ────────────────────────────────────────────────── */
+.learning-promo { max-width: 920px; margin: 0 auto; padding: 40px 24px; }
+.learning-promo__card {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 20px; padding: 40px; text-decoration: none;
+  position: relative; overflow: hidden; transition: border-color 0.3s, transform 0.3s;
+}
+.learning-promo__card:hover { border-color: var(--accent-border); transform: translateY(-4px); }
+.learning-promo__content { position: relative; z-index: 2; max-width: 500px; }
+.learning-promo__eyebrow {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--accent); margin-bottom: 12px;
+}
+.learning-promo__title {
+  font-family: var(--font-sans); font-size: 24px; font-weight: 500;
+  color: var(--text-1); margin-bottom: 12px;
+}
+.learning-promo__text {
+  font-family: var(--font-sans); font-size: 15px; color: var(--text-2);
+  line-height: 1.6; margin-bottom: 24px;
+}
+.learning-promo__action {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--font-sans); font-size: 14px; font-weight: 500; color: var(--accent);
+}
+
+.learning-promo__visual {
+  position: absolute; right: 40px; top: 0; bottom: 0; width: 140px;
+  display: flex; flex-direction: column; justify-content: center; gap: 20px;
+  opacity: 0.4;
+}
+.learning-promo__node {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: var(--accent-dim); border: 1px solid var(--accent-border);
+  animation: floatNode 3s ease-in-out infinite alternate;
+}
+.learning-promo__node:nth-child(2) { align-self: flex-end; animation-delay: 1s; }
+.learning-promo__node:nth-child(3) { animation-delay: 0.5s; }
+
+@keyframes floatNode {
+  from { transform: translateY(0); }
+  to { transform: translateY(-10px); }
+}
+
+@media (max-width: 639px) {
+  .learning-promo__card { padding: 30px; flex-direction: column; text-align: center; }
+  .learning-promo__visual { display: none; }
+}
+
 /* ── ProjectsSection ──────────────────────────────────────────────── */
 .projects-section { max-width: 920px; margin: 0 auto; padding: 80px 24px; }
 .projects-grid { display: grid; gap: 14px; }

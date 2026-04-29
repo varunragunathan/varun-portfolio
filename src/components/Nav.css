@@ -39,6 +39,13 @@
 }
 .nav__sign-in:hover { color: var(--accent); border-color: var(--accent-border); }
 
+.nav__action-link {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em;
+  text-decoration: none; color: var(--text-3);
+  padding: 5px 12px; transition: color 0.15s;
+}
+.nav__action-link:hover { color: var(--accent); }
+
 /* ── Avatar menu ──────────────────────────────────────────────────── */
 .avatar-menu { position: relative; }
 
@@ -104,3 +111,14 @@
   background: none; border: none; cursor: pointer; transition: background 0.15s;
 }
 .avatar-menu__logout:hover { background: rgba(248,113,113,0.08); }
+
+.avatar-menu__balance {
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 4px;
+}
+.avatar-menu__balance-label { font-family: var(--font-sans); font-size: 11px; color: var(--text-3); }
+.avatar-menu__balance-value { font-family: var(--font-mono); font-size: 16px; color: var(--text-1); font-weight: 600; }
+
+.avatar-menu__divider { height: 1px; background: var(--border); }
+
+.avatar-menu__link--primary { color: var(--accent); font-weight: 500; }
+.avatar-menu__link--primary:hover { background: var(--accent-dim); }
