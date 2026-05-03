@@ -238,6 +238,15 @@ function AvatarMenu({ user, onLogout }) {
             Learning Lab
           </Link>
 
+          {/* Glossary */}
+          <Link
+            to="/glossary"
+            onClick={() => setOpen(false)}
+            className="avatar-menu__link avatar-menu__link--primary"
+          >
+            Glossary
+          </Link>
+
           {/* Settings */}
           <Link
             to="/account/settings"

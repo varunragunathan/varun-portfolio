@@ -4,6 +4,7 @@ import { ThemeProvider, useTheme } from './hooks/useTheme';
 import { SkipLink, ThemeToggle } from './components/UI';
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import { VCoinsProvider } from './hooks/useVCoins.jsx';
+import { GlossaryProvider } from './hooks/useGlossary.jsx';
 import Nav from './components/Nav';
 import PixelOwl from './components/PixelOwl';
 import VersionBadge from './components/VersionBadge.jsx';
@@ -52,6 +53,7 @@ const EngineeringPage    = lazy(() => import('./pages/Engineering'));
 const TransparencyPage   = lazy(() => import('./pages/Transparency'));
 const LearnPage          = lazy(() => import('./pages/Learn'));
 const CourseViewerPage   = lazy(() => import('./pages/CourseViewer'));
+const GlossaryPage       = lazy(() => import('./pages/Glossary'));
 
 function Loading() {
   return (
@@ -107,6 +109,7 @@ function Footer({ onShakeEnable, shakeState }) {
           <a href="/engineering" className="footer__engineering-link">engineering</a>
           <a href="/transparency" className="footer__engineering-link">transparency</a>
           <Link to="/learn" className="footer__engineering-link">learn</Link>
+          <Link to="/glossary" className="footer__engineering-link">glossary</Link>
         </div>
         <ThemeToggle />
       </div>
@@ -151,6 +154,7 @@ function Shell() {
             <Route path="/transparency" element={<TransparencyPage />} />
             <Route path="/learn" element={<LearnPage />} />
             <Route path="/learn/:courseId/:moduleId" element={<CourseViewerPage />} />
+            <Route path="/glossary" element={<GlossaryPage />} />
           </Routes>
         </Suspense>
       </main>
@@ -168,11 +172,13 @@ export default function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <VCoinsProvider>
-          <AuthProvider>
-            <ErrorBoundary>
-              <Shell />
-            </ErrorBoundary>
-          </AuthProvider>
+          <GlossaryProvider>
+            <AuthProvider>
+              <ErrorBoundary>
+                <Shell />
+              </ErrorBoundary>
+            </AuthProvider>
+          </GlossaryProvider>
         </VCoinsProvider>
       </ThemeProvider>
     </ErrorBoundary>

@@ -3,6 +3,7 @@
 // Completing a module awards vCoins.
 
 import { LLM_DEEP_DIVE } from './llm-deep-dive';
+import { FRONTEND_INTERVIEW_COURSES } from './frontend-interview';
 
 export const COURSES = [
   {
@@ -290,4 +291,5 @@ export const COURSES = [
     ],
   },
   LLM_DEEP_DIVE,
+  ...FRONTEND_INTERVIEW_COURSES,
 ];

@@ -660,6 +660,92 @@ function Visual({ type }) {
     case 'custom-evals':       return <TypeIconVis icon="✅" labels={['Assertions', 'LLM-as-Judge', 'Human eval', 'Regression tests']} />;
     case 'hallucination':      return <TypeIconVis icon="🌫️" labels={['Plausible ≠ true', 'RAG grounding', 'Citations', 'Low temperature']} />;
     case 'safety-alignment':   return <TypeIconVis icon="🛡️" labels={['Constitutional AI', 'Red teaming', 'Guardrails', 'Alignment tax']} />;
+    // ── React Deep Dive visuals ──
+    case 'hooks-rules':        return <TypeIconVis icon="🪝" labels={['Top level only', 'No conditions/loops', 'FC or custom hooks', 'Call order = state slot']} />;
+    case 'effect-lifecycle':   return <FlowVis steps={['🖼️ Render', '🖌️ Paint', '⚡ Effect runs', '🧹 Cleanup']} />;
+    case 'memo-compare':       return <TypeIconVis icon="⚡" labels={['useMemo → value', 'useCallback → fn', 'Both use deps array', 'Measure before using']} />;
+    case 'ref-uses':           return <TypeIconVis icon="📌" labels={['DOM node access', 'Previous value', 'Stable callback', 'No re-render']} />;
+    case 'custom-hook':        return <FlowVis steps={['📦 Extract logic', '🪝 use prefix', '✅ Call hooks', '🔁 Return values']} />;
+    case 'render-triggers':    return <TypeIconVis icon="🔄" labels={['Own state change', 'Parent re-render', 'Context change', 'React.memo to skip']} />;
+    case 'reconciliation':     return <FlowVis steps={['🌳 New vDOM', '🔍 Diff', '📋 Patch', '🖼️ DOM update']} />;
+    case 'keys-vis':           return <TypeIconVis icon="🔑" labels={['Stable IDs', 'No array index', 'No Math.random()', 'Force reset: change key']} />;
+    case 'fiber-concurrent':   return <TypeIconVis icon="⚡" labels={['Pause work', 'Prioritize urgent', 'startTransition', 'useDeferredValue']} />;
+    case 'lift-state':         return <FlowVis steps={['🧩 Sibling A', '⬆️ Lift to parent', '🧩 Sibling B', '📡 Props down']} />;
+    case 'context-pattern':    return <TypeIconVis icon="🌐" labels={['createContext', 'Provider at top', 'useContext anywhere', 'Memoize value']} />;
+    case 'reducer-pattern':    return <FlowVis steps={['📨 dispatch', '🔀 reducer(state, action)', '🆕 New state', '🔁 Re-render']} />;
+    case 'state-libs':         return <TypeIconVis icon="🗄️" labels={['Zustand: simple', 'Jotai: atomic', 'TanStack Query: server', 'Redux: large teams']} />;
+    case 'react-memo':         return <TypeIconVis icon="🧠" labels={['Shallow prop compare', 'Skip re-render', 'Wrap with memo()', 'Combine useCallback']} />;
+    case 'code-split':         return <FlowVis steps={['📦 lazy()', '⏳ Suspense fallback', '🌐 Network fetch', '✅ Render chunk']} />;
+    case 'perf-pitfalls':      return <TypeIconVis icon="⚠️" labels={['Inline objects', 'Inline functions', 'Context literals', 'Long lists']} />;
+    case 'profiling':          return <TypeIconVis icon="🔬" labels={['DevTools Profiler', 'Highlight updates', 'Why Did You Render', 'Measure first']} />;
+    case 'composition':        return <TypeIconVis icon="🧩" labels={['children prop', 'Render props', 'Custom hooks', 'No inheritance']} />;
+    case 'compound':           return <TypeIconVis icon="🔗" labels={['Parent holds state', 'Context shares it', 'Children consume', 'Radix / Headless']} />;
+    case 'error-boundary':     return <TypeIconVis icon="🛡️" labels={['Class component', 'getDerivedStateFromError', 'Fallback UI', 'No async errors']} />;
+    case 'rsc':                return <TypeIconVis icon="🖥️" labels={['Server only', 'Zero JS to client', '\'use client\' for islands', 'async components']} />;
+    // ── JS Core visuals ──
+    case 'event-loop':         return <FlowVis steps={['📚 Call stack', '🔬 Microtasks', '⏱️ Macrotask', '🔁 Repeat']} />;
+    case 'micro-macro':        return <TypeIconVis icon="⏳" labels={['Sync code first', 'Promise → microtask', 'setTimeout → macrotask', 'Microtasks drain first']} />;
+    case 'long-task':          return <TypeIconVis icon="⛔" labels={['> 50ms blocks UI', 'No input handling', 'No repaints', 'Break up with yield']} />;
+    case 'lexical-scope':      return <TypeIconVis icon="🔍" labels={['Where written = scope', 'Scope chain', 'Not call site', 'Outer → inner']} />;
+    case 'closure-vis':        return <TypeIconVis icon="🔒" labels={['Fn + env snapshot', 'Survives outer return', 'Private data', 'Module pattern']} />;
+    case 'closure-trap':       return <TypeIconVis icon="⚠️" labels={['var = shared binding', 'let = per-iteration', 'IIFE captures copy', 'Async fires after loop']} />;
+    case 'this-rules':         return <TypeIconVis icon="👉" labels={['obj.method() → obj', 'fn() → undefined', 'new → instance', 'Arrow → lexical']} />;
+    case 'prototype-chain':    return <FlowVis steps={['🔍 Property lookup', '🔗 __proto__ link', '🔗 ..up chain..', '⬛ null (end)']} />;
+    case 'call-apply-bind':    return <TypeIconVis icon="🔧" labels={['call(ctx, ...args)', 'apply(ctx, [args])', 'bind → new fn', 'Arrow ignores all']} />;
+    case 'promise-vis':        return <TypeIconVis icon="🤝" labels={['pending → settled', 'Promise.all', 'Promise.allSettled', 'Promise.race']} />;
+    case 'async-await':        return <FlowVis steps={['async fn()', 'await pauses', '⚡ Microtask resumes', '✅ Returns value']} />;
+    case 'async-error':        return <TypeIconVis icon="🎯" labels={['try/catch', 'Result tuple', '.catch()', 'Never unhandled']} />;
+    case 'destructure':        return <TypeIconVis icon="📦" labels={['Object destructure', 'Array destructure', 'Default values', 'Spread is shallow']} />;
+    case 'nullish':            return <TypeIconVis icon="❓" labels={['?? = null|undefined', '|| = any falsy', '?. = safe chain', '0 and \'\' are valid']} />;
+    case 'generators':         return <TypeIconVis icon="⚙️" labels={['function*', 'yield values', 'Lazy sequences', 'Symbol.iterator']} />;
+    // ── CSS & Layout visuals ──
+    case 'box-model':          return <TypeIconVis icon="📦" labels={['content', 'padding', 'border', 'margin']} />;
+    case 'specificity':        return <TypeIconVis icon="🏆" labels={['ID: 0,1,0,0', 'Class: 0,0,1,0', 'Element: 0,0,0,1', 'Last rule wins tie']} />;
+    case 'stacking':           return <TypeIconVis icon="📚" labels={['z-index is relative', 'opacity < 1 = new ctx', 'transform = new ctx', 'Parent limits child']} />;
+    case 'flex-axes':          return <TypeIconVis icon="↔️" labels={['main axis: justify', 'cross axis: align', 'flex-direction sets main', 'gap replaces margins']} />;
+    case 'flex-props':         return <TypeIconVis icon="⚖️" labels={['basis: start size', 'grow: fill space', 'shrink: compress', 'flex:1 = 1 1 0%']} />;
+    case 'flex-patterns':      return <TypeIconVis icon="🔲" labels={['Center: justify+align', 'Sticky footer: flex:1', 'Auto margin push', 'Equal cols: flex:1']} />;
+    case 'grid-tracks':        return <TypeIconVis icon="🔲" labels={['fr = leftover fraction', 'template-areas', 'Named lines', 'gap for gutters']} />;
+    case 'grid-repeat':        return <TypeIconVis icon="🔁" labels={['auto-fill: keep cols', 'auto-fit: collapse', 'minmax(200px, 1fr)', 'Responsive no @media']} />;
+    case 'grid-placement':     return <TypeIconVis icon="📐" labels={['col: 1/3 = span 2', 'row: span 2', 'dense: fill gaps', 'Named areas']} />;
+    case 'responsive':         return <TypeIconVis icon="📱" labels={['Mobile-first', 'min-width queries', 'clamp() fluid sizing', 'Logical properties']} />;
+    case 'css-vars':           return <TypeIconVis icon="🎨" labels={['--var: value', 'var(--var)', 'Inherited cascade', 'Live at runtime']} />;
+    case 'container-queries':  return <TypeIconVis icon="📦" labels={['container-type', '@container (min-width)', 'Component-relative', 'All modern browsers']} />;
+    // ── Accessibility visuals ──
+    case 'wcag':               return <TypeIconVis icon="♿" labels={['Perceivable', 'Operable', 'Understandable', 'Robust']} />;
+    case 'a11y-legal':         return <TypeIconVis icon="⚖️" labels={['ADA (USA)', 'EAA 2025 (EU)', '15% have disability', 'SEO boost too']} />;
+    case 'landmarks':          return <TypeIconVis icon="🗺️" labels={['header / nav', 'main (one per page)', 'aside / footer', 'h1→h6 hierarchy']} />;
+    case 'forms-a11y':         return <TypeIconVis icon="📝" labels={['<label for=...>', 'aria-label', 'aria-describedby', 'No placeholder-only']} />;
+    case 'images-a11y':        return <TypeIconVis icon="🖼️" labels={['Alt describes content', 'alt="" = decorative', 'aria-label icons', 'SVG needs title']} />;
+    case 'aria-first-rule':    return <TypeIconVis icon="📋" labels={['Native HTML first', '<button> vs div', 'ARIA adds semantics', 'Not behavior']} />;
+    case 'aria-attrs':         return <TypeIconVis icon="🎭" labels={['aria-label / labelledby', 'aria-expanded/pressed', 'aria-live polite', 'aria-hidden']} />;
+    case 'modal-a11y':         return <TypeIconVis icon="🪟" labels={['role="dialog"', 'Focus trap', 'Escape closes', 'Restore focus']} />;
+    case 'keyboard-nav':       return <TypeIconVis icon="⌨️" labels={['Tab / Shift+Tab', 'Enter / Space', 'Escape', 'Arrow keys in widgets']} />;
+    case 'focus-management':   return <TypeIconVis icon="🎯" labels={['Skip links', 'Visible :focus', 'SPA route change', 'Focus trap modals']} />;
+    case 'a11y-testing':       return <TypeIconVis icon="🔬" labels={['axe DevTools', 'Lighthouse', 'Keyboard test', 'Screen reader test']} />;
+    // ── Performance visuals ──
+    case 'lcp':                return <TypeIconVis icon="🖼️" labels={['≤2.5s good', 'Hero img / heading', 'Slow TTFB', 'Preload + WebP']} />;
+    case 'inp':                return <TypeIconVis icon="👆" labels={['≤200ms good', 'Worst interaction', 'Long Tasks', 'yield() + debounce']} />;
+    case 'cls':                return <TypeIconVis icon="📏" labels={['≤0.1 good', 'No width/height', 'Ad injection', 'aspect-ratio reserve']} />;
+    case 'cwv-tools':          return <TypeIconVis icon="🔭" labels={['Lighthouse: lab', 'CrUX: field data', 'Search Console', 'web-vitals lib']} />;
+    case 'bundle-size':        return <TypeIconVis icon="📦" labels={['Tree shaking', 'Named ESM imports', 'Bundle analyzer', 'Code split by route']} />;
+    case 'script-loading':     return <TypeIconVis icon="📜" labels={['default: blocks', 'defer: after parse', 'async: immediate', 'module: deferred']} />;
+    case 'long-tasks':         return <TypeIconVis icon="⏱️" labels={['>50ms = long task', 'scheduler.yield()', 'Web Worker', 'No DOM in worker']} />;
+    case 'http-cache':         return <TypeIconVis icon="🗄️" labels={['max-age: browser TTL', 'immutable: no recheck', 'ETag: conditional', 'no-store: sensitive']} />;
+    case 'resource-hints':     return <TypeIconVis icon="💡" labels={['preload: this page', 'prefetch: next page', 'preconnect: warm DNS', "Don't over-preload"]} />;
+    case 'service-worker':     return <TypeIconVis icon="⚙️" labels={['Cache-first', 'Network-first', 'Stale-while-revalidate', 'Workbox']} />;
+    case 'render-pipeline':    return <FlowVis steps={['⚡ JS', '🎨 Style', '📐 Layout', '🖌️ Paint', '🖼️ Composite']} />;
+    case 'layout-thrash':      return <TypeIconVis icon="🔄" labels={['Read offsetHeight', 'Write style', 'Forces sync layout', 'Batch reads first']} />;
+    case 'compositing':        return <TypeIconVis icon="🎮" labels={['will-change: transform', 'GPU layer', 'contain: layout', 'Use sparingly']} />;
+    // ── SEO visuals ──
+    case 'crawl-index-rank':   return <FlowVis steps={['🕷️ Crawl', '📚 Index', '📊 Rank', '🔍 Serve result']} />;
+    case 'crawlability':       return <TypeIconVis icon="🗺️" labels={['robots.txt', 'sitemap.xml', 'Internal links', 'Canonical tag']} />;
+    case 'meta-tags':          return <TypeIconVis icon="🏷️" labels={['<title> 50-60 chars', 'description → CTR', 'og:image sharing', 'robots: index/noindex']} />;
+    case 'structured-data':    return <TypeIconVis icon="📋" labels={['JSON-LD', 'schema.org types', 'Rich results', 'Rich Results Test']} />;
+    case 'semantic-seo':       return <TypeIconVis icon="🏗️" labels={['One h1 per page', 'Heading hierarchy', 'Descriptive anchors', 'Alt text for images']} />;
+    case 'ssr-csr-seo':        return <TypeIconVis icon="🖥️" labels={['SSR: instant index', 'CSR: delayed crawl', 'SSG: pre-rendered', 'OG needs SSR HTML']} />;
+    case 'cwv-ranking':        return <TypeIconVis icon="📈" labels={['Page Experience signal', 'Tiebreaker not primary', 'Field data (CrUX)', 'LCP most impactful']} />;
+    case 'seo-checklist':      return <TypeIconVis icon="✅" labels={['HTTPS + mobile', 'Unique title+desc', 'CWV passing', 'Structured data']} />;
     default:                   return null;
   }
 }
