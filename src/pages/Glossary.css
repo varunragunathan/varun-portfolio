@@ -395,7 +395,6 @@
   display: flex;
   align-items: center;
   gap: 0.875rem;
-  cursor: pointer;
   user-select: none;
 }
 
@@ -428,7 +427,7 @@
 .term-form__checkbox:checked + .term-form__toggle-track::after { transform: translateX(1.125rem); }
 
 .term-form__toggle-text { display: flex; flex-direction: column; gap: 0.1rem; }
-.term-form__toggle-title { font-size: 0.9rem; font-weight: 600; color: var(--text1); }
+.term-form__toggle-title { font-size: 0.9rem; font-weight: 600; color: var(--text1); cursor: pointer; }
 .term-form__toggle-desc { font-size: 0.78rem; color: var(--text3); }
 
 .term-form__actions { display: flex; gap: 0.75rem; margin-top: 0.25rem; }
@@ -463,16 +462,26 @@
 .glossary-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.45);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   padding: 1rem;
+}
+
+.glossary-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
   backdrop-filter: blur(4px);
+  border: none;
+  cursor: default;
+  z-index: 0;
 }
 
 .glossary-modal {
+  position: relative;
+  z-index: 1;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 1rem;

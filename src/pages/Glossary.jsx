@@ -1,10 +1,10 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { Fade } from '../components/UI';
 import { useGlossary, buildSearchUrl } from '../hooks/useGlossary';
 import './Glossary.css';
 
 // ── Tag input ─────────────────────────────────────────────────────
-function TagInput({ tags, onChange, suggestions = [] }) {
+function TagInput({ tags, onChange, suggestions = [], inputId }) {
   const [input, setInput] = useState('');
 
   function commit(value) {
@@ -44,6 +44,7 @@ function TagInput({ tags, onChange, suggestions = [] }) {
       ))}
       <div className="tag-input__field-wrap">
         <input
+          id={inputId}
           type="text"
           value={input}
           onChange={e => setInput(e.target.value)}
@@ -70,6 +71,8 @@ function TermForm({ initial = EMPTY_DRAFT, onSave, onCancel, allTags = [] }) {
   const [draft, setDraft] = useState(initial);
   const termRef = useRef(null);
 
+  useEffect(() => { termRef.current?.focus(); }, []);
+
   function set(key, val) { setDraft(prev => ({ ...prev, [key]: val })); }
 
   function handleSubmit(e) {
@@ -90,7 +93,6 @@ function TermForm({ initial = EMPTY_DRAFT, onSave, onCancel, allTags = [] }) {
           value={draft.term}
           onChange={e => set('term', e.target.value)}
           placeholder="e.g. Closure, useCallback, LCP…"
-          autoFocus
           required
         />
       </div>
@@ -108,8 +110,9 @@ function TermForm({ initial = EMPTY_DRAFT, onSave, onCancel, allTags = [] }) {
       </div>
 
       <div className="term-form__row">
-        <label className="term-form__label">Tags</label>
+        <label className="term-form__label" htmlFor="tf-tags">Tags</label>
         <TagInput
+          inputId="tf-tags"
           tags={draft.tags}
           onChange={tags => set('tags', tags)}
           suggestions={allTags}
@@ -130,7 +133,7 @@ function TermForm({ initial = EMPTY_DRAFT, onSave, onCancel, allTags = [] }) {
       </div>
 
       <div className="term-form__row term-form__row--toggle">
-        <label className="term-form__toggle-label" htmlFor="tf-profile">
+        <div className="term-form__toggle-label">
           <input
             id="tf-profile"
             type="checkbox"
@@ -140,10 +143,10 @@ function TermForm({ initial = EMPTY_DRAFT, onSave, onCancel, allTags = [] }) {
           />
           <span className="term-form__toggle-track" aria-hidden="true" />
           <span className="term-form__toggle-text">
-            <span className="term-form__toggle-title">Add to my profile</span>
+            <label htmlFor="tf-profile" className="term-form__toggle-title">Add to my profile</label>
             <span className="term-form__toggle-desc">Highlights this term in your public glossary section</span>
           </span>
-        </label>
+        </div>
       </div>
 
       <div className="term-form__actions">
@@ -223,22 +226,15 @@ function TermCard({ term, onEdit, onDelete, onToggleProfile }) {
 
 // ── Modal ─────────────────────────────────────────────────────────
 function Modal({ title, onClose, children }) {
-  const overlayRef = useRef(null);
-
-  function handleOverlayClick(e) {
-    if (e.target === overlayRef.current) onClose();
-  }
-
   return (
-    <div
-      className="glossary-modal-overlay"
-      ref={overlayRef}
-      onClick={handleOverlayClick}
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-    >
-      <div className="glossary-modal">
+    <div className="glossary-modal-overlay">
+      <button className="glossary-modal-backdrop" onClick={onClose} aria-label="Close dialog" tabIndex={-1} />
+      <div
+        className="glossary-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+      >
         <div className="glossary-modal__header">
           <h2 className="glossary-modal__title">{title}</h2>
           <button className="glossary-modal__close" onClick={onClose} aria-label="Close">✕</button>
