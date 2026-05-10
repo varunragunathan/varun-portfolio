@@ -258,7 +258,7 @@ function EmptyState({ onAdd }) {
 
 // ── Main page ─────────────────────────────────────────────────────
 export default function Glossary() {
-  const { terms, addTerm, updateTerm, deleteTerm, toggleProfile, allTags } = useGlossary();
+  const { terms, addTerm, updateTerm, deleteTerm, toggleProfile, allTags, syncing } = useGlossary();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null); // term object being edited
   const [search, setSearch] = useState('');
@@ -315,6 +315,11 @@ export default function Glossary() {
             Your mental map of concepts, terms, and things worth remembering.
             Click any card to search it on Google.
           </p>
+          {syncing && (
+            <p className="glossary-hero__sync" aria-live="polite">
+              ↻ Syncing with your account…
+            </p>
+          )}
         </div>
       </Fade>
 

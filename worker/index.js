@@ -19,6 +19,7 @@ import {
 } from './admin.js';
 import { runEvals, getEvalRuns, deleteEvalRuns } from './evals.js';
 import { submitUpgradeRequest, getUpgradeRequest } from './userTier.js';
+import { listGlossary, createTerm, updateTerm, deleteTerm, bulkSync } from './glossary.js';
 import { submitFeedbackHandler } from './feedback.js';
 import { checkIpRateLimit } from './rateLimit.js';
 import { getMetrics } from './metrics.js';
@@ -199,6 +200,42 @@ async function handleRequest(request, env) {
       return withCors(response, cors);
     } catch (err) {
       console.error('User tier error:', err);
+      return new Response(JSON.stringify({ error: 'Internal server error' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...cors },
+      });
+    }
+  }
+
+  // ── /api/glossary ─────────────────────────────────────────────
+  if (url.pathname.startsWith('/api/glossary')) {
+    try {
+      const path   = url.pathname;
+      const method = request.method;
+      let response;
+
+      const termMatch = path.match(/^\/api\/glossary\/([^/]+)$/);
+
+      if (path === '/api/glossary/sync' && method === 'POST') {
+        response = await bulkSync(request, env);
+      } else if (path === '/api/glossary' && method === 'GET') {
+        response = await listGlossary(request, env);
+      } else if (path === '/api/glossary' && method === 'POST') {
+        response = await createTerm(request, env);
+      } else if (termMatch && method === 'PATCH') {
+        response = await updateTerm(request, env, termMatch[1]);
+      } else if (termMatch && method === 'DELETE') {
+        response = await deleteTerm(request, env, termMatch[1]);
+      } else {
+        response = new Response(JSON.stringify({ error: 'Not found' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      return withCors(response, cors);
+    } catch (err) {
+      console.error('Glossary error:', err);
       return new Response(JSON.stringify({ error: 'Internal server error' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json', ...cors },

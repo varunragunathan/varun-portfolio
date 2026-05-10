@@ -160,6 +160,21 @@ INSERT OR IGNORE INTO allowed_models (id, model_id, label, tier, enabled, added_
   ('model-llama-8b',  '@cf/meta/llama-3.1-8b-instruct',           'Llama 3.1 8B',        'pro', 1, 0),
   ('model-claude',    'claude-sonnet-4-6',                         'Claude Sonnet 4.6',   'pro', 0, 0);
 
+-- ── Glossary ──────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS glossary_terms (
+  id              TEXT    PRIMARY KEY,
+  user_id         TEXT    NOT NULL REFERENCES users(id),
+  term            TEXT    NOT NULL,
+  definition      TEXT    NOT NULL DEFAULT '',
+  tags            TEXT    NOT NULL DEFAULT '[]',
+  search_query    TEXT    NOT NULL DEFAULT '',
+  show_on_profile INTEGER NOT NULL DEFAULT 0,
+  created_at      INTEGER NOT NULL,
+  updated_at      INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_glossary_terms_user_id ON glossary_terms(user_id);
+
 -- ── Feedback ──────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS feedback (
   id          TEXT    PRIMARY KEY,

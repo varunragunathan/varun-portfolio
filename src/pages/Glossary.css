@@ -28,6 +28,18 @@
   margin: 0 0 1rem;
 }
 
+.glossary-hero__sync {
+  margin: 0.75rem auto 0;
+  font-size: 0.8rem;
+  color: var(--text-3);
+  animation: glossary-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes glossary-pulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
+}
+
 .glossary-hero__subtitle {
   font-size: 1.05rem;
   color: var(--text-3);

@@ -172,13 +172,13 @@ export default function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <VCoinsProvider>
-          <GlossaryProvider>
-            <AuthProvider>
+          <AuthProvider>
+            <GlossaryProvider>
               <ErrorBoundary>
                 <Shell />
               </ErrorBoundary>
-            </AuthProvider>
-          </GlossaryProvider>
+            </GlossaryProvider>
+          </AuthProvider>
         </VCoinsProvider>
       </ThemeProvider>
     </ErrorBoundary>
