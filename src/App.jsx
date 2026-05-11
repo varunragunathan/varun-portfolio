@@ -54,6 +54,8 @@ const TransparencyPage   = lazy(() => import('./pages/Transparency'));
 const LearnPage          = lazy(() => import('./pages/Learn'));
 const CourseViewerPage   = lazy(() => import('./pages/CourseViewer'));
 const GlossaryPage       = lazy(() => import('./pages/Glossary'));
+const SurveysPage        = lazy(() => import('./pages/Surveys'));
+const SurveyPage         = lazy(() => import('./pages/Survey'));
 
 function Loading() {
   return (
@@ -110,6 +112,7 @@ function Footer({ onShakeEnable, shakeState }) {
           <a href="/transparency" className="footer__engineering-link">transparency</a>
           <Link to="/learn" className="footer__engineering-link">learn</Link>
           <Link to="/glossary" className="footer__engineering-link">glossary</Link>
+          <Link to="/surveys" className="footer__engineering-link">surveys</Link>
         </div>
         <ThemeToggle />
       </div>
@@ -155,6 +158,8 @@ function Shell() {
             <Route path="/learn" element={<LearnPage />} />
             <Route path="/learn/:courseId/:moduleId" element={<CourseViewerPage />} />
             <Route path="/glossary" element={<GlossaryPage />} />
+            <Route path="/surveys" element={<SurveysPage />} />
+            <Route path="/survey/:surveyId" element={<SurveyPage />} />
           </Routes>
         </Suspense>
       </main>

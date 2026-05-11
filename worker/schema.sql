@@ -183,3 +183,35 @@ CREATE TABLE IF NOT EXISTS feedback (
   user_agent  TEXT,
   created_at  INTEGER NOT NULL
 );
+
+-- ── Surveys ───────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS surveys (
+  id              TEXT    PRIMARY KEY,
+  title           TEXT    NOT NULL,
+  description     TEXT    NOT NULL DEFAULT '',
+  system_prompt   TEXT    NOT NULL,
+  model           TEXT    NOT NULL DEFAULT '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+  is_active       INTEGER NOT NULL DEFAULT 1,
+  allow_retakes   INTEGER NOT NULL DEFAULT 1,
+  created_at      INTEGER NOT NULL,
+  updated_at      INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS survey_sessions (
+  id              TEXT    PRIMARY KEY,
+  survey_id       TEXT    NOT NULL REFERENCES surveys(id),
+  respondent_id   TEXT,
+  started_at      INTEGER NOT NULL,
+  completed_at    INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS survey_messages (
+  id          TEXT    PRIMARY KEY,
+  session_id  TEXT    NOT NULL REFERENCES survey_sessions(id),
+  role        TEXT    NOT NULL,
+  content     TEXT    NOT NULL,
+  created_at  INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_survey_sessions_survey_id ON survey_sessions(survey_id);
+CREATE INDEX IF NOT EXISTS idx_survey_messages_session_id ON survey_messages(session_id);

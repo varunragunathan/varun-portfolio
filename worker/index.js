@@ -20,6 +20,11 @@ import {
 import { runEvals, getEvalRuns, deleteEvalRuns } from './evals.js';
 import { submitUpgradeRequest, getUpgradeRequest } from './userTier.js';
 import { listGlossary, createTerm, updateTerm, deleteTerm, bulkSync } from './glossary.js';
+import {
+  listSurveys, getSurvey, createSession, sendMessage, completeSession,
+  adminListSurveys, adminCreateSurvey, adminUpdateSurvey, adminDeleteSurvey,
+  adminListSessions, adminGetSession,
+} from './surveys.js';
 import { submitFeedbackHandler } from './feedback.js';
 import { checkIpRateLimit } from './rateLimit.js';
 import { getMetrics } from './metrics.js';
@@ -200,6 +205,69 @@ async function handleRequest(request, env) {
       return withCors(response, cors);
     } catch (err) {
       console.error('User tier error:', err);
+      return new Response(JSON.stringify({ error: 'Internal server error' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...cors },
+      });
+    }
+  }
+
+  // ── /api/surveys (public + admin) ────────────────────────────
+  if (url.pathname.startsWith('/api/surveys') || (url.pathname.startsWith('/api/admin/surveys'))) {
+    try {
+      const path   = url.pathname;
+      const method = request.method;
+      let response;
+
+      // Admin routes
+      const adminSurveyMatch   = path.match(/^\/api\/admin\/surveys\/([^/]+)$/);
+      const adminSessionsMatch = path.match(/^\/api\/admin\/surveys\/([^/]+)\/sessions$/);
+      const adminSessionMatch  = path.match(/^\/api\/admin\/surveys\/([^/]+)\/sessions\/([^/]+)$/);
+
+      if (adminSessionsMatch && method === 'GET') {
+        response = await adminListSessions(request, env, adminSessionsMatch[1]);
+      } else if (adminSessionMatch && method === 'GET') {
+        response = await adminGetSession(request, env, adminSessionMatch[1], adminSessionMatch[2]);
+      } else if (path === '/api/admin/surveys' && method === 'GET') {
+        response = await adminListSurveys(request, env);
+      } else if (path === '/api/admin/surveys' && method === 'POST') {
+        response = await adminCreateSurvey(request, env);
+      } else if (adminSurveyMatch && method === 'PATCH') {
+        response = await adminUpdateSurvey(request, env, adminSurveyMatch[1]);
+      } else if (adminSurveyMatch && method === 'DELETE') {
+        response = await adminDeleteSurvey(request, env, adminSurveyMatch[1]);
+      }
+
+      // Public routes
+      else {
+        const sessionMatch       = path.match(/^\/api\/surveys\/([^/]+)\/sessions$/);
+        const messageMatch       = path.match(/^\/api\/surveys\/([^/]+)\/sessions\/([^/]+)\/message$/);
+        const completeMatch      = path.match(/^\/api\/surveys\/([^/]+)\/sessions\/([^/]+)\/complete$/);
+        const surveyByIdMatch    = path.match(/^\/api\/surveys\/([^/]+)$/);
+
+        if (path === '/api/surveys' && method === 'GET') {
+          response = await listSurveys(request, env);
+        } else if (surveyByIdMatch && method === 'GET') {
+          response = await getSurvey(request, env, surveyByIdMatch[1]);
+        } else if (sessionMatch && method === 'POST') {
+          response = await createSession(request, env, sessionMatch[1]);
+        } else if (messageMatch && method === 'POST') {
+          response = await sendMessage(request, env, messageMatch[1], messageMatch[2]);
+        } else if (completeMatch && method === 'PATCH') {
+          response = await completeSession(request, env, completeMatch[1], completeMatch[2]);
+        } else {
+          response = new Response(JSON.stringify({ error: 'Not found' }), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
+      // SSE responses pass through unmodified
+      if (response.headers.get('Content-Type')?.startsWith('text/event-stream')) return response;
+      return withCors(response, cors);
+    } catch (err) {
+      console.error('Survey error:', err);
       return new Response(JSON.stringify({ error: 'Internal server error' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json', ...cors },

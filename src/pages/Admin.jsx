@@ -2037,8 +2037,333 @@ function EvalsTab({ t }) {
   );
 }
 
+// ── Tab: Surveys ──────────────────────────────────────────────────
+const SURVEY_MODELS = [
+  { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', label: 'Llama 3.3 70B (free)' },
+  { id: '@cf/meta/llama-3.1-8b-instruct',           label: 'Llama 3.1 8B (free)' },
+  { id: 'claude-sonnet-4-6',                         label: 'Claude Sonnet 4.6' },
+];
+
+const AI_LITERACY_PROMPT = `You are Varun's Owl — a warm, curious, and slightly witty AI guide helping Varun understand how people think about AI.
+
+Your goal: conduct a friendly, conversational survey about AI literacy. Keep each message SHORT (2–4 sentences max). Ask one thing at a time. No bullet points.
+
+Cover these topics naturally across 5–8 exchanges:
+1. Current relationship with AI tools (experience level)
+2. Specific AI tools they use or have tried
+3. Their biggest fears or concerns about AI
+4. What they wish they understood better about AI
+5. Whether they feel AI could help their work/life and how
+
+At the end, wrap up warmly and provide 2–3 tailored learning resources based on their answers.
+
+IMPORTANT — after EVERY response (including the opening), append exactly this block on a new line:
+---SURVEY_OPTS---{"inputType":"choice","options":["Option A","Option B","Option C"],"done":false}
+
+Rules for the options block:
+- For the opening message and most turns: use "choice" with 2–4 relevant options that make sense given what you just asked
+- When asking for something personal/open-ended that can't be pre-answered: use "text" with options:null
+- For the FINAL message only: set done:true and include a "resources" array like: [{"title":"...","url":"...","description":"..."}]
+- Never include the delimiter text or JSON in the visible message — it must be on its own line after the message
+- Keep option labels short (3–6 words)
+
+Start: Greet the user warmly as the owl, introduce yourself briefly, and ask about their current experience with AI tools. Give 3–4 choice options covering the spectrum from "never used" to "use it daily".`;
+
+function SurveysTab({ t }) {
+  const [surveys,      setSurveys]      = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState(null);
+  const [showCreate,   setShowCreate]   = useState(false);
+  const [viewing,      setViewing]      = useState(null);   // { survey, sessions }
+  const [transcript,   setTranscript]   = useState(null);   // { session, messages }
+
+  // Create form state
+  const [form, setForm] = useState({
+    title: '', description: '', system_prompt: AI_LITERACY_PROMPT,
+    model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', allow_retakes: true,
+  });
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/surveys', { credentials: 'include' });
+      const data = await res.json();
+      setSurveys(data.surveys ?? []);
+    } catch { setError('Failed to load surveys'); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const createSurvey = useCallback(async () => {
+    if (!form.title.trim() || !form.system_prompt.trim()) return;
+    setSaving(true);
+    try {
+      await fetch('/api/admin/surveys', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      setShowCreate(false);
+      setForm({ title: '', description: '', system_prompt: AI_LITERACY_PROMPT, model: SURVEY_MODELS[0].id, allow_retakes: true });
+      load();
+    } finally { setSaving(false); }
+  }, [form, load]);
+
+  const toggleActive = useCallback(async (id, current) => {
+    await fetch(`/api/admin/surveys/${id}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !current }),
+    });
+    load();
+  }, [load]);
+
+  const deleteSurvey = useCallback(async (id) => {
+    if (!confirm('Delete this survey and all its responses?')) return;
+    await fetch(`/api/admin/surveys/${id}`, { method: 'DELETE', credentials: 'include' });
+    load();
+  }, [load]);
+
+  const viewSessions = useCallback(async (survey) => {
+    const res = await fetch(`/api/admin/surveys/${survey.id}/sessions`, { credentials: 'include' });
+    const data = await res.json();
+    setViewing({ survey, sessions: data.sessions ?? [] });
+    setTranscript(null);
+  }, []);
+
+  const viewTranscript = useCallback(async (surveyId, sessionId) => {
+    const res = await fetch(`/api/admin/surveys/${surveyId}/sessions/${sessionId}`, { credentials: 'include' });
+    const data = await res.json();
+    setTranscript(data);
+  }, []);
+
+  const cell = { fontFamily: M, fontSize: 12, color: t.text2, padding: '10px 12px', borderBottom: `1px solid ${t.border}` };
+  const hcell = { ...cell, color: t.text3, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600 };
+
+  if (loading) return <TabSpinner t={t} />;
+  if (error)   return <TabError msg={error} t={t} />;
+
+  // ── Transcript view ───────────────────────────────────────────
+  if (transcript) {
+    return (
+      <div>
+        <button onClick={() => setTranscript(null)} style={{ fontFamily: M, fontSize: 12, color: t.accent, background: 'none', border: 'none', cursor: 'pointer', marginBottom: 20 }}>
+          ← Back to sessions
+        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {transcript.messages.map((m, i) => (
+            <div key={i} style={{
+              padding: '10px 14px', borderRadius: 10,
+              background: m.role === 'owl' ? t.surfaceAlt : 'rgba(99,102,241,0.1)',
+              border: `1px solid ${m.role === 'owl' ? t.border : 'rgba(99,102,241,0.3)'}`,
+              alignSelf: m.role === 'owl' ? 'flex-start' : 'flex-end',
+              maxWidth: '75%',
+            }}>
+              <div style={{ fontFamily: M, fontSize: 9, letterSpacing: '0.1em', color: t.text3, marginBottom: 4, textTransform: 'uppercase' }}>{m.role}</div>
+              <div style={{ fontFamily: F, fontSize: 13, color: t.text1, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{m.content}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Sessions list view ────────────────────────────────────────
+  if (viewing) {
+    return (
+      <div>
+        <button onClick={() => setViewing(null)} style={{ fontFamily: M, fontSize: 12, color: t.accent, background: 'none', border: 'none', cursor: 'pointer', marginBottom: 20 }}>
+          ← Back to surveys
+        </button>
+        <div style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: t.text1, marginBottom: 4 }}>{viewing.survey.title}</div>
+        <div style={{ fontFamily: M, fontSize: 11, color: t.text3, marginBottom: 20 }}>
+          {viewing.sessions.length} response{viewing.sessions.length !== 1 ? 's' : ''}
+        </div>
+        {viewing.sessions.length === 0 ? (
+          <div style={{ color: t.text3, fontFamily: M, fontSize: 12 }}>No responses yet.</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {['Session', 'Started', 'Status', 'Messages', ''].map(h => (
+                  <th key={h} style={hcell}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {viewing.sessions.map(s => (
+                <tr key={s.id}>
+                  <td style={cell}><span style={{ fontFamily: M, fontSize: 10, color: t.text3 }}>{s.id.slice(0, 8)}…</span></td>
+                  <td style={cell}>{new Date(s.started_at).toLocaleString()}</td>
+                  <td style={cell}>
+                    <span style={{
+                      fontFamily: M, fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                      background: s.completed_at ? 'rgba(52,199,89,0.12)' : t.surfaceAlt,
+                      color: s.completed_at ? '#34c759' : t.text3,
+                      border: `1px solid ${s.completed_at ? 'rgba(52,199,89,0.35)' : t.border}`,
+                    }}>
+                      {s.completed_at ? 'done' : 'in progress'}
+                    </span>
+                  </td>
+                  <td style={cell}>{s.message_count}</td>
+                  <td style={cell}>
+                    <button onClick={() => viewTranscript(viewing.survey.id, s.id)} style={{ fontFamily: M, fontSize: 11, color: t.accent, background: 'none', border: 'none', cursor: 'pointer' }}>
+                      read →
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    );
+  }
+
+  // ── Create form ───────────────────────────────────────────────
+  if (showCreate) {
+    const inp = (label, key, placeholder, multiline) => (
+      <div style={{ marginBottom: 16 }}>
+        <label htmlFor={`sf-${key}`} style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.1em', color: t.text3, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>{label}</label>
+        {multiline ? (
+          <textarea
+            id={`sf-${key}`}
+            value={form[key]}
+            onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+            placeholder={placeholder}
+            rows={multiline}
+            style={{ width: '100%', boxSizing: 'border-box', fontFamily: M, fontSize: 11, lineHeight: 1.7, color: t.text1, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, padding: '10px 14px', outline: 'none', resize: 'vertical' }}
+          />
+        ) : (
+          <input
+            id={`sf-${key}`}
+            value={form[key]}
+            onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+            placeholder={placeholder}
+            style={{ width: '100%', boxSizing: 'border-box', fontFamily: F, fontSize: 13, color: t.text1, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, padding: '10px 14px', outline: 'none' }}
+          />
+        )}
+      </div>
+    );
+
+    return (
+      <div>
+        <button onClick={() => setShowCreate(false)} style={{ fontFamily: M, fontSize: 12, color: t.accent, background: 'none', border: 'none', cursor: 'pointer', marginBottom: 20 }}>
+          ← Cancel
+        </button>
+        <div style={{ fontFamily: F, fontSize: 18, fontWeight: 600, color: t.text1, marginBottom: 24 }}>New survey</div>
+        {inp('Title *', 'title', 'e.g. AI Literacy Check-in')}
+        {inp('Description', 'description', 'Short description shown on the survey listing page')}
+
+        <div style={{ marginBottom: 16 }}>
+          <label htmlFor="sf-model" style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.1em', color: t.text3, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Model</label>
+          <select
+            id="sf-model"
+            value={form.model}
+            onChange={e => setForm(f => ({ ...f, model: e.target.value }))}
+            style={{ fontFamily: F, fontSize: 13, color: t.text1, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, padding: '10px 14px', width: '100%', outline: 'none' }}
+          >
+            {SURVEY_MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+          </select>
+        </div>
+
+        <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <input type="checkbox" id="retakes" checked={form.allow_retakes} onChange={e => setForm(f => ({ ...f, allow_retakes: e.target.checked }))} />
+          <label htmlFor="retakes" style={{ fontFamily: F, fontSize: 13, color: t.text2, cursor: 'pointer' }}>Allow retakes</label>
+        </div>
+
+        {inp('System prompt *', 'system_prompt', 'Instructions for the owl…', 18)}
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+          <button
+            onClick={createSurvey}
+            disabled={saving || !form.title.trim() || !form.system_prompt.trim()}
+            style={{ fontFamily: M, fontSize: 12, letterSpacing: '0.06em', padding: '10px 24px', borderRadius: 8, cursor: 'pointer', background: t.accentDim, border: `1px solid ${t.accentBorder}`, color: t.accent }}
+          >
+            {saving ? 'Saving…' : 'Create survey'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Survey list ───────────────────────────────────────────────
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div style={{ fontFamily: M, fontSize: 11, color: t.text3 }}>{surveys.length} survey{surveys.length !== 1 ? 's' : ''}</div>
+        <button
+          onClick={() => setShowCreate(true)}
+          style={{ fontFamily: M, fontSize: 12, letterSpacing: '0.06em', padding: '8px 18px', borderRadius: 8, cursor: 'pointer', background: t.accentDim, border: `1px solid ${t.accentBorder}`, color: t.accent }}
+        >
+          + New survey
+        </button>
+      </div>
+
+      {surveys.length === 0 ? (
+        <div style={{ color: t.text3, fontFamily: M, fontSize: 12, padding: '40px 0', textAlign: 'center' }}>
+          No surveys yet. Create one to get started.
+        </div>
+      ) : (
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              {['Title', 'Model', 'Sessions', 'Completed', 'Status', ''].map(h => (
+                <th key={h} style={hcell}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {surveys.map(s => (
+              <tr key={s.id}>
+                <td style={cell}>
+                  <div style={{ fontFamily: F, fontSize: 13, color: t.text1, fontWeight: 500 }}>{s.title}</div>
+                  {s.description && <div style={{ fontFamily: F, fontSize: 11, color: t.text3, marginTop: 2 }}>{s.description.slice(0, 60)}{s.description.length > 60 ? '…' : ''}</div>}
+                </td>
+                <td style={cell}>
+                  <span style={{ fontFamily: M, fontSize: 10, color: t.text3 }}>
+                    {SURVEY_MODELS.find(m => m.id === s.model)?.label ?? s.model.split('/').pop()}
+                  </span>
+                </td>
+                <td style={{ ...cell, textAlign: 'center' }}>{s.session_count ?? 0}</td>
+                <td style={{ ...cell, textAlign: 'center' }}>{s.completed_count ?? 0}</td>
+                <td style={cell}>
+                  <span style={{
+                    fontFamily: M, fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                    background: s.is_active ? 'rgba(52,199,89,0.12)' : t.surfaceAlt,
+                    color: s.is_active ? '#34c759' : t.text3,
+                    border: `1px solid ${s.is_active ? 'rgba(52,199,89,0.35)' : t.border}`,
+                  }}>
+                    {s.is_active ? 'active' : 'inactive'}
+                  </span>
+                </td>
+                <td style={{ ...cell, whiteSpace: 'nowrap' }}>
+                  <button onClick={() => viewSessions(s)} style={{ fontFamily: M, fontSize: 11, color: t.accent, background: 'none', border: 'none', cursor: 'pointer', marginRight: 10 }}>responses</button>
+                  <button onClick={() => toggleActive(s.id, s.is_active)} style={{ fontFamily: M, fontSize: 11, color: t.text3, background: 'none', border: 'none', cursor: 'pointer', marginRight: 10 }}>
+                    {s.is_active ? 'deactivate' : 'activate'}
+                  </button>
+                  <button onClick={() => {
+                    const link = `${window.location.origin}/survey/${s.id}`;
+                    navigator.clipboard.writeText(link);
+                  }} style={{ fontFamily: M, fontSize: 11, color: t.text3, background: 'none', border: 'none', cursor: 'pointer', marginRight: 10 }}>copy link</button>
+                  <button onClick={() => deleteSurvey(s.id)} style={{ fontFamily: M, fontSize: 11, color: '#ff3b30', background: 'none', border: 'none', cursor: 'pointer' }}>delete</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 // ── Admin page ────────────────────────────────────────────────────
-const TABS = ['Metrics', 'Upgrade Requests', 'Users', 'Models', 'Personas', 'Endpoints', 'LLM Evals'];
+const TABS = ['Metrics', 'Upgrade Requests', 'Users', 'Models', 'Personas', 'Endpoints', 'LLM Evals', 'Surveys'];
 
 export default function Admin() {
   const { t }       = useTheme();
@@ -2126,6 +2451,7 @@ export default function Admin() {
         {tab === 4 && <PersonasTab t={t} />}
         {tab === 5 && <EndpointsTab t={t} />}
         {tab === 6 && <EvalsTab t={t} />}
+        {tab === 7 && <SurveysTab t={t} />}
       </div>
     </div>
   );
