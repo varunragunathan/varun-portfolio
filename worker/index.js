@@ -33,6 +33,20 @@ export { NumMatchDO } from './numMatchDO.js';
 
 const ALLOWED_ORIGINS = ['https://varunr.dev', 'http://localhost:5173'];
 
+// Escape characters that would break an HTML attribute value
+function escAttr(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
+// HTMLRewriter handler that replaces all text inside an element (e.g. <title>)
+class TextReplacer {
+  constructor(text) { this.text = text; this.first = true; }
+  text(chunk) {
+    if (this.first) { chunk.replace(this.text); this.first = false; }
+    else chunk.remove();
+  }
+}
+
 function corsHeaders(origin) {
   const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
   return {
@@ -330,6 +344,46 @@ async function handleRequest(request, env) {
         headers: { 'Content-Type': 'application/json', ...cors },
       });
     }
+  }
+
+  // ── Dynamic OG tags for survey pages ─────────────────────────
+  const surveyPageMatch = url.pathname.match(/^\/survey\/([^/]+)$/);
+  if (surveyPageMatch && request.method === 'GET') {
+    try {
+      const survey = await env.varun_portfolio_auth
+        .prepare('SELECT title, description FROM surveys WHERE id = ? AND is_active = 1')
+        .bind(surveyPageMatch[1])
+        .first();
+
+      if (survey) {
+        const title   = `${survey.title} — Hooty wants to chat 🦉`;
+        const desc    = survey.description?.trim() ||
+          'A friendly 3-minute chat with Hooty the owl. No right answers — just curious questions.';
+        const pageUrl = url.href;
+        const imgUrl  = `${url.origin}/icon-512.png`;
+
+        const asset = await env.ASSETS.fetch(request);
+        return new HTMLRewriter()
+          .on('title', new TextReplacer(title))
+          .on('meta[property="og:title"]',       { element: el => el.setAttribute('content', title) })
+          .on('meta[property="og:description"]',  { element: el => el.setAttribute('content', desc) })
+          .on('meta[property="og:url"]',          { element: el => el.setAttribute('content', pageUrl) })
+          .on('meta[name="description"]',         { element: el => el.setAttribute('content', desc) })
+          .on('head', {
+            element(el) {
+              el.append(
+                `<meta property="og:image" content="${imgUrl}" />` +
+                `<meta name="twitter:card" content="summary" />` +
+                `<meta name="twitter:title" content="${escAttr(title)}" />` +
+                `<meta name="twitter:description" content="${escAttr(desc)}" />` +
+                `<meta name="twitter:image" content="${imgUrl}" />`,
+                { html: true },
+              );
+            },
+          })
+          .transform(asset);
+      }
+    } catch { /* fall through */ }
   }
 
   // All non-API requests → serve the React static build
