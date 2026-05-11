@@ -164,7 +164,7 @@ function Shell() {
         </Suspense>
       </main>
       {!hideFooter && <Footer shakeState={shakeState} onShakeEnable={requestPermission} />}
-      {user && !hideFooter && <Suspense fallback={null}><ChatWidget /></Suspense>}
+      {user && pathname === '/' && <Suspense fallback={null}><ChatWidget /></Suspense>}
       {approval && <Suspense fallback={null}><NumMatchApprovalModal approval={approval} onRespond={respond} /></Suspense>}
       {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
       <UpdatePrompt />
