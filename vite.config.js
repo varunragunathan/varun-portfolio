@@ -70,7 +70,9 @@ export default defineConfig({
           if (id.includes('react-router-dom/') || id.includes('react-router/')) return 'vendor';
           if (id.includes('framer-motion/')) return 'motion';
           if (id.includes('@simplewebauthn/') || id.includes('qrcode/')) return 'auth-libs';
-          return 'vendor';
+          // Let Vite's default chunking handle other node_modules.
+          // This enables better code splitting for modules that are dynamically imported,
+          // reducing the initial JavaScript payload and addressing unused JavaScript.
         }
       }
     }
