@@ -14,7 +14,8 @@
 //   GET    /api/admin/surveys/:id/sessions — list sessions + completion status
 //   GET    /api/admin/surveys/:id/sessions/:sid — full transcript
 
-import { getSession } from './auth/session.js';
+import { getSession }             from './auth/session.js';
+import { requireAdmin as _requireAdmin } from './admin.js';
 
 const SURVEY_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
@@ -38,15 +39,10 @@ function sse(stream) {
   });
 }
 
-async function requireAdmin(request, env) {
+// Returns a 403 Response if not admin, otherwise null (matches admin.js pattern).
+async function guardAdmin(request, env) {
   const session = await getSession(env.KV, request);
-  if (!session) return null;
-  const user = await env.varun_portfolio_auth
-    .prepare('SELECT role FROM users WHERE id = ?')
-    .bind(session.userId)
-    .first();
-  if (user?.role !== 'admin') return null;
-  return session;
+  return _requireAdmin(session, env);
 }
 
 // ── Public: list active surveys ───────────────────────────────────
@@ -271,8 +267,8 @@ export async function completeSession(request, env, surveyId, sessionId) {
 
 // ── Admin: list all surveys ───────────────────────────────────────
 export async function adminListSurveys(request, env) {
-  const admin = await requireAdmin(request, env);
-  if (!admin) return json({ error: 'Forbidden' }, 403);
+  const guard = await guardAdmin(request, env);
+  if (guard) return guard;
 
   const { results } = await env.varun_portfolio_auth
     .prepare(`
@@ -289,8 +285,8 @@ export async function adminListSurveys(request, env) {
 
 // ── Admin: create a survey ────────────────────────────────────────
 export async function adminCreateSurvey(request, env) {
-  const admin = await requireAdmin(request, env);
-  if (!admin) return json({ error: 'Forbidden' }, 403);
+  const guard = await guardAdmin(request, env);
+  if (guard) return guard;
 
   const body = await request.json().catch(() => ({}));
   const { title, description = '', system_prompt, model, allow_retakes = true } = body;
@@ -308,8 +304,8 @@ export async function adminCreateSurvey(request, env) {
 
 // ── Admin: update a survey ────────────────────────────────────────
 export async function adminUpdateSurvey(request, env, id) {
-  const admin = await requireAdmin(request, env);
-  if (!admin) return json({ error: 'Forbidden' }, 403);
+  const guard = await guardAdmin(request, env);
+  if (guard) return guard;
 
   const body = await request.json().catch(() => ({}));
   const fields = [];
@@ -336,8 +332,8 @@ export async function adminUpdateSurvey(request, env, id) {
 
 // ── Admin: delete a survey ────────────────────────────────────────
 export async function adminDeleteSurvey(request, env, id) {
-  const admin = await requireAdmin(request, env);
-  if (!admin) return json({ error: 'Forbidden' }, 403);
+  const guard = await guardAdmin(request, env);
+  if (guard) return guard;
 
   await env.varun_portfolio_auth.batch([
     env.varun_portfolio_auth.prepare('DELETE FROM survey_messages WHERE session_id IN (SELECT id FROM survey_sessions WHERE survey_id = ?)').bind(id),
@@ -350,8 +346,8 @@ export async function adminDeleteSurvey(request, env, id) {
 
 // ── Admin: list sessions for a survey ────────────────────────────
 export async function adminListSessions(request, env, surveyId) {
-  const admin = await requireAdmin(request, env);
-  if (!admin) return json({ error: 'Forbidden' }, 403);
+  const guard = await guardAdmin(request, env);
+  if (guard) return guard;
 
   const { results } = await env.varun_portfolio_auth
     .prepare(`
@@ -371,8 +367,8 @@ export async function adminListSessions(request, env, surveyId) {
 
 // ── Admin: get full session transcript ────────────────────────────
 export async function adminGetSession(request, env, surveyId, sessionId) {
-  const admin = await requireAdmin(request, env);
-  if (!admin) return json({ error: 'Forbidden' }, 403);
+  const guard = await guardAdmin(request, env);
+  if (guard) return guard;
 
   const session = await env.varun_portfolio_auth
     .prepare('SELECT * FROM survey_sessions WHERE id = ? AND survey_id = ?')
