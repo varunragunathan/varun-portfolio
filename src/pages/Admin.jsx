@@ -2082,7 +2082,8 @@ function SurveysTab({ t }) {
     title: '', description: '', system_prompt: AI_LITERACY_PROMPT,
     model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', allow_retakes: true,
   });
-  const [saving, setSaving] = useState(false);
+  const [saving,    setSaving]    = useState(false);
+  const [copiedId,  setCopiedId]  = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -2350,7 +2351,11 @@ function SurveysTab({ t }) {
                   <button onClick={() => {
                     const link = `${window.location.origin}/survey/${s.id}`;
                     navigator.clipboard.writeText(link);
-                  }} style={{ fontFamily: M, fontSize: 11, color: t.text3, background: 'none', border: 'none', cursor: 'pointer', marginRight: 10 }}>copy link</button>
+                    setCopiedId(s.id);
+                    setTimeout(() => setCopiedId(id => id === s.id ? null : id), 2000);
+                  }} style={{ fontFamily: M, fontSize: 11, color: copiedId === s.id ? '#34c759' : t.text3, background: 'none', border: 'none', cursor: 'pointer', marginRight: 10, transition: 'color 0.15s' }}>
+                    {copiedId === s.id ? '✓ copied' : 'copy link'}
+                  </button>
                   <button onClick={() => deleteSurvey(s.id)} style={{ fontFamily: M, fontSize: 11, color: '#ff3b30', background: 'none', border: 'none', cursor: 'pointer' }}>delete</button>
                 </td>
               </tr>
