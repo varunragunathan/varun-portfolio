@@ -31,7 +31,7 @@ import {
 import { submitFeedbackHandler } from './feedback.js';
 import {
   adminListPages, adminCreatePage, adminGetPage, adminUpdatePage, adminDeletePage,
-  servePublicPage,
+  getPublicPage,
 } from './pages.js';
 import { checkIpRateLimit } from './rateLimit.js';
 import { getMetrics } from './metrics.js';
@@ -47,9 +47,9 @@ function escAttr(str) {
 
 // HTMLRewriter handler that replaces all text inside an element (e.g. <title>)
 class TextReplacer {
-  constructor(text) { this.text = text; this.first = true; }
+  constructor(text) { this._text = text; this._first = true; }
   text(chunk) {
-    if (this.first) { chunk.replace(this.text); this.first = false; }
+    if (this._first) { chunk.replace(this._text); this._first = false; }
     else chunk.remove();
   }
 }
@@ -273,6 +273,20 @@ async function handleRequest(request, env) {
     }
   }
 
+  // ── /api/pages (public) ──────────────────────────────────────
+  const publicPageApiMatch = url.pathname.match(/^\/api\/pages\/([^/]+)$/);
+  if (publicPageApiMatch && request.method === 'GET') {
+    try {
+      const response = await getPublicPage(request, env, publicPageApiMatch[1]);
+      return withCors(response, cors);
+    } catch (err) {
+      console.error('Public page error:', err);
+      return withCors(new Response(JSON.stringify({ error: 'Internal server error' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' },
+      }), cors);
+    }
+  }
+
   // ── /api/surveys (public) ────────────────────────────────────
   if (url.pathname.startsWith('/api/surveys')) {
     try {
@@ -453,20 +467,6 @@ async function handleRequest(request, env) {
           .transform(asset);
       }
     } catch { /* fall through */ }
-  }
-
-  // ── Public pages /p/:slug ─────────────────────────────────────
-  const publicPageMatch = url.pathname.match(/^\/p\/([^/]+)$/);
-  if (publicPageMatch && request.method === 'GET') {
-    try {
-      return await servePublicPage(env, publicPageMatch[1]);
-    } catch (err) {
-      console.error('servePublicPage error:', err);
-      return new Response(
-        '<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px"><h2>Page unavailable</h2><p>Try again later.</p></body></html>',
-        { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
-      );
-    }
   }
 
   // All non-API requests → serve the React static build

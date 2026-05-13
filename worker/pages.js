@@ -114,18 +114,11 @@ export async function adminDeletePage(request, env, id) {
   return json({ ok: true });
 }
 
-// Public: serve HTML directly (no React, no auth)
-export async function servePublicPage(env, slug) {
+// Public API: return page JSON (no auth) — used by the React /p/:slug route
+export async function getPublicPage(request, env, slug) {
   const row = await env.varun_portfolio_auth
     .prepare('SELECT title, content FROM pages WHERE slug = ?')
     .bind(slug).first();
-  if (!row) {
-    return new Response(
-      '<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px"><h2>Page not found</h2></body></html>',
-      { status: 404, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
-    );
-  }
-  return new Response(row.content, {
-    headers: { 'Content-Type': 'text/html; charset=utf-8' },
-  });
+  if (!row) return json({ error: 'Not found' }, 404);
+  return json({ page: row });
 }

@@ -56,6 +56,7 @@ const CourseViewerPage   = lazy(() => import('./pages/CourseViewer'));
 const GlossaryPage       = lazy(() => import('./pages/Glossary'));
 const SurveysPage        = lazy(() => import('./pages/Surveys'));
 const SurveyPage         = lazy(() => import('./pages/Survey'));
+const PublicPage         = lazy(() => import('./pages/PublicPage'));
 
 function Loading() {
   return (
@@ -138,7 +139,7 @@ function Shell() {
   const handleShake = useCallback(() => setFeedbackOpen(true), []);
   const { shakeState, requestPermission } = useShake(handleShake);
   const { pathname } = useLocation();
-  const hideFooter = !!matchPath('/chat', pathname) || pathname.startsWith('/survey/') || pathname.startsWith('/s/');
+  const hideFooter = !!matchPath('/chat', pathname) || pathname.startsWith('/survey/') || pathname.startsWith('/s/') || pathname.startsWith('/p/');
 
   return (
     <div className="shell">
@@ -161,6 +162,7 @@ function Shell() {
             <Route path="/surveys" element={<SurveysPage />} />
             <Route path="/survey/:surveyId" element={<SurveyPage />} />
             <Route path="/s/:slug" element={<SurveyPage />} />
+            <Route path="/p/:slug" element={<PublicPage />} />
           </Routes>
         </Suspense>
       </main>
