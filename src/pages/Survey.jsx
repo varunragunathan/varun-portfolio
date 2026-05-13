@@ -315,6 +315,15 @@ export default function Survey() {
               : <UserMessage key={i} text={m.text} />
           )}
 
+          {/* Thinking indicator lives in the message flow so it's never hidden by browser chrome */}
+          {streaming && (
+            <div className="survey-thinking" aria-live="polite">
+              <span className="survey-thinking__dot" />
+              <span className="survey-thinking__dot" />
+              <span className="survey-thinking__dot" />
+            </div>
+          )}
+
           {/* Resources at end */}
           {done && opts?.resources?.length > 0 && (
             <div className="survey-resources">
@@ -335,18 +344,17 @@ export default function Survey() {
           )}
         </div>
 
-        {/* Input area */}
+        {/* Input area — collapsed while streaming */}
         {!done && (
-          <div className="survey-input-area">
+          <div className={`survey-input-area${streaming ? ' survey-input-area--streaming' : ''}`}>
             {/* Choices */}
-            {opts?.inputType === 'choice' && opts.options?.length > 0 && (
+            {!streaming && opts?.inputType === 'choice' && opts.options?.length > 0 && (
               <div className="survey-choices" role="group" aria-label="Choose a response">
                 {opts.options.map((opt, i) => (
                   <button
                     key={i}
                     className="survey-choice-btn"
                     onClick={() => submitChoice(opt)}
-                    disabled={streaming}
                   >
                     {opt}
                   </button>
@@ -354,7 +362,7 @@ export default function Survey() {
               </div>
             )}
 
-            {/* Text input — always available so user can answer freely */}
+            {/* Text input */}
             {!streaming && (
               <div className="survey-text-input">
                 <textarea
@@ -372,20 +380,11 @@ export default function Survey() {
                 <button
                   className="survey-send-btn"
                   onClick={submitText}
-                  disabled={!inputText.trim() || streaming}
+                  disabled={!inputText.trim()}
                   aria-label="Send"
                 >
                   ↵
                 </button>
-              </div>
-            )}
-
-            {/* Thinking indicator */}
-            {streaming && (
-              <div className="survey-thinking" aria-live="polite">
-                <span className="survey-thinking__dot" />
-                <span className="survey-thinking__dot" />
-                <span className="survey-thinking__dot" />
               </div>
             )}
           </div>
