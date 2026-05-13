@@ -458,7 +458,13 @@ async function handleRequest(request, env) {
   if (publicPageMatch && request.method === 'GET') {
     try {
       return await servePublicPage(env, publicPageMatch[1]);
-    } catch { /* fall through */ }
+    } catch (err) {
+      console.error('servePublicPage error:', err);
+      return new Response(
+        '<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px"><h2>Page unavailable</h2><p>Try again later.</p></body></html>',
+        { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+      );
+    }
   }
 
   // All non-API requests → serve the React static build
