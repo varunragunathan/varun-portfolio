@@ -388,7 +388,7 @@ async function handleRequest(request, env) {
         const desc    = survey.description?.trim() ||
           'A friendly 3-minute chat with Hooty the owl. No right answers — just curious questions.';
         const pageUrl = url.href;
-        const imgUrl  = `${url.origin}/icon-512.png`;
+        const imgUrl  = `${url.origin}/owl-og.svg`;
         const asset   = await env.ASSETS.fetch(new Request(new URL('/', url.origin)));
         return new HTMLRewriter()
           .on('title', new TextReplacer(title))
@@ -400,6 +400,8 @@ async function handleRequest(request, env) {
             element(el) {
               el.append(
                 `<meta property="og:image" content="${imgUrl}" />` +
+                `<meta property="og:image:width" content="300" />` +
+                `<meta property="og:image:height" content="300" />` +
                 `<meta name="twitter:card" content="summary" />` +
                 `<meta name="twitter:title" content="${escAttr(title)}" />` +
                 `<meta name="twitter:description" content="${escAttr(desc)}" />` +

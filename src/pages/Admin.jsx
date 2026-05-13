@@ -2680,14 +2680,17 @@ function PagesTab({ t }) {
     if (creating) return (
       <div style={{ flex: 1, padding: 24, display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto' }}>
         <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.15em', color: t.text3, textTransform: 'uppercase', marginBottom: 4 }}>New Page</div>
+        <datalist id="pages-folders-list">
+          {folders.filter(f => f).map(f => <option key={f} value={f} />)}
+        </datalist>
         {[
           { label: 'Title', key: 'title', placeholder: 'Jennifer AI Guide' },
           { label: 'Slug', key: 'slug', placeholder: 'jennifer-ai-guide (auto-generated if blank)' },
-          { label: 'Folder', key: 'folder', placeholder: 'General (optional)' },
-        ].map(({ label, key, placeholder }) => (
+          { label: 'Folder', key: 'folder', placeholder: 'General (optional)', list: 'pages-folders-list' },
+        ].map(({ label, key, placeholder, list }) => (
           <div key={key}>
             <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginBottom: 4 }}>{label}</div>
-            <input value={newForm[key]} placeholder={placeholder} style={inputSt}
+            <input value={newForm[key]} placeholder={placeholder} list={list} style={inputSt}
               onChange={e => setNewForm(p => ({ ...p, [key]: e.target.value }))} />
           </div>
         ))}
@@ -2722,14 +2725,17 @@ function PagesTab({ t }) {
     if (editing) return (
       <div style={{ flex: 1, padding: 24, display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto' }}>
         <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.15em', color: t.text3, textTransform: 'uppercase' }}>Edit Page</div>
+        <datalist id="pages-folders-list">
+          {folders.filter(f => f).map(f => <option key={f} value={f} />)}
+        </datalist>
         {[
           { label: 'Title', key: 'title' },
           { label: 'Slug', key: 'slug' },
-          { label: 'Folder', key: 'folder', placeholder: 'General (optional)' },
-        ].map(({ label, key, placeholder }) => (
+          { label: 'Folder', key: 'folder', placeholder: 'General (optional)', list: 'pages-folders-list' },
+        ].map(({ label, key, placeholder, list }) => (
           <div key={key}>
             <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginBottom: 4 }}>{label}</div>
-            <input value={draft[key] ?? ''} placeholder={placeholder} style={inputSt}
+            <input value={draft[key] ?? ''} placeholder={placeholder} list={list} style={inputSt}
               onChange={e => setDraft(p => ({ ...p, [key]: e.target.value }))} />
           </div>
         ))}
