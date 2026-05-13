@@ -116,8 +116,9 @@
   border-top: 1px solid var(--border); padding: 16px 24px;
   display: flex; align-items: center; justify-content: space-between;
   max-width: 920px; margin: 0 auto;
+  flex-wrap: wrap; gap: 10px;
 }
-.footer__bottom-left { display: flex; align-items: center; gap: 16px; }
+.footer__bottom-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .footer__domain {
   font-family: var(--font-mono); font-size: 10px;
   letter-spacing: 0.1em; color: var(--text-3);

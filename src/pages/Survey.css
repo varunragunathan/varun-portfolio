@@ -179,6 +179,14 @@
   border-bottom: 1px solid var(--border, rgba(128,128,128,0.1));
   background: var(--bg);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.survey-chat__header-owl {
+  display: none;
+  flex-shrink: 0;
 }
 
 .survey-chat__title {
@@ -211,13 +219,15 @@
 @media (max-width: 600px) {
   .survey-owl-col { display: none; }
 
+  .survey-chat__header-owl { display: block; }
+
   .survey-chat {
     max-width: 100%;
     border-left: none;
   }
 
   .survey-chat__header {
-    padding: 12px 16px 10px;
+    padding: 10px 16px 10px;
   }
 
   .survey-chat__messages {

@@ -466,6 +466,25 @@ export async function adminListSessions(request, env, surveyId) {
   return json({ sessions: results });
 }
 
+// ── Admin: delete a session ───────────────────────────────────────
+export async function adminDeleteSession(request, env, surveyId, sessionId) {
+  const guard = await guardAdmin(request, env);
+  if (guard) return guard;
+
+  const session = await env.varun_portfolio_auth
+    .prepare('SELECT id FROM survey_sessions WHERE id = ? AND survey_id = ?')
+    .bind(sessionId, surveyId)
+    .first();
+  if (!session) return json({ error: 'Not found' }, 404);
+
+  await env.varun_portfolio_auth.batch([
+    env.varun_portfolio_auth.prepare('DELETE FROM survey_messages WHERE session_id = ?').bind(sessionId),
+    env.varun_portfolio_auth.prepare('DELETE FROM survey_sessions WHERE id = ?').bind(sessionId),
+  ]);
+
+  return json({ ok: true });
+}
+
 // ── Admin: get full session transcript ────────────────────────────
 export async function adminGetSession(request, env, surveyId, sessionId) {
   const guard = await guardAdmin(request, env);

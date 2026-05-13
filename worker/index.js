@@ -23,7 +23,7 @@ import { listGlossary, createTerm, updateTerm, deleteTerm, bulkSync } from './gl
 import {
   listSurveys, getSurvey, getSurveyBySlug, createSession, sendMessage, completeSession,
   adminListSurveys, adminCreateSurvey, adminUpdateSurvey, adminDeleteSurvey,
-  adminListSessions, adminGetSession,
+  adminListSessions, adminGetSession, adminDeleteSession,
 } from './surveys.js';
 import { submitFeedbackHandler } from './feedback.js';
 import { checkIpRateLimit } from './rateLimit.js';
@@ -173,6 +173,8 @@ async function handleRequest(request, env) {
           response = await adminListSessions(request, env, adminSessionsMatch[1]);
         } else if (adminSessionMatch && method === 'GET') {
           response = await adminGetSession(request, env, adminSessionMatch[1], adminSessionMatch[2]);
+        } else if (adminSessionMatch && method === 'DELETE') {
+          response = await adminDeleteSession(request, env, adminSessionMatch[1], adminSessionMatch[2]);
         } else if (path === '/api/admin/surveys' && method === 'GET') {
           response = await adminListSurveys(request, env);
         } else if (path === '/api/admin/surveys' && method === 'POST') {

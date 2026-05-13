@@ -93,10 +93,12 @@
    1. Prevent iOS from zooming on input focus (requires font-size ≥ 16px)
    2. Keep tap targets comfortable
    ───────────────────────────────────────────────────────────────── */
+/* Prevent horizontal overflow / swipe-right ghost space on iOS Safari.
+   Must be on both html and body — body-only is ignored by iOS rubber-band scroll. */
+html, body { overflow-x: hidden; max-width: 100%; }
+
 @media (max-width: 639px) {
   input, textarea, select, button {
     font-size: max(16px, 1em) !important;
   }
-  /* Prevent horizontal overflow caused by fixed-width children */
-  body { overflow-x: hidden; }
 }

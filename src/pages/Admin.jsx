@@ -2208,6 +2208,13 @@ function SurveysTab({ t }) {
     setTranscript(data);
   }, []);
 
+  const deleteSession = useCallback(async (surveyId, sessionId) => {
+    if (!confirm('Delete this response? This cannot be undone.')) return;
+    await fetch(`/api/admin/surveys/${surveyId}/sessions/${sessionId}`, { method: 'DELETE', credentials: 'include' });
+    if (transcript?.session?.id === sessionId) setTranscript(null);
+    setViewing(prev => prev ? { ...prev, sessions: prev.sessions.filter(s => s.id !== sessionId) } : prev);
+  }, [transcript]);
+
   const cell = { fontFamily: M, fontSize: 12, color: t.text2, padding: '10px 12px', borderBottom: `1px solid ${t.border}` };
   const hcell = { ...cell, color: t.text3, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600 };
 
@@ -2218,9 +2225,17 @@ function SurveysTab({ t }) {
   if (transcript) {
     return (
       <div>
-        <button onClick={() => setTranscript(null)} style={{ fontFamily: M, fontSize: 12, color: t.accent, background: 'none', border: 'none', cursor: 'pointer', marginBottom: 20 }}>
-          ← Back to sessions
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <button onClick={() => setTranscript(null)} style={{ fontFamily: M, fontSize: 12, color: t.accent, background: 'none', border: 'none', cursor: 'pointer' }}>
+            ← Back to sessions
+          </button>
+          <button
+            onClick={() => deleteSession(viewing?.survey?.id, transcript.session?.id)}
+            style={{ fontFamily: M, fontSize: 11, color: '#ff453a', background: 'none', border: '1px solid rgba(255,69,58,0.3)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}
+          >
+            delete response
+          </button>
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {transcript.messages.map((m, i) => (
             <div key={i} style={{
@@ -2256,7 +2271,7 @@ function SurveysTab({ t }) {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                {['Session', 'Started', 'Status', 'Messages', ''].map(h => (
+                {['Session', 'Started', 'Status', 'Messages', ''].map((h, i) => (
                   <th key={h} style={hcell}>{h}</th>
                 ))}
               </tr>
@@ -2277,9 +2292,12 @@ function SurveysTab({ t }) {
                     </span>
                   </td>
                   <td style={cell}>{s.message_count}</td>
-                  <td style={cell}>
-                    <button onClick={() => viewTranscript(viewing.survey.id, s.id)} style={{ fontFamily: M, fontSize: 11, color: t.accent, background: 'none', border: 'none', cursor: 'pointer' }}>
+                  <td style={{ ...cell, whiteSpace: 'nowrap' }}>
+                    <button onClick={() => viewTranscript(viewing.survey.id, s.id)} style={{ fontFamily: M, fontSize: 11, color: t.accent, background: 'none', border: 'none', cursor: 'pointer', marginRight: 10 }}>
                       read →
+                    </button>
+                    <button onClick={() => deleteSession(viewing.survey.id, s.id)} style={{ fontFamily: M, fontSize: 11, color: '#ff453a', background: 'none', border: 'none', cursor: 'pointer' }}>
+                      delete
                     </button>
                   </td>
                 </tr>
@@ -2471,8 +2489,16 @@ export default function Admin() {
   const { t }       = useTheme();
   const { user, loading } = useAuth();
   const navigate    = useNavigate();
-  const [tab,       setTab]       = useState(0);
   const [authChecked, setAuthChecked] = useState(false);
+
+  // Persist active tab in the URL hash so refresh restores it
+  const hashTab = TABS.indexOf(decodeURIComponent(window.location.hash.slice(1)));
+  const [tab, setTab] = useState(hashTab >= 0 ? hashTab : 0);
+
+  const switchTab = useCallback((i) => {
+    setTab(i);
+    window.location.hash = encodeURIComponent(TABS[i]);
+  }, []);
 
   // Redirect if not signed in
   useEffect(() => {
@@ -2530,7 +2556,7 @@ export default function Admin() {
           {TABS.map((label, i) => (
             <button
               key={label}
-              onClick={() => setTab(i)}
+              onClick={() => switchTab(i)}
               style={{
                 fontFamily: F, fontSize: 14, fontWeight: tab === i ? 600 : 400,
                 color: tab === i ? t.text1 : t.text3,

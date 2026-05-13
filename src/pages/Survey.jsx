@@ -302,6 +302,9 @@ export default function Survey() {
       {/* Chat area */}
       <div className="survey-chat">
         <div className="survey-chat__header">
+          <div className="survey-chat__header-owl" aria-hidden="true">
+            <PixelOwl size={3} state={owlState} />
+          </div>
           <span className="survey-chat__title">{survey.title}</span>
         </div>
 
