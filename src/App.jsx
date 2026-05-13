@@ -138,7 +138,7 @@ function Shell() {
   const handleShake = useCallback(() => setFeedbackOpen(true), []);
   const { shakeState, requestPermission } = useShake(handleShake);
   const { pathname } = useLocation();
-  const hideFooter = !!matchPath('/chat', pathname) || pathname.startsWith('/survey/');
+  const hideFooter = !!matchPath('/chat', pathname) || pathname.startsWith('/survey/') || pathname.startsWith('/s/');
 
   return (
     <div className="shell">
@@ -160,6 +160,7 @@ function Shell() {
             <Route path="/glossary" element={<GlossaryPage />} />
             <Route path="/surveys" element={<SurveysPage />} />
             <Route path="/survey/:surveyId" element={<SurveyPage />} />
+            <Route path="/s/:slug" element={<SurveyPage />} />
           </Routes>
         </Suspense>
       </main>

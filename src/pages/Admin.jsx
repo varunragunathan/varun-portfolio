@@ -799,169 +799,213 @@ function Toggle({ checked, onChange, t }) {
 }
 
 // ── Tab: Models ───────────────────────────────────────────────────
-function ModelsTab({ t }) {
-  const [models,  setModels]  = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState(null);
-  const [form,    setForm]    = useState({ model_id: '', label: '', tier: 'pro' });
-  const [adding,  setAdding]  = useState(false);
-  const [addErr,  setAddErr]  = useState(null);
+const MODEL_CATALOG = [
+  {
+    group: 'Cloudflare Workers AI', note: 'No API key needed',
+    items: [
+      { model_id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', label: 'Llama 3.3 70B Fast' },
+      { model_id: '@cf/meta/llama-3.1-8b-instruct',           label: 'Llama 3.1 8B' },
+    ],
+  },
+  {
+    group: 'OpenRouter · Free', note: 'Requires OPENROUTER_API_KEY secret',
+    items: [
+      { model_id: 'meta-llama/llama-3.3-70b-instruct:free',       label: 'Llama 3.3 70B',        provider: 'Meta' },
+      { model_id: 'google/gemma-4-31b-it:free',                   label: 'Gemma 4 31B',           provider: 'Google' },
+      { model_id: 'google/gemma-4-26b-a4b-it:free',               label: 'Gemma 4 26B A4B',       provider: 'Google' },
+      { model_id: 'openai/gpt-oss-120b:free',                     label: 'GPT OSS 120B',          provider: 'OpenAI' },
+      { model_id: 'openai/gpt-oss-20b:free',                      label: 'GPT OSS 20B',           provider: 'OpenAI' },
+      { model_id: 'nvidia/nemotron-3-super-120b-a12b:free',        label: 'Nemotron 3 Super 120B', provider: 'NVIDIA' },
+      { model_id: 'nvidia/nemotron-3-nano-30b-a3b:free',           label: 'Nemotron 3 Nano 30B',   provider: 'NVIDIA' },
+      { model_id: 'nvidia/nemotron-nano-9b-v2:free',               label: 'Nemotron Nano 9B V2',   provider: 'NVIDIA' },
+      { model_id: 'nousresearch/hermes-3-llama-3.1-405b:free',     label: 'Hermes 3 405B',         provider: 'Nous Research' },
+      { model_id: 'qwen/qwen3-coder:free',                         label: 'Qwen3 Coder 480B',      provider: 'Alibaba' },
+      { model_id: 'qwen/qwen3-next-80b-a3b-instruct:free',         label: 'Qwen3 Next 80B',        provider: 'Alibaba' },
+    ],
+  },
+  {
+    group: 'Paid',
+    items: [
+      { model_id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'Anthropic' },
+      { model_id: 'claude-opus-4-7',   label: 'Claude Opus 4.7',   provider: 'Anthropic' },
+    ],
+  },
+];
 
-  useEffect(() => {
+function ModelsTab({ t }) {
+  const [dbModels, setDbModels] = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState(null);
+  const [busy,     setBusy]     = useState({});  // model_id → true while saving
+  const [form,     setForm]     = useState({ model_id: '', label: '', tier: 'pro' });
+  const [adding,   setAdding]   = useState(false);
+  const [addErr,   setAddErr]   = useState(null);
+
+  const load = useCallback(() => {
+    setLoading(true);
     fetch('/api/admin/models', { credentials: 'include' })
-      .then(r => {
-        if (!r.ok) throw new Error('Failed to load models');
-        return r.json();
-      })
-      .then(data => { setModels(data.models ?? data); setLoading(false); })
-      .catch(err => { setError(err.message); setLoading(false); });
+      .then(r => r.ok ? r.json() : Promise.reject('Failed'))
+      .then(d => { setDbModels(d.models ?? []); setLoading(false); })
+      .catch(e => { setError(String(e)); setLoading(false); });
   }, []);
 
-  const toggleModel = useCallback(async (model) => {
-    const nextEnabled = model.enabled ? 0 : 1;
-    setModels(prev => prev.map(m => m.model_id === model.model_id ? { ...m, enabled: nextEnabled } : m));
+  useEffect(() => { load(); }, [load]);
+
+  const toggle = useCallback(async (item) => {
+    const db = dbModels.find(m => m.model_id === item.model_id);
+    setBusy(b => ({ ...b, [item.model_id]: true }));
     try {
-      await fetch(`/api/admin/models/${model.model_id}`, {
-        method: 'PATCH', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: nextEnabled }),
-      });
+      if (!db) {
+        // not in DB yet → add enabled
+        await fetch('/api/admin/models', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model_id: item.model_id, label: item.label, tier: 'pro' }),
+        });
+      } else {
+        await fetch(`/api/admin/models/${encodeURIComponent(item.model_id)}`, {
+          method: 'PATCH', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: db.enabled ? 0 : 1 }),
+        });
+      }
+      await load();
     } catch (err) {
       console.error(err);
-      // revert
-      setModels(prev => prev.map(m => m.model_id === model.model_id ? { ...m, enabled: model.enabled } : m));
+    } finally {
+      setBusy(b => ({ ...b, [item.model_id]: false }));
     }
-  }, []);
+  }, [dbModels, load]);
 
-  const addModel = useCallback(async () => {
-    if (!form.model_id.trim() || !form.label.trim()) {
-      setAddErr('model_id and label are required');
-      return;
-    }
-    setAdding(true);
-    setAddErr(null);
+  const addCustom = useCallback(async () => {
+    if (!form.model_id.trim() || !form.label.trim()) { setAddErr('Both fields required'); return; }
+    setAdding(true); setAddErr(null);
     try {
       const res = await fetch('/api/admin/models', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.error ?? 'Failed to add model');
-      }
-      const created = await res.json();
-      setModels(prev => [...prev, created.model ?? created]);
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error ?? 'Failed'); }
       setForm({ model_id: '', label: '', tier: 'pro' });
-    } catch (err) {
-      setAddErr(err.message);
-    } finally {
-      setAdding(false);
-    }
-  }, [form]);
+      load();
+    } catch (err) { setAddErr(err.message); }
+    finally { setAdding(false); }
+  }, [form, load]);
 
   if (loading) return <TabSpinner t={t} />;
   if (error)   return <TabError msg={error} t={t} />;
 
+  // model IDs in DB for quick lookup
+  const catalogIds = new Set(MODEL_CATALOG.flatMap(g => g.items.map(i => i.model_id)));
+  const customModels = dbModels.filter(m => !catalogIds.has(m.model_id));
+
   return (
-    <div>
-      {models.length === 0 ? (
-        <div style={{ fontFamily: M, fontSize: 12, color: t.text3, textAlign: 'center', padding: '40px 0' }}>
-          no models configured
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+      {MODEL_CATALOG.map(({ group, note, items }) => (
+        <div key={group}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
+            <span style={{ fontFamily: M, fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: t.text2 }}>
+              {group}
+            </span>
+            {note && (
+              <span style={{ fontFamily: M, fontSize: 10, color: t.text3 }}>{note}</span>
+            )}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {items.map(item => {
+              const db = dbModels.find(m => m.model_id === item.model_id);
+              const enabled = !!db?.enabled;
+              const isBusy  = !!busy[item.model_id];
+              return (
+                <div key={item.model_id} style={{
+                  padding: '10px 16px', borderRadius: 10,
+                  background: t.cardBg, border: `1px solid ${enabled ? t.accentBorder : t.border}`,
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  opacity: isBusy ? 0.6 : 1, transition: 'opacity 0.15s, border-color 0.15s',
+                }}>
+                  <Toggle checked={enabled} onChange={() => !isBusy && toggle(item)} t={t} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: F, fontSize: 13, fontWeight: 500, color: t.text1 }}>
+                      {item.label}
+                      {item.provider && (
+                        <span style={{ fontFamily: M, fontSize: 10, color: t.text3, marginLeft: 8 }}>
+                          {item.provider}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item.model_id}
+                    </div>
+                  </div>
+                  {db && (
+                    <span style={{
+                      fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
+                      padding: '2px 8px', borderRadius: 4,
+                      background: t.accentDim, color: t.accent, border: `1px solid ${t.accentBorder}`,
+                    }}>
+                      {db.tier ?? 'pro'}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 32 }}>
-          {models.map(model => (
-            <div key={model.model_id} style={{
-              padding: '12px 18px', borderRadius: 10,
-              background: t.cardBg, border: `1px solid ${t.border}`,
-              display: 'flex', alignItems: 'center', gap: 14,
-            }}>
-              <Toggle checked={!!model.enabled} onChange={() => toggleModel(model)} t={t} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: M, fontSize: 12, color: t.text1 }}>
-                  {model.model_id}
-                </div>
-                <div style={{ fontFamily: F, fontSize: 12, color: t.text3, marginTop: 2 }}>
-                  {model.label}
-                </div>
-              </div>
-              <span style={{
-                fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
-                padding: '2px 8px', borderRadius: 4,
-                background: t.accentDim, color: t.accent, border: `1px solid ${t.accentBorder}`,
+      ))}
+
+      {/* Custom models not in catalog */}
+      {customModels.length > 0 && (
+        <div>
+          <div style={{ fontFamily: M, fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: t.text2, marginBottom: 10 }}>
+            Custom
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {customModels.map(m => (
+              <div key={m.model_id} style={{
+                padding: '10px 16px', borderRadius: 10,
+                background: t.cardBg, border: `1px solid ${m.enabled ? t.accentBorder : t.border}`,
+                display: 'flex', alignItems: 'center', gap: 14,
               }}>
-                {model.tier ?? 'pro'}
-              </span>
-            </div>
-          ))}
+                <Toggle checked={!!m.enabled} onChange={() => toggle(m)} t={t} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: F, fontSize: 13, fontWeight: 500, color: t.text1 }}>{m.label}</div>
+                  <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginTop: 2 }}>{m.model_id}</div>
+                </div>
+                <span style={{
+                  fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
+                  padding: '2px 8px', borderRadius: 4,
+                  background: t.accentDim, color: t.accent, border: `1px solid ${t.accentBorder}`,
+                }}>
+                  {m.tier ?? 'pro'}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Add model form */}
-      <div style={{
-        padding: '20px', borderRadius: 12,
-        background: t.surfaceAlt, border: `1px solid ${t.border}`,
-      }}>
-        <div style={{ fontFamily: M, fontSize: 11, letterSpacing: '0.1em', color: t.text3, marginBottom: 14, textTransform: 'uppercase' }}>
-          Add Model
+      {/* Add custom model */}
+      <div style={{ padding: '16px 20px', borderRadius: 12, background: t.surfaceAlt, border: `1px solid ${t.border}` }}>
+        <div style={{ fontFamily: M, fontSize: 11, letterSpacing: '0.1em', color: t.text3, marginBottom: 12, textTransform: 'uppercase' }}>
+          Add custom model
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <input
-            value={form.model_id}
-            onChange={e => setForm(f => ({ ...f, model_id: e.target.value }))}
-            placeholder="model_id"
-            style={{
-              flex: '1 1 160px', padding: '8px 12px',
-              fontFamily: M, fontSize: 12, color: t.text1,
-              background: t.surface, border: `1px solid ${t.border}`,
-              borderRadius: 8, outline: 'none',
-            }}
-          />
-          <input
-            value={form.label}
-            onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
-            placeholder="Display label"
-            style={{
-              flex: '2 1 200px', padding: '8px 12px',
-              fontFamily: F, fontSize: 13, color: t.text1,
-              background: t.surface, border: `1px solid ${t.border}`,
-              borderRadius: 8, outline: 'none',
-            }}
-          />
-          <select
-            value={form.tier}
-            onChange={e => setForm(f => ({ ...f, tier: e.target.value }))}
-            style={{
-              flex: '0 1 90px', padding: '8px 10px',
-              fontFamily: M, fontSize: 12, color: t.text1,
-              background: t.surface, border: `1px solid ${t.border}`,
-              borderRadius: 8, outline: 'none', cursor: 'pointer',
-            }}
-          >
+          <input value={form.model_id} onChange={e => setForm(f => ({ ...f, model_id: e.target.value }))}
+            placeholder="model_id" style={{ flex: '1 1 160px', padding: '8px 12px', fontFamily: M, fontSize: 12, color: t.text1, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, outline: 'none' }} />
+          <input value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
+            placeholder="Display label" style={{ flex: '2 1 180px', padding: '8px 12px', fontFamily: F, fontSize: 13, color: t.text1, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, outline: 'none' }} />
+          <select value={form.tier} onChange={e => setForm(f => ({ ...f, tier: e.target.value }))}
+            style={{ flex: '0 1 90px', padding: '8px 10px', fontFamily: M, fontSize: 12, color: t.text1, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, outline: 'none', cursor: 'pointer' }}>
             <option value="pro">pro</option>
             <option value="admin">admin</option>
           </select>
-          <button
-            onClick={addModel}
-            disabled={adding}
-            style={{
-              padding: '8px 20px', borderRadius: 8, cursor: adding ? 'default' : 'pointer',
-              fontFamily: M, fontSize: 12,
-              background: adding ? 'transparent' : t.accentDim,
-              border: `1px solid ${adding ? t.border : t.accentBorder}`,
-              color: adding ? t.text3 : t.accent,
-              transition: 'all 0.15s',
-            }}
-          >
+          <button onClick={addCustom} disabled={adding}
+            style={{ padding: '8px 20px', borderRadius: 8, cursor: adding ? 'default' : 'pointer', fontFamily: M, fontSize: 12, background: adding ? 'transparent' : t.accentDim, border: `1px solid ${adding ? t.border : t.accentBorder}`, color: adding ? t.text3 : t.accent, transition: 'all 0.15s' }}>
             {adding ? '…' : 'add'}
           </button>
         </div>
-        {addErr && (
-          <div style={{ fontFamily: M, fontSize: 11, color: '#ff3b30', marginTop: 10 }}>
-            {addErr}
-          </div>
-        )}
+        {addErr && <div style={{ fontFamily: M, fontSize: 11, color: '#ff3b30', marginTop: 8 }}>{addErr}</div>}
       </div>
     </div>
   );
@@ -2042,16 +2086,15 @@ const SURVEY_MODELS = [
   // Cloudflare Workers AI (free, no key needed)
   { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', label: 'Llama 3.3 70B · Workers AI (free)' },
   { id: '@cf/meta/llama-3.1-8b-instruct',           label: 'Llama 3.1 8B · Workers AI (free)' },
-  // OpenRouter free tier (requires OPENROUTER_API_KEY)
-  { id: 'meta-llama/llama-4-maverick:free',              label: 'Llama 4 Maverick · OpenRouter (free)' },
-  { id: 'meta-llama/llama-4-scout:free',                 label: 'Llama 4 Scout · OpenRouter (free)' },
-  { id: 'google/gemma-3-27b-it:free',                    label: 'Gemma 3 27B · Google / OpenRouter (free)' },
-  { id: 'google/gemma-3-12b-it:free',                    label: 'Gemma 3 12B · Google / OpenRouter (free)' },
-  { id: 'nvidia/llama-3.3-nemotron-super-49b-v1:free',   label: 'Nemotron Super 49B · NVIDIA / OpenRouter (free)' },
-  { id: 'nvidia/llama-3.1-nemotron-ultra-253b-v1:free',  label: 'Nemotron Ultra 253B · NVIDIA / OpenRouter (free)' },
-  { id: 'deepseek/deepseek-r1:free',                     label: 'DeepSeek R1 · OpenRouter (free)' },
-  { id: 'deepseek/deepseek-v3-0324:free',                label: 'DeepSeek V3 · OpenRouter (free)' },
-  { id: 'mistralai/mistral-small-3.2-24b-instruct:free', label: 'Mistral Small 3.2 24B · OpenRouter (free)' },
+  // OpenRouter free tier (requires OPENROUTER_API_KEY secret)
+  { id: 'meta-llama/llama-3.3-70b-instruct:free',       label: 'Llama 3.3 70B · Meta / OpenRouter (free)' },
+  { id: 'google/gemma-4-31b-it:free',                   label: 'Gemma 4 31B · Google / OpenRouter (free)' },
+  { id: 'google/gemma-4-26b-a4b-it:free',               label: 'Gemma 4 26B · Google / OpenRouter (free)' },
+  { id: 'nvidia/nemotron-3-super-120b-a12b:free',        label: 'Nemotron 3 Super 120B · NVIDIA / OpenRouter (free)' },
+  { id: 'nvidia/nemotron-3-nano-30b-a3b:free',           label: 'Nemotron 3 Nano 30B · NVIDIA / OpenRouter (free)' },
+  { id: 'nousresearch/hermes-3-llama-3.1-405b:free',     label: 'Hermes 3 405B · Nous / OpenRouter (free)' },
+  { id: 'openai/gpt-oss-120b:free',                      label: 'GPT OSS 120B · OpenAI / OpenRouter (free)' },
+  { id: 'qwen/qwen3-coder:free',                         label: 'Qwen3 Coder 480B · Alibaba / OpenRouter (free)' },
   // Paid
   { id: 'claude-sonnet-4-6',                             label: 'Claude Sonnet 4.6 (paid)' },
 ];
@@ -2094,7 +2137,8 @@ function SurveysTab({ t }) {
     model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', allow_retakes: true,
   });
   const [saving,    setSaving]    = useState(false);
-  const [copiedId,  setCopiedId]  = useState(null);
+  const [copiedId,   setCopiedId]   = useState(null);
+  const [editingSlug, setEditingSlug] = useState(null); // { id, value }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -2132,6 +2176,16 @@ function SurveysTab({ t }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_active: !current }),
     });
+    load();
+  }, [load]);
+
+  const saveSlug = useCallback(async (id, slug) => {
+    await fetch(`/api/admin/surveys/${id}`, {
+      method: 'PATCH', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug }),
+    });
+    setEditingSlug(null);
     load();
   }, [load]);
 
@@ -2336,6 +2390,36 @@ function SurveysTab({ t }) {
                 <td style={cell}>
                   <div style={{ fontFamily: F, fontSize: 13, color: t.text1, fontWeight: 500 }}>{s.title}</div>
                   {s.description && <div style={{ fontFamily: F, fontSize: 11, color: t.text3, marginTop: 2 }}>{s.description.slice(0, 60)}{s.description.length > 60 ? '…' : ''}</div>}
+                  {/* Slug inline editor */}
+                  {editingSlug?.id === s.id ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6 }}>
+                      <span style={{ fontFamily: M, fontSize: 10, color: t.text3 }}>/s/</span>
+                      <input
+                        autoFocus
+                        value={editingSlug.value}
+                        onChange={e => setEditingSlug(es => ({ ...es, value: e.target.value }))}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') saveSlug(s.id, editingSlug.value);
+                          if (e.key === 'Escape') setEditingSlug(null);
+                        }}
+                        style={{ fontFamily: M, fontSize: 10, color: t.text1, background: t.surface, border: `1px solid ${t.accentBorder}`, borderRadius: 4, padding: '2px 6px', outline: 'none', width: 140 }}
+                      />
+                      <button onClick={() => saveSlug(s.id, editingSlug.value)} style={{ fontFamily: M, fontSize: 10, color: t.accent, background: 'none', border: 'none', cursor: 'pointer' }}>save</button>
+                      <button onClick={() => setEditingSlug(null)} style={{ fontFamily: M, fontSize: 10, color: t.text3, background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 4 }}>
+                      {s.slug ? (
+                        <button onClick={() => setEditingSlug({ id: s.id, value: s.slug })} style={{ fontFamily: M, fontSize: 10, color: t.accent, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                          /s/{s.slug}
+                        </button>
+                      ) : (
+                        <button onClick={() => setEditingSlug({ id: s.id, value: '' })} style={{ fontFamily: M, fontSize: 10, color: t.text3, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                          + set short URL
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </td>
                 <td style={cell}>
                   <span style={{ fontFamily: M, fontSize: 10, color: t.text3 }}>
@@ -2360,10 +2444,12 @@ function SurveysTab({ t }) {
                     {s.is_active ? 'deactivate' : 'activate'}
                   </button>
                   <button onClick={() => {
-                    const link = `${window.location.origin}/survey/${s.id}`;
+                    const link = s.slug
+                      ? `${window.location.origin}/s/${s.slug}`
+                      : `${window.location.origin}/survey/${s.id}`;
                     navigator.clipboard.writeText(link);
                     setCopiedId(s.id);
-                    setTimeout(() => setCopiedId(id => id === s.id ? null : id), 2000);
+                    setTimeout(() => setCopiedId(prev => prev === s.id ? null : prev), 2000);
                   }} style={{ fontFamily: M, fontSize: 11, color: copiedId === s.id ? '#34c759' : t.text3, background: 'none', border: 'none', cursor: 'pointer', marginRight: 10, transition: 'color 0.15s' }}>
                     {copiedId === s.id ? '✓ copied' : 'copy link'}
                   </button>

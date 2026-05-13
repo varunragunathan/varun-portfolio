@@ -90,9 +90,10 @@ function ResourceCard({ title, url, description }) {
 
 // ── Main page ─────────────────────────────────────────────────────
 export default function Survey() {
-  const { surveyId } = useParams();
+  const { surveyId: paramId, slug } = useParams();
 
   const [survey,     setSurvey]     = useState(null);
+  const [surveyId,   setSurveyId]   = useState(paramId ?? null); // actual UUID for API calls
   const [messages,   setMessages]   = useState([]);       // { role: 'owl'|'user', text }
   const [streaming,  setStreaming]  = useState(false);    // owl is typing
   const [owlState,   setOwlState]   = useState('idle');
@@ -106,13 +107,17 @@ export default function Survey() {
   const inputRef    = useRef(null);
   const sessionRef  = useRef(null); // stable ref for session ID
 
-  // Load survey metadata
+  // Load survey metadata (by UUID or slug)
   useEffect(() => {
-    fetch(`/api/surveys/${surveyId}`)
+    const url = slug ? `/api/surveys/s/${slug}` : `/api/surveys/${paramId}`;
+    fetch(url)
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(setSurvey)
+      .then(data => {
+        setSurvey(data);
+        setSurveyId(data.id); // always use the UUID for session API calls
+      })
       .catch(() => setError('Survey not found or no longer active.'));
-  }, [surveyId]);
+  }, [paramId, slug]);
 
   // Scroll the messages panel to bottom (not the window)
   useEffect(() => {

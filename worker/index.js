@@ -21,7 +21,7 @@ import { runEvals, getEvalRuns, deleteEvalRuns } from './evals.js';
 import { submitUpgradeRequest, getUpgradeRequest } from './userTier.js';
 import { listGlossary, createTerm, updateTerm, deleteTerm, bulkSync } from './glossary.js';
 import {
-  listSurveys, getSurvey, createSession, sendMessage, completeSession,
+  listSurveys, getSurvey, getSurveyBySlug, createSession, sendMessage, completeSession,
   adminListSurveys, adminCreateSurvey, adminUpdateSurvey, adminDeleteSurvey,
   adminListSessions, adminGetSession,
 } from './surveys.js';
@@ -125,7 +125,7 @@ async function handleRequest(request, env) {
 
       const makeAdminMatch   = path.match(/^\/api\/admin\/users\/([^/]+)\/make-admin$/);
       const makeProMatch     = path.match(/^\/api\/admin\/users\/([^/]+)\/make-pro$/);
-      const modelToggleMatch = path.match(/^\/api\/admin\/models\/([^/]+)$/);
+      const modelToggleMatch = path.match(/^\/api\/admin\/models\/(.+)$/);
       const approveMatch     = path.match(/^\/api\/admin\/upgrade-requests\/([^/]+)\/approve$/);
       const rejectMatch      = path.match(/^\/api\/admin\/upgrade-requests\/([^/]+)\/reject$/);
 
@@ -138,7 +138,7 @@ async function handleRequest(request, env) {
       } else if (rejectMatch && method === 'POST') {
         response = await rejectUpgrade(request, env, rejectMatch[1]);
       } else if (modelToggleMatch && method === 'PATCH') {
-        response = await toggleAdminModel(request, env, modelToggleMatch[1]);
+        response = await toggleAdminModel(request, env, decodeURIComponent(modelToggleMatch[1]));
       } else if (path === '/api/admin/upgrade-requests' && method === 'GET') {
         response = await listUpgradeRequests(request, env);
       } else if (path === '/api/admin/users' && method === 'GET') {
@@ -255,12 +255,15 @@ async function handleRequest(request, env) {
       let response;
 
       const sessionMatch    = path.match(/^\/api\/surveys\/([^/]+)\/sessions$/);
-      const messageMatch    = path.match(/^\/api\/surveys\/([^/]+)\/sessions\/([^/]+)\/message$/);
-      const completeMatch   = path.match(/^\/api\/surveys\/([^/]+)\/sessions\/([^/]+)\/complete$/);
-      const surveyByIdMatch = path.match(/^\/api\/surveys\/([^/]+)$/);
+      const messageMatch      = path.match(/^\/api\/surveys\/([^/]+)\/sessions\/([^/]+)\/message$/);
+      const completeMatch     = path.match(/^\/api\/surveys\/([^/]+)\/sessions\/([^/]+)\/complete$/);
+      const surveyBySlugMatch = path.match(/^\/api\/surveys\/s\/([^/]+)$/);
+      const surveyByIdMatch   = path.match(/^\/api\/surveys\/([^/]+)$/);
 
       if (path === '/api/surveys' && method === 'GET') {
         response = await listSurveys(request, env);
+      } else if (surveyBySlugMatch && method === 'GET') {
+        response = await getSurveyBySlug(request, env, surveyBySlugMatch[1]);
       } else if (surveyByIdMatch && method === 'GET') {
         response = await getSurvey(request, env, surveyByIdMatch[1]);
       } else if (sessionMatch && method === 'POST') {
@@ -344,6 +347,44 @@ async function handleRequest(request, env) {
         headers: { 'Content-Type': 'application/json', ...cors },
       });
     }
+  }
+
+  // ── Dynamic OG tags for short survey URLs /s/:slug ───────────
+  const shortSurveyMatch = url.pathname.match(/^\/s\/([^/]+)$/);
+  if (shortSurveyMatch && request.method === 'GET') {
+    try {
+      const survey = await env.varun_portfolio_auth
+        .prepare('SELECT id, title, description FROM surveys WHERE slug = ? AND is_active = 1')
+        .bind(shortSurveyMatch[1])
+        .first();
+      if (survey) {
+        const title   = `${survey.title} — Hooty wants to chat 🦉`;
+        const desc    = survey.description?.trim() ||
+          'A friendly 3-minute chat with Hooty the owl. No right answers — just curious questions.';
+        const pageUrl = url.href;
+        const imgUrl  = `${url.origin}/icon-512.png`;
+        const asset   = await env.ASSETS.fetch(new Request(new URL('/', url.origin)));
+        return new HTMLRewriter()
+          .on('title', new TextReplacer(title))
+          .on('meta[property="og:title"]',      { element: el => el.setAttribute('content', title) })
+          .on('meta[property="og:description"]', { element: el => el.setAttribute('content', desc) })
+          .on('meta[property="og:url"]',         { element: el => el.setAttribute('content', pageUrl) })
+          .on('meta[name="description"]',        { element: el => el.setAttribute('content', desc) })
+          .on('head', {
+            element(el) {
+              el.append(
+                `<meta property="og:image" content="${imgUrl}" />` +
+                `<meta name="twitter:card" content="summary" />` +
+                `<meta name="twitter:title" content="${escAttr(title)}" />` +
+                `<meta name="twitter:description" content="${escAttr(desc)}" />` +
+                `<meta name="twitter:image" content="${imgUrl}" />`,
+                { html: true },
+              );
+            },
+          })
+          .transform(asset);
+      }
+    } catch { /* fall through to SPA */ }
   }
 
   // ── Dynamic OG tags for survey pages ─────────────────────────

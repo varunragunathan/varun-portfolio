@@ -1,6 +1,7 @@
 // ── Survey API ────────────────────────────────────────────────────
 // Public (no auth):
 //   GET    /api/surveys                    — list active surveys
+//   GET    /api/surveys/s/:slug           — get survey by short slug
 //   GET    /api/surveys/:id               — get survey metadata
 //   POST   /api/surveys/:id/sessions      — start a session
 //   POST   /api/surveys/:id/sessions/:sid/message — send message, get SSE stream
@@ -39,6 +40,32 @@ function sse(stream) {
   });
 }
 
+// ── Slug helpers ─────────────────────────────────────────────────
+function slugify(str) {
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 50)
+    .replace(/-$/, '');
+}
+
+async function ensureUniqueSlug(db, base, excludeId = null) {
+  let candidate = base || 'survey';
+  let suffix = 0;
+  while (true) {
+    const slug = suffix === 0 ? candidate : `${candidate}-${suffix}`;
+    const existing = await db
+      .prepare('SELECT id FROM surveys WHERE slug = ?')
+      .bind(slug)
+      .first();
+    if (!existing || existing.id === excludeId) return slug;
+    suffix++;
+  }
+}
+
 // Returns a 403 Response if not admin, otherwise null (matches admin.js pattern).
 async function guardAdmin(request, env) {
   const session = await getSession(env.KV, request);
@@ -56,8 +83,18 @@ export async function listSurveys(request, env) {
 // ── Public: get one survey (metadata only, no system_prompt) ──────
 export async function getSurvey(request, env, id) {
   const row = await env.varun_portfolio_auth
-    .prepare('SELECT id, title, description, allow_retakes FROM surveys WHERE id = ? AND is_active = 1')
+    .prepare('SELECT id, title, description, allow_retakes, slug FROM surveys WHERE id = ? AND is_active = 1')
     .bind(id)
+    .first();
+  if (!row) return json({ error: 'Not found' }, 404);
+  return json(row);
+}
+
+// ── Public: get survey by short slug ─────────────────────────────
+export async function getSurveyBySlug(request, env, slug) {
+  const row = await env.varun_portfolio_auth
+    .prepare('SELECT id, title, description, allow_retakes, slug FROM surveys WHERE slug = ? AND is_active = 1')
+    .bind(slug)
     .first();
   if (!row) return json({ error: 'Not found' }, 404);
   return json(row);
@@ -285,15 +322,26 @@ export async function sendMessage(request, env, surveyId, sessionId) {
 
   let upstreamStream;
   let source;
-  if (model.startsWith('claude')) {
-    source = 'claude';
-    upstreamStream = await streamClaude(env.ANTHROPIC_API_KEY, model, survey.system_prompt, messages);
-  } else if (model.startsWith('@cf/')) {
-    source = 'workersai';
-    upstreamStream = await streamWorkersAI(env.AI, model, survey.system_prompt, messages);
-  } else {
-    source = 'openrouter';
-    upstreamStream = await streamOpenRouter(env.OPENROUTER_API_KEY, model, survey.system_prompt, messages);
+  try {
+    if (model.startsWith('claude')) {
+      source = 'claude';
+      upstreamStream = await streamClaude(env.ANTHROPIC_API_KEY, model, survey.system_prompt, messages);
+    } else if (model.startsWith('@cf/')) {
+      source = 'workersai';
+      upstreamStream = await streamWorkersAI(env.AI, model, survey.system_prompt, messages);
+    } else {
+      source = 'openrouter';
+      upstreamStream = await streamOpenRouter(env.OPENROUTER_API_KEY, model, survey.system_prompt, messages);
+    }
+  } catch (err) {
+    const enc = new TextEncoder();
+    const errStream = new ReadableStream({
+      start(c) {
+        c.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'error', message: `Model error: ${err.message}` })}\n\n`));
+        c.close();
+      },
+    });
+    return sse(errStream);
   }
 
   return sse(buildSurveyStream(upstreamStream, source, onFullText));
@@ -332,17 +380,21 @@ export async function adminCreateSurvey(request, env) {
   if (guard) return guard;
 
   const body = await request.json().catch(() => ({}));
-  const { title, description = '', system_prompt, model, allow_retakes = true } = body;
+  const { title, description = '', system_prompt, model, allow_retakes = true, slug: rawSlug } = body;
   if (!title?.trim() || !system_prompt?.trim()) return json({ error: 'title and system_prompt required' }, 400);
 
-  const id = crypto.randomUUID();
-  const now = Date.now();
-  await env.varun_portfolio_auth
-    .prepare('INSERT INTO surveys (id, title, description, system_prompt, model, is_active, allow_retakes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)')
-    .bind(id, title.trim(), description, system_prompt.trim(), model ?? SURVEY_MODEL, allow_retakes ? 1 : 0, now, now)
+  const db   = env.varun_portfolio_auth;
+  const id   = crypto.randomUUID();
+  const now  = Date.now();
+  const base = rawSlug?.trim() ? slugify(rawSlug.trim()) : slugify(title.trim());
+  const slug = await ensureUniqueSlug(db, base);
+
+  await db
+    .prepare('INSERT INTO surveys (id, title, description, system_prompt, model, is_active, allow_retakes, slug, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)')
+    .bind(id, title.trim(), description, system_prompt.trim(), model ?? SURVEY_MODEL, allow_retakes ? 1 : 0, slug, now, now)
     .run();
 
-  return json({ id });
+  return json({ id, slug });
 }
 
 // ── Admin: update a survey ────────────────────────────────────────
@@ -351,6 +403,7 @@ export async function adminUpdateSurvey(request, env, id) {
   if (guard) return guard;
 
   const body = await request.json().catch(() => ({}));
+  const db = env.varun_portfolio_auth;
   const fields = [];
   const values = [];
 
@@ -360,12 +413,17 @@ export async function adminUpdateSurvey(request, env, id) {
   if (body.model !== undefined)         { fields.push('model = ?');         values.push(body.model); }
   if (body.is_active !== undefined)     { fields.push('is_active = ?');     values.push(body.is_active ? 1 : 0); }
   if (body.allow_retakes !== undefined) { fields.push('allow_retakes = ?'); values.push(body.allow_retakes ? 1 : 0); }
+  if (body.slug !== undefined) {
+    const newSlug = await ensureUniqueSlug(db, slugify(body.slug.trim()), id);
+    fields.push('slug = ?');
+    values.push(newSlug);
+  }
 
   if (fields.length === 0) return json({ error: 'Nothing to update' }, 400);
   fields.push('updated_at = ?');
   values.push(Date.now(), id);
 
-  await env.varun_portfolio_auth
+  await db
     .prepare(`UPDATE surveys SET ${fields.join(', ')} WHERE id = ?`)
     .bind(...values)
     .run();

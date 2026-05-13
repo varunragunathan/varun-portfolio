@@ -279,23 +279,25 @@ export async function updatePersonas(request, env) {
 }
 
 // PATCH /api/admin/models/:id  — flip enabled 0↔1
-export async function toggleAdminModel(request, env, id) {
+export async function toggleAdminModel(request, env, modelId) {
   const session = await getSession(env.KV, request);
   const guard = await requireAdmin(session, env);
   if (guard) return guard;
 
   const db = env.varun_portfolio_auth;
+  const body = await request.json().catch(() => ({}));
+
   const existing = await db
-    .prepare('SELECT id, enabled FROM allowed_models WHERE id = ?')
-    .bind(id)
+    .prepare('SELECT id, enabled FROM allowed_models WHERE model_id = ?')
+    .bind(modelId)
     .first();
 
   if (!existing) return json({ error: 'Not found' }, 404);
 
-  const newEnabled = existing.enabled ? 0 : 1;
+  const newEnabled = body.enabled !== undefined ? (body.enabled ? 1 : 0) : (existing.enabled ? 0 : 1);
   await db
-    .prepare('UPDATE allowed_models SET enabled = ? WHERE id = ?')
-    .bind(newEnabled, id)
+    .prepare('UPDATE allowed_models SET enabled = ? WHERE model_id = ?')
+    .bind(newEnabled, modelId)
     .run();
 
   return json({ ok: true, enabled: newEnabled });
