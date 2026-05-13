@@ -112,8 +112,18 @@ async function streamClaude(apiKey, model, systemPrompt, messages) {
   return response.body;
 }
 
+// Returns the safe emit length: how much of `text` can be sent without risking
+// a partial delimiter appearing at the end.
+function getSafeEmitLength(text, delimiter) {
+  for (let len = Math.min(text.length, delimiter.length - 1); len > 0; len--) {
+    if (text.endsWith(delimiter.slice(0, len))) return text.length - len;
+  }
+  return text.length;
+}
+
 function buildSurveyStream(upstreamStream, source, onFullText) {
   let fullText = '';
+  let emittedLen = 0; // how many chars of fullText have been sent as delta events
   const decoder = new TextDecoder();
   let buffer = '';
 
@@ -137,6 +147,32 @@ function buildSurveyStream(upstreamStream, source, onFullText) {
         return { prose, opts };
       }
 
+      function handleToken(token) {
+        fullText += token;
+        const delimIdx = fullText.indexOf(OPTS_DELIMITER);
+        if (delimIdx !== -1) {
+          // Delimiter found — flush any prose before it that hasn't been emitted yet
+          if (emittedLen < delimIdx) {
+            emit({ type: 'delta', text: fullText.slice(emittedLen, delimIdx) });
+            emittedLen = delimIdx;
+          }
+          return;
+        }
+        // No delimiter yet — emit up to the point that can't be a partial delimiter prefix
+        const safeLen = getSafeEmitLength(fullText, OPTS_DELIMITER);
+        if (safeLen > emittedLen) {
+          emit({ type: 'delta', text: fullText.slice(emittedLen, safeLen) });
+          emittedLen = safeLen;
+        }
+      }
+
+      async function handleDone() {
+        const { prose, opts } = processText(fullText);
+        await onFullText(prose);
+        emit({ type: 'opts', opts: opts ?? { inputType: 'text', options: null, done: false } });
+        emit({ type: 'done' });
+      }
+
       try {
         while (true) {
           const { done, value } = await reader.read();
@@ -149,13 +185,7 @@ function buildSurveyStream(upstreamStream, source, onFullText) {
           for (const line of lines) {
             if (!line.startsWith('data: ')) continue;
             const raw = line.slice(6).trim();
-            if (raw === '[DONE]') {
-              const { prose, opts } = processText(fullText);
-              await onFullText(prose);
-              emit({ type: 'opts', opts: opts ?? { inputType: 'text', options: null, done: false } });
-              emit({ type: 'done' });
-              continue;
-            }
+            if (raw === '[DONE]') { await handleDone(); continue; }
 
             let event;
             try { event = JSON.parse(raw); } catch { continue; }
@@ -171,22 +201,11 @@ function buildSurveyStream(upstreamStream, source, onFullText) {
             ) {
               token = event.delta.text;
             } else if (source === 'claude' && event.type === 'message_stop') {
-              const { prose, opts } = processText(fullText);
-              await onFullText(prose);
-              emit({ type: 'opts', opts: opts ?? { inputType: 'text', options: null, done: false } });
-              emit({ type: 'done' });
+              await handleDone();
               continue;
             }
 
-            if (token) {
-              fullText += token;
-              // Only stream tokens before the delimiter — hold the opts JSON back
-              const delimIdx = fullText.indexOf(OPTS_DELIMITER);
-              if (delimIdx === -1) {
-                emit({ type: 'delta', text: token });
-              }
-              // Once we hit the delimiter, stop streaming prose — wait for done
-            }
+            if (token) handleToken(token);
           }
         }
       } catch (err) {

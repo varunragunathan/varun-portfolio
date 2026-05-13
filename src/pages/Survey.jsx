@@ -7,6 +7,14 @@ import './Survey.css';
 
 const OPTS_DELIMITER = '---SURVEY_OPTS---';
 
+// Strip any suffix of `text` that is a prefix of `delimiter` (partial leak guard)
+function stripPartialDelimiter(text, delimiter) {
+  for (let len = Math.min(text.length, delimiter.length - 1); len > 0; len--) {
+    if (text.endsWith(delimiter.slice(0, len))) return text.slice(0, -len);
+  }
+  return text;
+}
+
 // ── Respondent ID: stable per-browser anonymous token ────────────
 function getRespondentId() {
   const KEY = 'survey_respondent_id';
@@ -134,8 +142,7 @@ export default function Survey() {
       for await (const event of readSSE(res)) {
         if (event.type === 'delta') {
           buffer += event.text;
-          // Don't show delimiter or anything after it
-          const display = buffer.split(OPTS_DELIMITER)[0];
+          const display = stripPartialDelimiter(buffer.split(OPTS_DELIMITER)[0], OPTS_DELIMITER).trimEnd();
           setMessages(prev => {
             const copy = [...prev];
             copy[copy.length - 1] = { role: 'owl', text: display, _streaming: true };
