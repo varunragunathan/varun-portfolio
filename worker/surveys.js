@@ -112,6 +112,26 @@ async function streamClaude(apiKey, model, systemPrompt, messages) {
   return response.body;
 }
 
+async function streamOpenRouter(apiKey, model, systemPrompt, messages) {
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://varunr.dev',
+      'X-Title': "Varun's Portfolio",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 600,
+      messages: [{ role: 'system', content: systemPrompt }, ...messages],
+      stream: true,
+    }),
+  });
+  if (!response.ok) throw new Error(`OpenRouter error ${response.status}`);
+  return response.body;
+}
+
 // Returns the safe emit length: how much of `text` can be sent without risking
 // a partial delimiter appearing at the end.
 function getSafeEmitLength(text, delimiter) {
@@ -193,6 +213,8 @@ function buildSurveyStream(upstreamStream, source, onFullText) {
             let token = '';
             if (source === 'workersai' && event.response) {
               token = event.response;
+            } else if (source === 'openrouter') {
+              token = event.choices?.[0]?.delta?.content ?? '';
             } else if (
               source === 'claude' &&
               event.type === 'content_block_delta' &&
@@ -252,7 +274,6 @@ export async function sendMessage(request, env, surveyId, sessionId) {
   const messages = history.map(r => ({ role: r.role === 'owl' ? 'assistant' : 'user', content: r.content }));
 
   const model = survey.model ?? SURVEY_MODEL;
-  const isClaudeModel = model.startsWith('claude');
 
   const onFullText = async (prose) => {
     const assistantMsgId = crypto.randomUUID();
@@ -264,12 +285,15 @@ export async function sendMessage(request, env, surveyId, sessionId) {
 
   let upstreamStream;
   let source;
-  if (isClaudeModel) {
-    upstreamStream = await streamClaude(env.ANTHROPIC_API_KEY, model, survey.system_prompt, messages);
+  if (model.startsWith('claude')) {
     source = 'claude';
-  } else {
-    upstreamStream = await streamWorkersAI(env.AI, model, survey.system_prompt, messages);
+    upstreamStream = await streamClaude(env.ANTHROPIC_API_KEY, model, survey.system_prompt, messages);
+  } else if (model.startsWith('@cf/')) {
     source = 'workersai';
+    upstreamStream = await streamWorkersAI(env.AI, model, survey.system_prompt, messages);
+  } else {
+    source = 'openrouter';
+    upstreamStream = await streamOpenRouter(env.OPENROUTER_API_KEY, model, survey.system_prompt, messages);
   }
 
   return sse(buildSurveyStream(upstreamStream, source, onFullText));

@@ -102,9 +102,9 @@ export default function Survey() {
   const [error,      setError]      = useState(null);
   const [started,    setStarted]    = useState(false);
 
-  const bottomRef  = useRef(null);
-  const inputRef   = useRef(null);
-  const sessionRef = useRef(null); // stable ref for session ID
+  const messagesRef = useRef(null);
+  const inputRef    = useRef(null);
+  const sessionRef  = useRef(null); // stable ref for session ID
 
   // Load survey metadata
   useEffect(() => {
@@ -114,9 +114,10 @@ export default function Survey() {
       .catch(() => setError('Survey not found or no longer active.'));
   }, [surveyId]);
 
-  // Scroll to bottom on new messages
+  // Scroll the messages panel to bottom (not the window)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = messagesRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages, streaming]);
 
   // Stream owl response for a given user message
@@ -300,7 +301,7 @@ export default function Survey() {
           <span className="survey-chat__title">{survey.title}</span>
         </div>
 
-        <div className="survey-chat__messages" role="log" aria-live="polite" aria-label="Survey conversation">
+        <div ref={messagesRef} className="survey-chat__messages" role="log" aria-live="polite" aria-label="Survey conversation">
           {messages.map((m, i) =>
             m.role === 'owl'
               ? <OwlMessage key={i} text={m.text} streaming={!!(m._streaming)} />
@@ -325,8 +326,6 @@ export default function Survey() {
               <Link to="/surveys" className="survey-btn survey-btn--ghost">← Other surveys</Link>
             </div>
           )}
-
-          <div ref={bottomRef} />
         </div>
 
         {/* Input area */}
@@ -348,8 +347,8 @@ export default function Survey() {
               </div>
             )}
 
-            {/* Text input */}
-            {(!opts || opts.inputType === 'text') && !streaming && (
+            {/* Text input — always available so user can answer freely */}
+            {!streaming && (
               <div className="survey-text-input">
                 <textarea
                   ref={inputRef}

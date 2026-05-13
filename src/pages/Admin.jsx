@@ -2039,9 +2039,21 @@ function EvalsTab({ t }) {
 
 // ── Tab: Surveys ──────────────────────────────────────────────────
 const SURVEY_MODELS = [
-  { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', label: 'Llama 3.3 70B (free)' },
-  { id: '@cf/meta/llama-3.1-8b-instruct',           label: 'Llama 3.1 8B (free)' },
-  { id: 'claude-sonnet-4-6',                         label: 'Claude Sonnet 4.6' },
+  // Cloudflare Workers AI (free, no key needed)
+  { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', label: 'Llama 3.3 70B · Workers AI (free)' },
+  { id: '@cf/meta/llama-3.1-8b-instruct',           label: 'Llama 3.1 8B · Workers AI (free)' },
+  // OpenRouter free tier (requires OPENROUTER_API_KEY)
+  { id: 'meta-llama/llama-4-maverick:free',              label: 'Llama 4 Maverick · OpenRouter (free)' },
+  { id: 'meta-llama/llama-4-scout:free',                 label: 'Llama 4 Scout · OpenRouter (free)' },
+  { id: 'google/gemma-3-27b-it:free',                    label: 'Gemma 3 27B · Google / OpenRouter (free)' },
+  { id: 'google/gemma-3-12b-it:free',                    label: 'Gemma 3 12B · Google / OpenRouter (free)' },
+  { id: 'nvidia/llama-3.3-nemotron-super-49b-v1:free',   label: 'Nemotron Super 49B · NVIDIA / OpenRouter (free)' },
+  { id: 'nvidia/llama-3.1-nemotron-ultra-253b-v1:free',  label: 'Nemotron Ultra 253B · NVIDIA / OpenRouter (free)' },
+  { id: 'deepseek/deepseek-r1:free',                     label: 'DeepSeek R1 · OpenRouter (free)' },
+  { id: 'deepseek/deepseek-v3-0324:free',                label: 'DeepSeek V3 · OpenRouter (free)' },
+  { id: 'mistralai/mistral-small-3.2-24b-instruct:free', label: 'Mistral Small 3.2 24B · OpenRouter (free)' },
+  // Paid
+  { id: 'claude-sonnet-4-6',                             label: 'Claude Sonnet 4.6 (paid)' },
 ];
 
 const AI_LITERACY_PROMPT = `You are Varun's Owl — a warm, curious, and slightly witty AI guide helping Varun understand how people think about AI.

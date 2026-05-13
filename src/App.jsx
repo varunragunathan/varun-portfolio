@@ -138,7 +138,7 @@ function Shell() {
   const handleShake = useCallback(() => setFeedbackOpen(true), []);
   const { shakeState, requestPermission } = useShake(handleShake);
   const { pathname } = useLocation();
-  const hideFooter = !!matchPath('/chat', pathname) || !!matchPath('/survey/:surveyId', pathname);
+  const hideFooter = !!matchPath('/chat', pathname) || pathname.startsWith('/survey/');
 
   return (
     <div className="shell">

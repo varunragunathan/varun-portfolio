@@ -178,6 +178,30 @@ async function streamClaude(apiKey, model, systemPrompt, messages) {
   return response.body; // ReadableStream of SSE bytes
 }
 
+// ── OpenRouter streaming call ────────────────────────────────────
+async function streamOpenRouter(apiKey, model, systemPrompt, messages) {
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://varunr.dev',
+      'X-Title': "Varun's Portfolio",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 1024,
+      messages: [{ role: 'system', content: systemPrompt }, ...messages],
+      stream: true,
+    }),
+  });
+  if (!response.ok) {
+    const err = await response.text().catch(() => '');
+    throw new Error(`OpenRouter API error ${response.status}: ${err}`);
+  }
+  return response.body;
+}
+
 // ── Unified SSE transform ─────────────────────────────────────────
 // Transforms either a Workers AI or Anthropic SSE stream into our
 // client format:
@@ -227,13 +251,18 @@ function transformStream(upstreamStream, source, onFullText) {
             try { event = JSON.parse(raw); } catch { continue; }
 
             if (source === 'workersai') {
-              // Workers AI: { response: "token" }
               if (event.response) {
                 fullText += event.response;
                 emit({ type: 'delta', text: event.response });
               }
+            } else if (source === 'openrouter') {
+              const content = event.choices?.[0]?.delta?.content;
+              if (content) {
+                fullText += content;
+                emit({ type: 'delta', text: content });
+              }
             } else {
-              // Anthropic: various event types
+              // Anthropic
               if (
                 event.type === 'content_block_delta' &&
                 event.delta?.type === 'text_delta' &&
@@ -245,7 +274,6 @@ function transformStream(upstreamStream, source, onFullText) {
                 await onFullText(fullText);
                 emit({ type: 'done' });
               }
-              // Ignore ping, message_start, content_block_start, etc.
             }
           }
         }
@@ -259,6 +287,9 @@ function transformStream(upstreamStream, source, onFullText) {
               if (source === 'workersai' && event.response) {
                 fullText += event.response;
                 emit({ type: 'delta', text: event.response });
+              } else if (source === 'openrouter') {
+                const content = event.choices?.[0]?.delta?.content;
+                if (content) { fullText += content; emit({ type: 'delta', text: content }); }
               } else if (
                 source === 'claude' &&
                 event.type === 'content_block_delta' &&
@@ -368,7 +399,9 @@ export async function postChat(request, env) {
       return json({ error: 'Model not available' }, 400);
     }
     selectedModel = requestedModel;
-    modelSource   = selectedModel.startsWith('claude-') ? 'claude' : 'workersai';
+    if (selectedModel.startsWith('claude-'))      modelSource = 'claude';
+    else if (selectedModel.startsWith('@cf/'))    modelSource = 'workersai';
+    else                                          modelSource = 'openrouter';
   } else if (requestedModel) {
     // Non-pro users requesting a model: silently ignore, use default
     selectedModel = DEFAULT_MODEL;
@@ -413,6 +446,8 @@ export async function postChat(request, env) {
   let upstreamStream;
   if (modelSource === 'claude') {
     upstreamStream = await streamClaude(env.ANTHROPIC_API_KEY, selectedModel, systemPrompt, aiMessages);
+  } else if (modelSource === 'openrouter') {
+    upstreamStream = await streamOpenRouter(env.OPENROUTER_API_KEY, selectedModel, systemPrompt, aiMessages);
   } else {
     upstreamStream = await streamWorkersAI(env.AI, selectedModel, systemPrompt, aiMessages);
   }
