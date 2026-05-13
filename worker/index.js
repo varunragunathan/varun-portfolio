@@ -29,6 +29,10 @@ import {
   adminListSessions, adminGetSession, adminDeleteSession,
 } from './surveys.js';
 import { submitFeedbackHandler } from './feedback.js';
+import {
+  adminListPages, adminCreatePage, adminGetPage, adminUpdatePage, adminDeletePage,
+  servePublicPage,
+} from './pages.js';
 import { checkIpRateLimit } from './rateLimit.js';
 import { getMetrics } from './metrics.js';
 import { logEndpointRequest, getEndpointMetrics } from './endpointMetrics.js';
@@ -164,6 +168,10 @@ async function handleRequest(request, env) {
         response = await updateRateLimits(request, env);
       } else if (path === '/api/admin/rate-limits' && method === 'DELETE') {
         response = await resetRateLimits(request, env);
+      } else if (path === '/api/admin/pages' && method === 'GET') {
+        response = await adminListPages(request, env);
+      } else if (path === '/api/admin/pages' && method === 'POST') {
+        response = await adminCreatePage(request, env);
       } else if (path === '/api/admin/evals/runs' && method === 'GET') {
         response = await getEvalRuns(request, env);
       } else if (path === '/api/admin/evals/runs' && method === 'DELETE') {
@@ -172,13 +180,20 @@ async function handleRequest(request, env) {
         response = await runEvals(request, env);
       }
 
-      // ── Admin survey routes ───────────────────────────────────
+      // ── Pattern-matched admin routes (pages + surveys) ────────
       else {
+        const adminPageMatch     = path.match(/^\/api\/admin\/pages\/([^/]+)$/);
         const adminSurveyMatch   = path.match(/^\/api\/admin\/surveys\/([^/]+)$/);
         const adminSessionsMatch = path.match(/^\/api\/admin\/surveys\/([^/]+)\/sessions$/);
         const adminSessionMatch  = path.match(/^\/api\/admin\/surveys\/([^/]+)\/sessions\/([^/]+)$/);
 
-        if (adminSessionsMatch && method === 'GET') {
+        if (adminPageMatch && method === 'GET') {
+          response = await adminGetPage(request, env, adminPageMatch[1]);
+        } else if (adminPageMatch && method === 'PATCH') {
+          response = await adminUpdatePage(request, env, adminPageMatch[1]);
+        } else if (adminPageMatch && method === 'DELETE') {
+          response = await adminDeletePage(request, env, adminPageMatch[1]);
+        } else if (adminSessionsMatch && method === 'GET') {
           response = await adminListSessions(request, env, adminSessionsMatch[1]);
         } else if (adminSessionMatch && method === 'GET') {
           response = await adminGetSession(request, env, adminSessionMatch[1], adminSessionMatch[2]);
@@ -435,6 +450,14 @@ async function handleRequest(request, env) {
           })
           .transform(asset);
       }
+    } catch { /* fall through */ }
+  }
+
+  // ── Public pages /p/:slug ─────────────────────────────────────
+  const publicPageMatch = url.pathname.match(/^\/p\/([^/]+)$/);
+  if (publicPageMatch && request.method === 'GET') {
+    try {
+      return await servePublicPage(env, publicPageMatch[1]);
     } catch { /* fall through */ }
   }
 
