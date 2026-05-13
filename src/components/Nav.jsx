@@ -67,7 +67,32 @@ function Identicon({ email, size = 32 }) {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !email) return;
+    if (!canvas) return;
+
+    if (!email) {
+      // Fallback: plain colored circle with a generic person silhouette
+      const R = 300;
+      canvas.width = R;
+      canvas.height = R;
+      const ctx = canvas.getContext('2d');
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(R / 2, R / 2, R / 2, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.fillStyle = '#6366f1';
+      ctx.fillRect(0, 0, R, R);
+      // head
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.beginPath();
+      ctx.arc(R / 2, R * 0.38, R * 0.2, 0, Math.PI * 2);
+      ctx.fill();
+      // body
+      ctx.beginPath();
+      ctx.ellipse(R / 2, R * 0.78, R * 0.28, R * 0.22, 0, Math.PI, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
 
     const R = 300;
     canvas.width = R;
