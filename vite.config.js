@@ -11,7 +11,7 @@ const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(file
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
   plugins: [react(), VitePWA({
-    registerType: 'prompt',
+    registerType: 'autoUpdate',
     includeAssets: ['favicon.svg', 'robots.txt', 'icon-192.png', 'icon-512.png'],
     manifest: {
       name: 'Varun Ragunathan — Staff Engineer',
