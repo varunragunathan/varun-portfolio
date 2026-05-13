@@ -2271,7 +2271,7 @@ function SurveysTab({ t }) {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                {['Session', 'Started', 'Status', 'Messages', ''].map((h, i) => (
+                {['Session', 'Started', 'Status', 'Messages', ''].map((h) => (
                   <th key={h} style={hcell}>{h}</th>
                 ))}
               </tr>
