@@ -2,7 +2,7 @@
 // Three tabs: Upgrade Requests | Users | Models
 // Redirects to / if user is not admin (detected via 403 on first fetch).
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
@@ -2523,6 +2523,265 @@ function SurveysTab({ t }) {
   );
 }
 
+// ── Tab: Pages ────────────────────────────────────────────────────
+function PagesTab({ t }) {
+  const [pages,      setPages]      = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [selected,   setSelected]   = useState(null);   // full page obj w/ content
+  const [loadingSel, setLoadingSel] = useState(false);
+  const [editing,    setEditing]    = useState(false);
+  const [draft,      setDraft]      = useState({});
+  const [creating,   setCreating]   = useState(false);
+  const [newForm,    setNewForm]    = useState({ title: '', slug: '', folder: '', content: '' });
+  const [saving,     setSaving]     = useState(false);
+  const [copied,     setCopied]     = useState(false);
+  const [err,        setErr]        = useState(null);
+
+  const loadPages = useCallback(() => {
+    setLoading(true);
+    fetch('/api/admin/pages', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => { setPages(d.pages ?? []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { loadPages(); }, [loadPages]);
+
+  const selectPage = useCallback(async (page) => {
+    setLoadingSel(true);
+    setEditing(false);
+    setCreating(false);
+    setErr(null);
+    const res  = await fetch(`/api/admin/pages/${page.id}`, { credentials: 'include' });
+    const data = await res.json();
+    setSelected(data.page);
+    setDraft({ title: data.page.title, slug: data.page.slug, folder: data.page.folder ?? '', content: data.page.content });
+    setLoadingSel(false);
+  }, []);
+
+  const savePage = useCallback(async () => {
+    setSaving(true); setErr(null);
+    try {
+      const res  = await fetch(`/api/admin/pages/${selected.id}`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(draft),
+      });
+      const data = await res.json();
+      if (data.error) { setErr(data.error); setSaving(false); return; }
+      const updated = { ...selected, ...data.page, content: draft.content };
+      setSelected(updated);
+      setPages(prev => prev.map(p => p.id === selected.id ? { ...p, ...data.page } : p));
+      setEditing(false);
+    } catch { setErr('Save failed'); }
+    setSaving(false);
+  }, [selected, draft]);
+
+  const createPage = useCallback(async () => {
+    setSaving(true); setErr(null);
+    try {
+      const res  = await fetch('/api/admin/pages', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newForm),
+      });
+      const data = await res.json();
+      if (data.error) { setErr(data.error); setSaving(false); return; }
+      loadPages();
+      setCreating(false);
+      setNewForm({ title: '', slug: '', folder: '', content: '' });
+      selectPage(data.page);
+    } catch { setErr('Create failed'); }
+    setSaving(false);
+  }, [newForm, loadPages, selectPage]);
+
+  const deletePage = useCallback(async () => {
+    if (!selected || !confirm(`Delete "${selected.title}"? This cannot be undone.`)) return;
+    await fetch(`/api/admin/pages/${selected.id}`, { method: 'DELETE', credentials: 'include' });
+    setPages(prev => prev.filter(p => p.id !== selected.id));
+    setSelected(null); setEditing(false);
+  }, [selected]);
+
+  const copyLink = useCallback(() => {
+    if (!selected) return;
+    navigator.clipboard.writeText(`https://varunr.dev/p/${selected.slug}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [selected]);
+
+  const grouped = useMemo(() => {
+    const map = {};
+    for (const p of pages) {
+      const key = p.folder ?? '';
+      if (!map[key]) map[key] = [];
+      map[key].push(p);
+    }
+    return map;
+  }, [pages]);
+
+  const folders = useMemo(() =>
+    Object.keys(grouped).sort((a, b) => a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)),
+  [grouped]);
+
+  const inputSt = {
+    fontFamily: M, fontSize: 12, padding: '7px 10px', borderRadius: 7,
+    border: `1px solid ${t.border}`, background: t.surface, color: t.text1, outline: 'none',
+    width: '100%',
+  };
+  const btnSt = (accent) => ({
+    fontFamily: M, fontSize: 11, padding: '5px 12px', borderRadius: 7, cursor: 'pointer',
+    background: accent ? t.accentDim : 'transparent',
+    border: `1px solid ${accent ? t.accentBorder : t.border}`,
+    color: accent ? t.accent : t.text2,
+  });
+
+  const leftPane = (
+    <div style={{ width: 200, flexShrink: 0, borderRight: `1px solid ${t.border}`, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ padding: '10px 12px', borderBottom: `1px solid ${t.border}` }}>
+        <button onClick={() => { setCreating(true); setSelected(null); setEditing(false); }} style={{ ...btnSt(true), width: '100%' }}>
+          + New Page
+        </button>
+      </div>
+      {loading ? (
+        <div style={{ fontFamily: M, fontSize: 11, color: t.text3, padding: 16 }}>loading…</div>
+      ) : pages.length === 0 ? (
+        <div style={{ fontFamily: M, fontSize: 11, color: t.text3, padding: 16 }}>No pages yet</div>
+      ) : (
+        folders.map(folder => (
+          <div key={folder}>
+            {folder && (
+              <div style={{ fontFamily: M, fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: t.text3, padding: '10px 12px 4px' }}>
+                {folder}
+              </div>
+            )}
+            {grouped[folder].map(p => (
+              <div
+                key={p.id}
+                onClick={() => selectPage(p)}
+                style={{
+                  padding: '8px 14px', cursor: 'pointer', fontFamily: F, fontSize: 13,
+                  color: selected?.id === p.id ? t.accent : t.text2,
+                  background: selected?.id === p.id ? t.accentDim : 'transparent',
+                  borderLeft: selected?.id === p.id ? `3px solid ${t.accent}` : '3px solid transparent',
+                  transition: 'background 0.12s',
+                }}
+              >
+                {p.title}
+              </div>
+            ))}
+          </div>
+        ))
+      )}
+    </div>
+  );
+
+  const rightPane = () => {
+    if (creating) return (
+      <div style={{ flex: 1, padding: 24, display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto' }}>
+        <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.15em', color: t.text3, textTransform: 'uppercase', marginBottom: 4 }}>New Page</div>
+        {[
+          { label: 'Title', key: 'title', placeholder: 'Jennifer AI Guide' },
+          { label: 'Slug', key: 'slug', placeholder: 'jennifer-ai-guide (auto-generated if blank)' },
+          { label: 'Folder', key: 'folder', placeholder: 'General (optional)' },
+        ].map(({ label, key, placeholder }) => (
+          <div key={key}>
+            <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginBottom: 4 }}>{label}</div>
+            <input value={newForm[key]} placeholder={placeholder} style={inputSt}
+              onChange={e => setNewForm(p => ({ ...p, [key]: e.target.value }))} />
+          </div>
+        ))}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginBottom: 4 }}>HTML Content</div>
+          <textarea
+            value={newForm.content} placeholder="Paste HTML here…"
+            onChange={e => setNewForm(p => ({ ...p, content: e.target.value }))}
+            style={{ ...inputSt, flex: 1, resize: 'none', fontFamily: M, fontSize: 11, minHeight: 200 }}
+          />
+        </div>
+        {err && <div style={{ fontFamily: M, fontSize: 11, color: '#ff3b30' }}>{err}</div>}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={createPage} disabled={saving} style={btnSt(true)}>{saving ? 'Saving…' : 'Create'}</button>
+          <button onClick={() => { setCreating(false); setErr(null); }} style={btnSt(false)}>Cancel</button>
+        </div>
+      </div>
+    );
+
+    if (!selected) return (
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontFamily: M, fontSize: 11, color: t.text3 }}>Select a page or create one</div>
+      </div>
+    );
+
+    if (loadingSel) return (
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontFamily: M, fontSize: 11, color: t.text3 }}>loading…</div>
+      </div>
+    );
+
+    if (editing) return (
+      <div style={{ flex: 1, padding: 24, display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto' }}>
+        <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.15em', color: t.text3, textTransform: 'uppercase' }}>Edit Page</div>
+        {[
+          { label: 'Title', key: 'title' },
+          { label: 'Slug', key: 'slug' },
+          { label: 'Folder', key: 'folder', placeholder: 'General (optional)' },
+        ].map(({ label, key, placeholder }) => (
+          <div key={key}>
+            <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginBottom: 4 }}>{label}</div>
+            <input value={draft[key] ?? ''} placeholder={placeholder} style={inputSt}
+              onChange={e => setDraft(p => ({ ...p, [key]: e.target.value }))} />
+          </div>
+        ))}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginBottom: 4 }}>HTML Content</div>
+          <textarea value={draft.content ?? ''} onChange={e => setDraft(p => ({ ...p, content: e.target.value }))}
+            style={{ ...inputSt, flex: 1, resize: 'none', fontFamily: M, fontSize: 11, minHeight: 200 }} />
+        </div>
+        {err && <div style={{ fontFamily: M, fontSize: 11, color: '#ff3b30' }}>{err}</div>}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={savePage} disabled={saving} style={btnSt(true)}>{saving ? 'Saving…' : 'Save'}</button>
+          <button onClick={() => { setEditing(false); setErr(null); }} style={btnSt(false)}>Cancel</button>
+        </div>
+      </div>
+    );
+
+    return (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {/* Toolbar */}
+        <div style={{ padding: '12px 18px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: F, fontSize: 14, fontWeight: 600, color: t.text1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected.title}</div>
+            <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginTop: 2 }}>
+              varunr.dev/p/{selected.slug}
+              {selected.folder && <span style={{ marginLeft: 8 }}>· {selected.folder}</span>}
+            </div>
+          </div>
+          <button onClick={copyLink} style={btnSt(true)}>
+            {copied ? '✓ Copied' : '↗ Copy link'}
+          </button>
+          <button onClick={() => setEditing(true)} style={btnSt(false)}>Edit</button>
+          <button onClick={deletePage} style={{ ...btnSt(false), color: '#ff3b30', borderColor: 'rgba(255,59,48,0.3)' }}>Delete</button>
+        </div>
+        {/* Preview iframe */}
+        <iframe
+          key={selected.id}
+          srcDoc={selected.content}
+          sandbox="allow-same-origin"
+          title={selected.title}
+          style={{ flex: 1, border: 'none', width: '100%' }}
+        />
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ display: 'flex', border: `1px solid ${t.border}`, borderRadius: 12, overflow: 'hidden', height: 560 }}>
+      {leftPane}
+      {rightPane()}
+    </div>
+  );
+}
+
 // ── Tab: Rate Limits ──────────────────────────────────────────────
 const WINDOW_LABELS = {
   600000:   '10 min',
@@ -2691,7 +2950,7 @@ function RateLimitsTab({ t }) {
 }
 
 // ── Admin page ────────────────────────────────────────────────────
-const TABS = ['Metrics', 'Upgrade Requests', 'Users', 'Models', 'Personas', 'Endpoints', 'LLM Evals', 'Surveys', 'Rate Limits'];
+const TABS = ['Metrics', 'Upgrade Requests', 'Users', 'Models', 'Personas', 'Endpoints', 'LLM Evals', 'Surveys', 'Rate Limits', 'Pages'];
 
 export default function Admin() {
   const { t }       = useTheme();
@@ -2789,6 +3048,7 @@ export default function Admin() {
         {tab === 6 && <EvalsTab t={t} />}
         {tab === 7 && <SurveysTab t={t} />}
         {tab === 8 && <RateLimitsTab t={t} />}
+        {tab === 9 && <PagesTab t={t} />}
       </div>
     </div>
   );
