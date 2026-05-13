@@ -178,8 +178,8 @@ async function streamClaude(apiKey, model, systemPrompt, messages) {
   return response.body; // ReadableStream of SSE bytes
 }
 
-// ── OpenRouter streaming call ────────────────────────────────────
-async function streamOpenRouter(apiKey, model, systemPrompt, messages) {
+// ── OpenRouter non-streaming call ────────────────────────────────
+async function callOpenRouter(apiKey, model, systemPrompt, messages) {
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -192,14 +192,16 @@ async function streamOpenRouter(apiKey, model, systemPrompt, messages) {
       model,
       max_tokens: 1024,
       messages: [{ role: 'system', content: systemPrompt }, ...messages],
-      stream: true,
+      include_reasoning: false,
     }),
   });
   if (!response.ok) {
     const err = await response.text().catch(() => '');
     throw new Error(`OpenRouter API error ${response.status}: ${err}`);
   }
-  return response.body;
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content ?? '';
+  return content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 }
 
 // ── Unified SSE transform ─────────────────────────────────────────
@@ -213,6 +215,7 @@ async function streamOpenRouter(apiKey, model, systemPrompt, messages) {
 //                      data: {"type":"message_stop"}
 //
 // `source` — 'workersai' | 'claude'
+// (OpenRouter is handled separately as non-streaming)
 function transformStream(upstreamStream, source, onFullText) {
   let fullText = '';
   const decoder = new TextDecoder();
@@ -255,12 +258,6 @@ function transformStream(upstreamStream, source, onFullText) {
                 fullText += event.response;
                 emit({ type: 'delta', text: event.response });
               }
-            } else if (source === 'openrouter') {
-              const content = event.choices?.[0]?.delta?.content;
-              if (content) {
-                fullText += content;
-                emit({ type: 'delta', text: content });
-              }
             } else {
               // Anthropic
               if (
@@ -287,9 +284,6 @@ function transformStream(upstreamStream, source, onFullText) {
               if (source === 'workersai' && event.response) {
                 fullText += event.response;
                 emit({ type: 'delta', text: event.response });
-              } else if (source === 'openrouter') {
-                const content = event.choices?.[0]?.delta?.content;
-                if (content) { fullText += content; emit({ type: 'delta', text: content }); }
               } else if (
                 source === 'claude' &&
                 event.type === 'content_block_delta' &&
@@ -443,11 +437,31 @@ export async function postChat(request, env) {
     await saveMessages(db, conversation.id, message, assistantText);
   }
 
+  // ── OpenRouter: non-streaming, return full text as single SSE chunk
+  if (modelSource === 'openrouter') {
+    const fullText = await callOpenRouter(env.OPENROUTER_API_KEY, selectedModel, systemPrompt, aiMessages);
+    await onFullText(fullText);
+    const enc = new TextEncoder();
+    const stream = new ReadableStream({
+      start(c) {
+        if (fullText) c.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'delta', text: fullText })}\n\n`));
+        c.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
+        c.close();
+      },
+    });
+    return new Response(stream, {
+      headers: {
+        'Content-Type':        'text/event-stream',
+        'Cache-Control':       'no-cache',
+        'X-Conversation-Id':   conversation.id,
+        'X-User-Role':         role,
+      },
+    });
+  }
+
   let upstreamStream;
   if (modelSource === 'claude') {
     upstreamStream = await streamClaude(env.ANTHROPIC_API_KEY, selectedModel, systemPrompt, aiMessages);
-  } else if (modelSource === 'openrouter') {
-    upstreamStream = await streamOpenRouter(env.OPENROUTER_API_KEY, selectedModel, systemPrompt, aiMessages);
   } else {
     upstreamStream = await streamWorkersAI(env.AI, selectedModel, systemPrompt, aiMessages);
   }
