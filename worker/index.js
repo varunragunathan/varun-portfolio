@@ -16,6 +16,9 @@ import {
   makeProUser,
   getPersonas,
   updatePersonas,
+  getRateLimits,
+  updateRateLimits,
+  resetRateLimits,
 } from './admin.js';
 import { runEvals, getEvalRuns, deleteEvalRuns } from './evals.js';
 import { submitUpgradeRequest, getUpgradeRequest } from './userTier.js';
@@ -155,6 +158,12 @@ async function handleRequest(request, env) {
         response = await getPersonas(request, env);
       } else if (path === '/api/admin/personas' && method === 'PUT') {
         response = await updatePersonas(request, env);
+      } else if (path === '/api/admin/rate-limits' && method === 'GET') {
+        response = await getRateLimits(request, env);
+      } else if (path === '/api/admin/rate-limits' && method === 'PUT') {
+        response = await updateRateLimits(request, env);
+      } else if (path === '/api/admin/rate-limits' && method === 'DELETE') {
+        response = await resetRateLimits(request, env);
       } else if (path === '/api/admin/evals/runs' && method === 'GET') {
         response = await getEvalRuns(request, env);
       } else if (path === '/api/admin/evals/runs' && method === 'DELETE') {

@@ -12,8 +12,9 @@
 //   addAdminModel(request, env)
 //   toggleAdminModel(request, env, id)
 
-import { getSession }          from './auth/session.js';
-import { consumeStepUpToken } from './auth/stepUp.js';
+import { getSession }                         from './auth/session.js';
+import { consumeStepUpToken }                from './auth/stepUp.js';
+import { DEFAULT_LIMITS, getEffectiveLimits, saveEffectiveLimits } from './rateLimit.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -301,4 +302,43 @@ export async function toggleAdminModel(request, env, modelId) {
     .run();
 
   return json({ ok: true, enabled: newEnabled });
+}
+
+// GET /api/admin/rate-limits
+export async function getRateLimits(request, env) {
+  const session = await getSession(env.KV, request);
+  const guard = await requireAdmin(session, env);
+  if (guard) return guard;
+  const effective = await getEffectiveLimits(env.KV);
+  return json({ defaults: DEFAULT_LIMITS, effective });
+}
+
+// PUT /api/admin/rate-limits
+export async function updateRateLimits(request, env) {
+  const session = await getSession(env.KV, request);
+  const guard = await requireAdmin(session, env);
+  if (guard) return guard;
+  const body = await request.json().catch(() => ({}));
+  const allowed = ['user', 'pro', 'student'];
+  const sanitized = {};
+  for (const role of allowed) {
+    if (!body[role]) continue;
+    const { windowCount, day } = body[role];
+    sanitized[role] = {
+      windowMs: DEFAULT_LIMITS[role].windowMs, // keep window duration fixed
+      windowCount: Math.max(1, Math.min(1000, parseInt(windowCount, 10) || DEFAULT_LIMITS[role].windowCount)),
+      day: Math.max(1, Math.min(10000, parseInt(day, 10) || DEFAULT_LIMITS[role].day)),
+    };
+  }
+  await saveEffectiveLimits(env.KV, sanitized);
+  return json({ ok: true, effective: sanitized });
+}
+
+// DELETE /api/admin/rate-limits  — reset to defaults
+export async function resetRateLimits(request, env) {
+  const session = await getSession(env.KV, request);
+  const guard = await requireAdmin(session, env);
+  if (guard) return guard;
+  await env.KV.delete('config:chat_rate_limits');
+  return json({ ok: true });
 }

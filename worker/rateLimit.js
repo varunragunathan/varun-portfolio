@@ -14,16 +14,43 @@
 //   student → 30 per hour,  200 per day  (same as pro)
 //   admin   → unlimited
 
-const LIMITS = {
+export const DEFAULT_LIMITS = {
   user:    { windowMs: 10 * 60_000,   windowCount: 5,   day: 20  },
   pro:     { windowMs:      3_600_000, windowCount: 30,  day: 200 },
   student: { windowMs:      3_600_000, windowCount: 30,  day: 200 },
   admin:   null,
 };
 
+const LIMITS_KV_KEY = 'config:chat_rate_limits';
+
+// Read effective limits: KV overrides merged over defaults
+export async function getEffectiveLimits(kv) {
+  try {
+    const raw = await kv.get(LIMITS_KV_KEY);
+    if (!raw) return DEFAULT_LIMITS;
+    const overrides = JSON.parse(raw);
+    const merged = { ...DEFAULT_LIMITS };
+    for (const role of ['user', 'pro', 'student']) {
+      if (overrides[role]) merged[role] = { ...DEFAULT_LIMITS[role], ...overrides[role] };
+    }
+    return merged;
+  } catch {
+    return DEFAULT_LIMITS;
+  }
+}
+
+export async function saveEffectiveLimits(kv, limits) {
+  const payload = {};
+  for (const role of ['user', 'pro', 'student']) {
+    if (limits[role]) payload[role] = limits[role];
+  }
+  await kv.put(LIMITS_KV_KEY, JSON.stringify(payload));
+}
+
 // Returns { allowed: bool, retryAfter?: number (seconds), reason?: string }
 export async function checkRateLimit(kv, userId, role) {
-  const limits = LIMITS[role] ?? LIMITS.user;
+  const effectiveLimits = await getEffectiveLimits(kv);
+  const limits = effectiveLimits[role] ?? effectiveLimits.user;
   if (limits === null) return { allowed: true };
 
   const now       = Date.now();
