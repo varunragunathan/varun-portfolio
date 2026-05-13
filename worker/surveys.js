@@ -149,7 +149,8 @@ async function streamClaude(apiKey, model, systemPrompt, messages) {
   return response.body;
 }
 
-async function streamOpenRouter(apiKey, model, systemPrompt, messages) {
+// Non-streaming call — returns full text immediately for fast display
+async function callOpenRouter(apiKey, model, systemPrompt, messages) {
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -162,11 +163,14 @@ async function streamOpenRouter(apiKey, model, systemPrompt, messages) {
       model,
       max_tokens: 600,
       messages: [{ role: 'system', content: systemPrompt }, ...messages],
-      stream: true,
+      include_reasoning: false, // suppress chain-of-thought tokens for reasoning models
     }),
   });
   if (!response.ok) throw new Error(`OpenRouter error ${response.status}`);
-  return response.body;
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content ?? '';
+  // Strip <think>…</think> blocks for models that don't honour include_reasoning: false
+  return content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 }
 
 // Returns the safe emit length: how much of `text` can be sent without risking
@@ -320,18 +324,42 @@ export async function sendMessage(request, env, surveyId, sessionId) {
       .run();
   };
 
+  // OpenRouter: non-streaming for instant display
+  if (!model.startsWith('claude') && !model.startsWith('@cf/')) {
+    try {
+      const fullText = await callOpenRouter(env.OPENROUTER_API_KEY, model, survey.system_prompt, messages);
+      const delimIdx = fullText.indexOf(OPTS_DELIMITER);
+      const prose = delimIdx === -1 ? fullText.trimEnd() : fullText.slice(0, delimIdx).trimEnd();
+      let opts = null;
+      if (delimIdx !== -1) {
+        try { opts = JSON.parse(fullText.slice(delimIdx + OPTS_DELIMITER.length).trim()); } catch { /* ignore */ }
+      }
+      await onFullText(prose);
+      const enc = new TextEncoder();
+      return sse(new ReadableStream({
+        start(c) {
+          if (prose) c.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'delta', text: prose })}\n\n`));
+          c.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'opts', opts: opts ?? { inputType: 'text', options: null, done: false } })}\n\n`));
+          c.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
+          c.close();
+        },
+      }));
+    } catch (err) {
+      const enc = new TextEncoder();
+      return sse(new ReadableStream({ start(c) { c.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'error', message: `Model error: ${err.message}` })}\n\n`)); c.close(); } }));
+    }
+  }
+
+  // Claude / Workers AI: streaming
   let upstreamStream;
   let source;
   try {
     if (model.startsWith('claude')) {
       source = 'claude';
       upstreamStream = await streamClaude(env.ANTHROPIC_API_KEY, model, survey.system_prompt, messages);
-    } else if (model.startsWith('@cf/')) {
+    } else {
       source = 'workersai';
       upstreamStream = await streamWorkersAI(env.AI, model, survey.system_prompt, messages);
-    } else {
-      source = 'openrouter';
-      upstreamStream = await streamOpenRouter(env.OPENROUTER_API_KEY, model, survey.system_prompt, messages);
     }
   } catch (err) {
     const enc = new TextEncoder();
