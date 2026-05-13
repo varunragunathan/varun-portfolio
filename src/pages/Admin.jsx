@@ -2655,19 +2655,20 @@ function PagesTab({ t }) {
               </div>
             )}
             {grouped[folder].map(p => (
-              <div
+              <button
                 key={p.id}
                 onClick={() => selectPage(p)}
                 style={{
-                  padding: '8px 14px', cursor: 'pointer', fontFamily: F, fontSize: 13,
+                  width: '100%', textAlign: 'left', padding: '8px 14px', cursor: 'pointer',
+                  fontFamily: F, fontSize: 13, border: 'none', background: 'none',
                   color: selected?.id === p.id ? t.accent : t.text2,
-                  background: selected?.id === p.id ? t.accentDim : 'transparent',
+                  backgroundColor: selected?.id === p.id ? t.accentDim : 'transparent',
                   borderLeft: selected?.id === p.id ? `3px solid ${t.accent}` : '3px solid transparent',
                   transition: 'background 0.12s',
                 }}
               >
                 {p.title}
-              </div>
+              </button>
             ))}
           </div>
         ))
