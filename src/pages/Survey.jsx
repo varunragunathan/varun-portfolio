@@ -1,6 +1,7 @@
 // ── Agentic survey — owl-guided conversational experience ─────────
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import { useParams, Link } from 'react-router-dom';
 import PixelOwl from '../components/PixelOwl';
 import './Survey.css';
@@ -149,10 +150,12 @@ export default function Survey() {
         if (event.type === 'delta') {
           buffer += event.text;
           const display = stripPartialDelimiter(buffer.split(OPTS_DELIMITER)[0], OPTS_DELIMITER).trimEnd();
-          setMessages(prev => {
-            const copy = [...prev];
-            copy[copy.length - 1] = { role: 'owl', text: display, _streaming: true };
-            return copy;
+          flushSync(() => {
+            setMessages(prev => {
+              const copy = [...prev];
+              copy[copy.length - 1] = { role: 'owl', text: display, _streaming: true };
+              return copy;
+            });
           });
         } else if (event.type === 'opts') {
           setMessages(prev => {
@@ -278,10 +281,6 @@ export default function Survey() {
           {survey.description && (
             <p className="survey-landing__desc">{survey.description}</p>
           )}
-          <p className="survey-landing__note">
-            This is a conversational survey — the owl will chat with you, not throw a form at you.
-            No account needed.
-          </p>
           <button className="survey-btn survey-btn--primary survey-btn--large" onClick={startSurvey}>
             Start conversation →
           </button>
