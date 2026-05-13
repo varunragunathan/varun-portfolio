@@ -177,11 +177,14 @@ function eventColor(type) {
 }
 
 // ── Tab: Metrics ──────────────────────────────────────────────────
+const EVENTS_PAGE_SIZE = 5;
+
 function MetricsTab({ t }) {
-  const [data,      setData]      = useState(null);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState(null);
-  const [updatedAt, setUpdatedAt] = useState(null);
+  const [data,           setData]           = useState(null);
+  const [loading,        setLoading]        = useState(true);
+  const [error,          setError]          = useState(null);
+  const [updatedAt,      setUpdatedAt]      = useState(null);
+  const [eventsVisible,  setEventsVisible]  = useState(EVENTS_PAGE_SIZE);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -404,33 +407,71 @@ function MetricsTab({ t }) {
         {events.length === 0 ? (
           <div style={{ fontFamily: M, fontSize: 11, color: t.text3 }}>no events yet</div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {events.map((ev, i) => (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '9px 0',
-                borderBottom: i < events.length - 1 ? `1px solid ${t.border}` : 'none',
-              }}>
-                <div style={{
-                  width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                  background: eventColor(ev.type),
-                }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ fontFamily: M, fontSize: 11, color: t.text1 }}>
-                    {EVENT_LABELS[ev.type] ?? ev.type}
-                  </span>
-                  {ev.email && (
-                    <span style={{ fontFamily: M, fontSize: 11, color: t.text3, marginLeft: 8 }}>
-                      {ev.email}
-                    </span>
-                  )}
-                </div>
-                <div style={{ fontFamily: M, fontSize: 10, color: t.text3, flexShrink: 0 }}>
-                  {timeAgo(ev.created_at)}
-                </div>
+          <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {events.slice(0, eventsVisible).map((ev, i) => {
+                const shown = Math.min(eventsVisible, events.length);
+                return (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '9px 0',
+                    borderBottom: i < shown - 1 ? `1px solid ${t.border}` : 'none',
+                  }}>
+                    <div style={{
+                      width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                      background: eventColor(ev.type),
+                    }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontFamily: M, fontSize: 11, color: t.text1 }}>
+                        {EVENT_LABELS[ev.type] ?? ev.type}
+                      </span>
+                      {ev.email && (
+                        <span style={{ fontFamily: M, fontSize: 11, color: t.text3, marginLeft: 8 }}>
+                          {ev.email}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontFamily: M, fontSize: 10, color: t.text3, flexShrink: 0 }}>
+                      {timeAgo(ev.created_at)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {events.length > EVENTS_PAGE_SIZE && (
+              <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+                {eventsVisible < events.length && (
+                  <button
+                    onClick={() => setEventsVisible(v => v + EVENTS_PAGE_SIZE)}
+                    style={{
+                      fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
+                      padding: '4px 12px', borderRadius: 6, cursor: 'pointer',
+                      background: 'transparent', border: `1px solid ${t.border}`,
+                      color: t.text3, transition: 'color 0.15s, border-color 0.15s',
+                    }}
+                  >
+                    Show {Math.min(EVENTS_PAGE_SIZE, events.length - eventsVisible)} more
+                  </button>
+                )}
+                {eventsVisible > EVENTS_PAGE_SIZE && (
+                  <button
+                    onClick={() => setEventsVisible(EVENTS_PAGE_SIZE)}
+                    style={{
+                      fontFamily: M, fontSize: 10, letterSpacing: '0.06em',
+                      padding: '4px 12px', borderRadius: 6, cursor: 'pointer',
+                      background: 'transparent', border: `1px solid ${t.border}`,
+                      color: t.text3, transition: 'color 0.15s, border-color 0.15s',
+                    }}
+                  >
+                    Show less
+                  </button>
+                )}
+                <span style={{ fontFamily: M, fontSize: 10, color: t.text3 }}>
+                  {Math.min(eventsVisible, events.length)} of {events.length}
+                </span>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 
@@ -2482,8 +2523,175 @@ function SurveysTab({ t }) {
   );
 }
 
+// ── Tab: Rate Limits ──────────────────────────────────────────────
+const WINDOW_LABELS = {
+  600000:   '10 min',
+  3600000:  '1 hour',
+};
+
+const TIER_META = {
+  user:    { label: 'Free Users',   color: '#888' },
+  pro:     { label: 'Pro Users',    color: '#6366f1' },
+  student: { label: 'Students',     color: '#34c759' },
+};
+
+function RateLimitsTab({ t }) {
+  const [data,    setData]    = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(null);
+  const [saving,  setSaving]  = useState(false);
+  const [saved,   setSaved]   = useState(false);
+  const [draft,   setDraft]   = useState(null); // { user, pro, student }
+
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    fetch('/api/admin/rate-limits', { credentials: 'include' })
+      .then(r => { if (!r.ok) throw new Error('Failed'); return r.json(); })
+      .then(d => {
+        setData(d);
+        setDraft({
+          user:    { windowCount: d.effective.user.windowCount,    day: d.effective.user.day    },
+          pro:     { windowCount: d.effective.pro.windowCount,     day: d.effective.pro.day     },
+          student: { windowCount: d.effective.student.windowCount, day: d.effective.student.day },
+        });
+        setLoading(false);
+      })
+      .catch(e => { setError(e.message); setLoading(false); });
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const save = useCallback(async () => {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/admin/rate-limits', {
+        method: 'PUT', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(draft),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      load();
+    } catch { /* ignore */ }
+    setSaving(false);
+  }, [draft, load]);
+
+  const reset = useCallback(async () => {
+    if (!confirm('Reset all limits to defaults?')) return;
+    await fetch('/api/admin/rate-limits', { method: 'DELETE', credentials: 'include' });
+    load();
+  }, [load]);
+
+  const updateDraft = (role, field, value) => {
+    setDraft(prev => ({ ...prev, [role]: { ...prev[role], [field]: value } }));
+  };
+
+  if (loading && !data) return <TabSpinner t={t} />;
+  if (error)            return <TabError msg={error} t={t} />;
+  if (!data || !draft)  return null;
+
+  const inputStyle = {
+    fontFamily: M, fontSize: 13, width: 80, padding: '4px 8px',
+    borderRadius: 6, border: `1px solid ${t.border}`,
+    background: t.surface, color: t.text1, textAlign: 'center',
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.15em', color: t.text3, textTransform: 'uppercase' }}>
+          Chat rate limits
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={reset} style={{
+            fontFamily: M, fontSize: 11, padding: '5px 14px', borderRadius: 8, cursor: 'pointer',
+            background: 'transparent', border: `1px solid ${t.border}`, color: t.text3,
+          }}>Reset to defaults</button>
+          <button onClick={save} disabled={saving} style={{
+            fontFamily: M, fontSize: 11, padding: '5px 14px', borderRadius: 8, cursor: saving ? 'default' : 'pointer',
+            background: saved ? 'rgba(52,211,153,0.15)' : t.accentDim,
+            border: `1px solid ${saved ? '#34d399' : t.accentBorder}`,
+            color: saved ? '#34d399' : t.accent,
+          }}>
+            {saved ? '✓ Saved' : saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+
+      {/* Limits table */}
+      <div style={{ borderRadius: 12, border: `1px solid ${t.border}`, overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: `1px solid ${t.border}`, background: t.surface }}>
+              {['Tier', 'Window size', 'Per window', 'Per day'].map((h, i) => (
+                <th key={i} style={{
+                  fontFamily: M, fontSize: 10, letterSpacing: '0.12em', color: t.text3,
+                  textTransform: 'uppercase', padding: '10px 16px', textAlign: i === 0 ? 'left' : 'center',
+                }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {['user', 'pro', 'student'].map((role, ri) => {
+              const meta = TIER_META[role];
+              const def  = data.defaults[role];
+              const eff  = draft[role];
+              return (
+                <tr key={role} style={{ borderBottom: ri < 2 ? `1px solid ${t.border}` : 'none' }}>
+                  <td style={{ padding: '12px 16px' }}>
+                    <span style={{ fontFamily: M, fontSize: 12, color: meta.color, fontWeight: 600 }}>{meta.label}</span>
+                    {(eff.windowCount !== def.windowCount || eff.day !== def.day) && (
+                      <span style={{ fontFamily: M, fontSize: 9, color: t.accent, marginLeft: 6, letterSpacing: '0.1em' }}>MODIFIED</span>
+                    )}
+                  </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                    <span style={{ fontFamily: M, fontSize: 12, color: t.text2 }}>
+                      {WINDOW_LABELS[def.windowMs] ?? `${def.windowMs / 60000}m`}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                    <input
+                      type="number" min={1} max={1000}
+                      value={eff.windowCount}
+                      onChange={e => updateDraft(role, 'windowCount', e.target.value)}
+                      style={inputStyle}
+                    />
+                    <div style={{ fontFamily: M, fontSize: 9, color: t.text3, marginTop: 2 }}>
+                      default: {def.windowCount}
+                    </div>
+                  </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                    <input
+                      type="number" min={1} max={10000}
+                      value={eff.day}
+                      onChange={e => updateDraft(role, 'day', e.target.value)}
+                      style={inputStyle}
+                    />
+                    <div style={{ fontFamily: M, fontSize: 9, color: t.text3, marginTop: 2 }}>
+                      default: {def.day}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ fontFamily: M, fontSize: 10, color: t.text3, lineHeight: 1.6 }}>
+        Admin accounts are always unlimited.
+        Window size is fixed (10 min for free, 1 hour for pro/student).
+        Changes take effect immediately for new requests.
+      </div>
+    </div>
+  );
+}
+
 // ── Admin page ────────────────────────────────────────────────────
-const TABS = ['Metrics', 'Upgrade Requests', 'Users', 'Models', 'Personas', 'Endpoints', 'LLM Evals', 'Surveys'];
+const TABS = ['Metrics', 'Upgrade Requests', 'Users', 'Models', 'Personas', 'Endpoints', 'LLM Evals', 'Surveys', 'Rate Limits'];
 
 export default function Admin() {
   const { t }       = useTheme();
@@ -2580,6 +2788,7 @@ export default function Admin() {
         {tab === 5 && <EndpointsTab t={t} />}
         {tab === 6 && <EvalsTab t={t} />}
         {tab === 7 && <SurveysTab t={t} />}
+        {tab === 8 && <RateLimitsTab t={t} />}
       </div>
     </div>
   );
