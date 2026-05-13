@@ -2395,7 +2395,7 @@ function SurveysTab({ t }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6 }}>
                       <span style={{ fontFamily: M, fontSize: 10, color: t.text3 }}>/s/</span>
                       <input
-                        autoFocus
+                        ref={el => el?.focus()}
                         value={editingSlug.value}
                         onChange={e => setEditingSlug(es => ({ ...es, value: e.target.value }))}
                         onKeyDown={e => {
