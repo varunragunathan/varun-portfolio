@@ -43,6 +43,8 @@ export default defineConfig({
       // Main app assets are all well under 2 MiB so this has no PWA impact.
       maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+      // /p/:slug routes are served as raw HTML by the Worker — bypass the SW navigation fallback
+      navigateFallbackDenylist: [/^\/p\//],
       runtimeCaching: [{
         urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
         handler: 'CacheFirst',
