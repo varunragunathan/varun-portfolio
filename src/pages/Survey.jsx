@@ -324,8 +324,8 @@ export default function Survey() {
             </div>
           )}
 
-          {/* Resources at end */}
-          {done && opts?.resources?.length > 0 && (
+          {/* Resources — show whenever the model provides them */}
+          {opts?.resources?.length > 0 && (
             <div className="survey-resources">
               <p className="survey-resources__heading">Resources for you</p>
               {opts.resources.map((r, i) => (
