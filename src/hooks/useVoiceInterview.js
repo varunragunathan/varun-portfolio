@@ -1,8 +1,6 @@
 // ── useVoiceInterview ─────────────────────────────────────────────
 // Orchestrates the full voice interview loop:
 //   SpeechRecognition (STT) → API → SSE stream → SpeechSynthesis (TTS)
-//
-// Phase-1: browser-native voice, site's Anthropic key (free for user).
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -43,6 +41,10 @@ export function useVoiceInterview() {
   const durationRef  = useRef(1800);
   const startTimeRef = useRef(null);
   const stateRef     = useRef(INTERVIEW_STATES.IDLE);
+  // Set when onresult fires so onend doesn't restart listening unnecessarily
+  const gotResultRef = useRef(false);
+  // Set when user explicitly stops recording so onend doesn't restart
+  const manualStopRef = useRef(false);
 
   // Refs to break circular useCallback dependencies
   const handleUserTurnRef  = useRef(null);
@@ -59,26 +61,29 @@ export function useVoiceInterview() {
     return new Promise((resolve) => {
       synthRef.current.cancel();
       const utt = new SpeechSynthesisUtterance(text);
-      utt.rate  = 0.95;
+      utt.rate  = 0.92;
       utt.pitch = 1.0;
       const voices = synthRef.current.getVoices();
       const preferred = voices.find(v =>
         /en[-_]US/i.test(v.lang) && /natural|premium|enhanced/i.test(v.name)
       ) || voices.find(v => /en[-_]US/i.test(v.lang));
       if (preferred) utt.voice = preferred;
-      utt.onend  = resolve;
+      utt.onend   = resolve;
       utt.onerror = resolve;
       synthRef.current.speak(utt);
     });
   }, []);
 
-  // ── STT — uses handleUserTurnRef to avoid circular dep ──────────
+  // ── STT ──────────────────────────────────────────────────────────
   const startListening = useCallback(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
-      setError('Voice input requires Chrome or Edge.');
+      setError('Voice input requires Chrome or Edge. Use the text input below instead.');
       return;
     }
+
+    gotResultRef.current  = false;
+    manualStopRef.current = false;
 
     const recog = new SR();
     recog.lang           = 'en-US';
@@ -89,17 +94,26 @@ export function useVoiceInterview() {
 
     recog.onresult = (e) => {
       const text = e.results[e.results.length - 1][0].transcript.trim();
-      if (text) handleUserTurnRef.current?.(text);
+      if (text) {
+        gotResultRef.current = true;
+        handleUserTurnRef.current?.(text);
+      }
     };
 
     recog.onend = () => {
-      if (stateRef.current === INTERVIEW_STATES.LISTENING) startListeningRef.current?.();
+      // Don't restart if: we already got a result, user manually stopped, or session ended
+      if (gotResultRef.current) return;
+      if (manualStopRef.current) return;
+      if (stateRef.current !== INTERVIEW_STATES.LISTENING) return;
+      startListeningRef.current?.();
     };
 
     recog.onerror = (e) => {
       if (e.error === 'no-speech') {
-        if (stateRef.current === INTERVIEW_STATES.LISTENING) startListeningRef.current?.();
-      } else {
+        if (stateRef.current === INTERVIEW_STATES.LISTENING && !manualStopRef.current) {
+          startListeningRef.current?.();
+        }
+      } else if (e.error !== 'aborted') {
         setError(`Microphone error: ${e.error}`);
       }
     };
@@ -107,11 +121,34 @@ export function useVoiceInterview() {
     recog.start();
   }, [setStateSynced]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Stop recording (user explicitly stops, optionally sending partial) ─
+  const stopRecording = useCallback(() => {
+    manualStopRef.current = true;
+    recogRef.current?.stop();
+    // Stay in listening state — user can re-tap mic or type
+    // If they stopped without speaking, don't process an empty turn
+  }, []);
+
+  // ── Interrupt Hooty mid-speech ───────────────────────────────────
+  const interrupt = useCallback(() => {
+    synthRef.current.cancel();
+    startListeningRef.current?.();
+  }, []);
+
+  // ── Send a text turn (fallback for no-mic / typed input) ─────────
+  const sendText = useCallback((text) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    manualStopRef.current = true;
+    recogRef.current?.stop();
+    handleUserTurnRef.current?.(trimmed);
+  }, []);
+
   // ── Read SSE stream ──────────────────────────────────────────────
   const readStream = useCallback(async (response, onText) => {
     const reader = response.body.getReader();
     const dec    = new TextDecoder();
-    let buf = '';
+    let buf  = '';
     let full = '';
 
     while (true) {
@@ -140,7 +177,10 @@ export function useVoiceInterview() {
   // ── AI response: stream → accumulate → TTS → listen ─────────────
   const handleAIResponse = useCallback(async (fetchPromise) => {
     const response = await fetchPromise;
-    if (!response.ok) throw new Error('API error');
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || `HTTP ${response.status}`);
+    }
 
     const fullText = await readStream(response, (partial) => setLastText(partial));
     if (!fullText) return;
@@ -168,12 +208,15 @@ export function useVoiceInterview() {
           body:    JSON.stringify({ content: text }),
         })
       );
-    } catch {
-      setError('Connection lost. Please try again.');
+    } catch (err) {
+      setError(`Something went wrong: ${err.message}`);
+      // Return to listening so user can try again
+      if (stateRef.current !== INTERVIEW_STATES.ENDED) {
+        startListening();
+      }
     }
-  }, [handleAIResponse, setStateSynced]);
+  }, [handleAIResponse, setStateSynced, startListening]);
 
-  // Keep refs current so callbacks can call each other without dep cycles
   useEffect(() => { handleUserTurnRef.current = handleUserTurn; }, [handleUserTurn]);
   useEffect(() => { startListeningRef.current = startListening; }, [startListening]);
 
@@ -181,6 +224,7 @@ export function useVoiceInterview() {
   const endInterview = useCallback(async () => {
     clearInterval(timerRef.current);
     synthRef.current.cancel();
+    manualStopRef.current = true;
     recogRef.current?.stop();
     setStateSynced(INTERVIEW_STATES.ENDED);
 
@@ -203,7 +247,7 @@ export function useVoiceInterview() {
 
   useEffect(() => { endInterviewRef.current = endInterview; }, [endInterview]);
 
-  // ── Start interview — uses endInterviewRef to avoid circular dep ─
+  // ── Start interview ───────────────────────────────────────────────
   const start = useCallback(async ({ theme, duration }) => {
     setError(null);
     setTranscript([]);
@@ -229,8 +273,9 @@ export function useVoiceInterview() {
           body:    JSON.stringify({ theme, duration }),
         })
       );
-    } catch {
-      setError('Could not start interview. Please check your connection.');
+    } catch (err) {
+      setError(`Could not start: ${err.message}`);
+      clearInterval(timerRef.current);
       setStateSynced(INTERVIEW_STATES.IDLE);
     }
   }, [handleAIResponse, setStateSynced]);
@@ -241,6 +286,7 @@ export function useVoiceInterview() {
     return () => {
       clearInterval(timerRef.current);
       synth?.cancel();
+      manualStopRef.current = true;
       recogRef.current?.stop();
     };
   }, []);
@@ -258,6 +304,9 @@ export function useVoiceInterview() {
     cost,
     start,
     endInterview,
+    stopRecording,
+    interrupt,
+    sendText,
     isSupported: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
   };
 }

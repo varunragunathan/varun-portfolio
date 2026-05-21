@@ -502,6 +502,177 @@
 }
 .interview-summary__home:hover { color: var(--text-2); }
 
+/* ── Interview avatar — slow, elegant overrides ──────────────── */
+.interview-avatar {
+  filter: drop-shadow(0 8px 32px rgba(99, 102, 241, 0.12));
+}
+
+/* Slow-motion overrides — descend into PixelOwl's animation classes */
+.interview-avatar .pixel-owl--idle {
+  animation: iv-owl-float 6s ease-in-out infinite;
+}
+.interview-avatar .pixel-owl--talking {
+  animation: iv-owl-float 5s ease-in-out infinite;
+}
+.interview-avatar .pixel-owl--listening {
+  animation: iv-owl-tilt 4s ease-in-out infinite;
+}
+.interview-avatar .pixel-owl--thinking {
+  animation: iv-owl-breathe 5.5s ease-in-out infinite;
+}
+
+@keyframes iv-owl-float {
+  0%, 100% { transform: translateY(0)    scale(1);    }
+  50%       { transform: translateY(-5px) scale(1.02); }
+}
+@keyframes iv-owl-tilt {
+  0%, 100% { transform: rotate(0deg); }
+  30%       { transform: rotate(2.5deg); }
+  70%       { transform: rotate(-2deg); }
+}
+@keyframes iv-owl-breathe {
+  0%, 100% { transform: scale(1)     translateY(0); }
+  50%       { transform: scale(1.03) translateY(-3px); }
+}
+
+/* ── Active interview stage ───────────────────────────────────── */
+.interview-active__stage {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+.interview-active__waveform-wrap,
+.interview-active__avatar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  animation: iv-stage-in 0.55s ease both;
+}
+.interview-active__waveform-wrap { width: 100%; max-width: 320px; }
+
+@keyframes iv-stage-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.interview-active__stage-label {
+  font-size: 12px;
+  color: var(--text-3);
+  letter-spacing: 0.04em;
+  text-align: center;
+  min-height: 18px;
+}
+
+/* ── Mic waveform (listening state) ──────────────────────────── */
+.interview-active__mic-wave {
+  width: 100%;
+  max-width: 240px;
+  transform: scaleY(0.72);
+  transform-origin: bottom;
+  opacity: 0.8;
+  animation: iv-stage-in 0.4s ease both;
+}
+
+/* ── Controls row ─────────────────────────────────────────────── */
+.interview-active__controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.interview-ctrl {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 24px;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s, background 0.15s, border-color 0.15s;
+}
+.interview-ctrl:active { transform: scale(0.97); }
+.interview-ctrl__icon  { font-size: 15px; line-height: 1; }
+
+/* Interrupt — indigo filled */
+.interview-ctrl--interrupt {
+  background: #6366f1;
+  color: #fff;
+  border-color: #6366f1;
+  box-shadow: 0 4px 18px rgba(99, 102, 241, 0.3);
+}
+.interview-ctrl--interrupt:hover {
+  opacity: 0.9;
+  box-shadow: 0 6px 26px rgba(99, 102, 241, 0.45);
+}
+
+/* Stop — red outline */
+.interview-ctrl--stop {
+  background: transparent;
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+.interview-ctrl--stop:hover {
+  background: rgba(239, 68, 68, 0.07);
+  border-color: #ef4444;
+}
+
+/* Type / Use mic — ghost */
+.interview-ctrl--text {
+  background: transparent;
+  color: var(--text-3);
+  border-color: var(--border);
+}
+.interview-ctrl--text:hover {
+  color: var(--text-1);
+  border-color: var(--border-hover);
+}
+
+/* Send — compact indigo */
+.interview-ctrl--send {
+  background: #6366f1;
+  color: #fff;
+  border-color: #6366f1;
+  padding: 11px 20px;
+}
+.interview-ctrl--send:hover:not(:disabled) { opacity: 0.9; }
+.interview-ctrl--send:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+/* ── Text input fallback form ─────────────────────────────────── */
+.interview-active__text-form {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 480px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.interview-active__text-input {
+  flex: 1;
+  min-width: 200px;
+  padding: 11px 18px;
+  border-radius: 100px;
+  border: 1.5px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-1);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.interview-active__text-input::placeholder { color: var(--text-3); }
+.interview-active__text-input:focus       { border-color: #6366f1; }
+
 /* ── Light mode: card icon filter to prevent emoji darkness ──── */
 [data-theme="light"] .interview-theme-card--active {
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
