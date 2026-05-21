@@ -68,6 +68,12 @@ export function useVoiceInterview() {
         /en[-_]US/i.test(v.lang) && /natural|premium|enhanced/i.test(v.name)
       ) || voices.find(v => /en[-_]US/i.test(v.lang));
       if (preferred) utt.voice = preferred;
+      utt.onboundary = (e) => {
+        if (e.name !== 'word') return;
+        const word = text.slice(e.charIndex, e.charIndex + (e.charLength ?? 4));
+        const amp  = Math.min(0.92, 0.42 + Math.min(word.replace(/\W/g, '').length, 9) * 0.057);
+        window.dispatchEvent(new CustomEvent('iv-voice-pulse', { detail: { amp } }));
+      };
       utt.onend   = resolve;
       utt.onerror = resolve;
       synthRef.current.speak(utt);
