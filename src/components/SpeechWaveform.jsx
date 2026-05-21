@@ -37,7 +37,6 @@ const SpeechWaveform = forwardRef(function SpeechWaveform({ mode = 'speaking' },
     const ctx = canvas.getContext('2d');
 
     // ── Mic setup for listening mode ──────────────────────────────
-    let micReady = false;
     if (mode === 'listening') {
       navigator.mediaDevices.getUserMedia({ audio: true, video: false })
         .then(stream => {
@@ -49,7 +48,6 @@ const SpeechWaveform = forwardRef(function SpeechWaveform({ mode = 'speaking' },
           analyser.smoothingTimeConstant = 0.75;
           source.connect(analyser);
           analyserRef.current = { analyser, audioCtx };
-          micReady = true;
         })
         .catch(() => { /* fall back to animated idle */ });
     }
