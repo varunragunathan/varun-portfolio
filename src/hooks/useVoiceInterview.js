@@ -114,7 +114,13 @@ export function useVoiceInterview() {
           startListeningRef.current?.();
         }
       } else if (e.error !== 'aborted') {
-        setError(`Microphone error: ${e.error}`);
+        // Mark as manual stop so onend doesn't restart into another error loop
+        manualStopRef.current = true;
+        setError(
+          e.error === 'not-allowed'
+            ? 'Microphone access denied. Allow mic access in your browser, or type your answer below.'
+            : `Microphone error: ${e.error}`
+        );
       }
     };
 
@@ -293,6 +299,8 @@ export function useVoiceInterview() {
 
   const remaining = Math.max(0, duration - elapsed);
 
+  const clearError = useCallback(() => setError(null), []);
+
   return {
     state,
     sessionId,
@@ -307,6 +315,7 @@ export function useVoiceInterview() {
     stopRecording,
     interrupt,
     sendText,
+    clearError,
     isSupported: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
   };
 }

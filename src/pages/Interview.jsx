@@ -308,7 +308,7 @@ export default function InterviewPage() {
   const {
     state, transcript, lastText, error,
     elapsed, remaining, cost,
-    start, endInterview, stopRecording, interrupt, sendText, isSupported,
+    start, endInterview, stopRecording, interrupt, sendText, clearError, isSupported,
   } = useVoiceInterview();
 
   if (!user) {
@@ -328,7 +328,7 @@ export default function InterviewPage() {
       {error && (
         <div className="interview-error" role="alert">
           {error}
-          <button onClick={() => {}} className="interview-error__dismiss">✕</button>
+          <button onClick={clearError} className="interview-error__dismiss">✕</button>
         </div>
       )}
 
