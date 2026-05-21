@@ -33,6 +33,10 @@ import {
   adminListPages, adminCreatePage, adminGetPage, adminUpdatePage, adminDeletePage,
   getPublicPage,
 } from './pages.js';
+import {
+  createInterviewSession, sendInterviewMessage, endInterviewSession,
+  listInterviewSessions, getInterviewSession,
+} from './interview.js';
 import { checkIpRateLimit } from './rateLimit.js';
 import { getMetrics } from './metrics.js';
 import { logEndpointRequest, getEndpointMetrics } from './endpointMetrics.js';
@@ -270,6 +274,42 @@ async function handleRequest(request, env) {
         status: 500,
         headers: { 'Content-Type': 'application/json', ...cors },
       });
+    }
+  }
+
+  // ── /api/interview ───────────────────────────────────────────
+  if (url.pathname.startsWith('/api/interview')) {
+    try {
+      const path   = url.pathname;
+      const method = request.method;
+      const sessionMatch  = path.match(/^\/api\/interview\/sessions\/([^/]+)$/);
+      const messageMatch  = path.match(/^\/api\/interview\/sessions\/([^/]+)\/message$/);
+      const endMatch      = path.match(/^\/api\/interview\/sessions\/([^/]+)\/end$/);
+
+      let response;
+      if (path === '/api/interview/sessions' && method === 'POST') {
+        response = await createInterviewSession(request, env);
+      } else if (path === '/api/interview/sessions' && method === 'GET') {
+        response = await listInterviewSessions(request, env);
+      } else if (messageMatch && method === 'POST') {
+        response = await sendInterviewMessage(request, env, messageMatch[1]);
+      } else if (endMatch && method === 'PATCH') {
+        response = await endInterviewSession(request, env, endMatch[1]);
+      } else if (sessionMatch && method === 'GET') {
+        response = await getInterviewSession(request, env, sessionMatch[1]);
+      } else {
+        response = new Response(JSON.stringify({ error: 'Not found' }), {
+          status: 404, headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (response.headers.get('Content-Type')?.startsWith('text/event-stream')) return response;
+      return withCors(response, cors);
+    } catch (err) {
+      console.error('Interview error:', err);
+      return withCors(new Response(JSON.stringify({ error: 'Internal server error' }), {
+        status: 500, headers: { 'Content-Type': 'application/json', ...cors },
+      }), cors);
     }
   }
 

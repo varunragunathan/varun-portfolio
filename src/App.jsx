@@ -57,6 +57,7 @@ const GlossaryPage       = lazy(() => import('./pages/Glossary'));
 const SurveysPage        = lazy(() => import('./pages/Surveys'));
 const SurveyPage         = lazy(() => import('./pages/Survey'));
 const PublicPage         = lazy(() => import('./pages/PublicPage'));
+const InterviewPage      = lazy(() => import('./pages/Interview'));
 
 function Loading() {
   return (
@@ -114,6 +115,7 @@ function Footer({ onShakeEnable, shakeState }) {
           <Link to="/learn" className="footer__engineering-link">learn</Link>
           <Link to="/glossary" className="footer__engineering-link">glossary</Link>
           <Link to="/surveys" className="footer__engineering-link">surveys</Link>
+          <Link to="/interview" className="footer__engineering-link">interview</Link>
         </div>
         <ThemeToggle />
       </div>
@@ -163,6 +165,7 @@ function Shell() {
             <Route path="/survey/:surveyId" element={<SurveyPage />} />
             <Route path="/s/:slug" element={<SurveyPage />} />
             <Route path="/p/:slug" element={<PublicPage />} />
+            <Route path="/interview" element={<InterviewPage />} />
           </Routes>
         </Suspense>
       </main>

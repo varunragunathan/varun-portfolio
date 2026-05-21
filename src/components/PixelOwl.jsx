@@ -1,6 +1,6 @@
 // ── Pixel owl mascot — reacts to chat state ───────────────────────
 // Props:
-//   state  'idle' | 'thinking' | 'streaming' | 'done'
+//   state  'idle' | 'thinking' | 'streaming' | 'done' | 'talking' | 'listening'
 //   size   px per pixel (default 8 ≈ 96×112 px)
 
 import React, { useState, useEffect } from 'react';
@@ -103,6 +103,40 @@ const F = {
     '..dd....dd..',
     '..d......d..',
   ],
+  // Eyes open, beak open — Hooty is speaking
+  talking: [
+    '..dd....dd..',
+    '.dddd..dddd.',
+    'dddddddddddd',
+    'ddfffddfffdd',
+    'ddfyyfdfyyfd',
+    'ddfypfdfypfd',
+    'ddfyyfdfyyfd',
+    'ddddkdkddddd',   //  7  beak open
+    'dddddddddddd',
+    'dwwddddddwwd',
+    'dwwddddddwwd',
+    '.dddddddddd.',
+    '..dd....dd..',
+    '..d......d..',
+  ],
+  // Pupils shifted right — attentive, leaning in to listen
+  listening: [
+    '..dd....dd..',
+    '.dddd..dddd.',
+    'dddddddddddd',
+    'ddfffddfffdd',
+    'ddfyyfdfyyfd',
+    'ddfyfpdfyfpd',   //  5  pupils right — attentive
+    'ddfyyfdfyyfd',
+    'ddddfkkfdddd',
+    'dddddddddddd',
+    'dwwddddddwwd',
+    'dwwddddddwwd',
+    '.dddddddddd.',
+    '..dd....dd..',
+    '..d......d..',
+  ],
 };
 
 // ── Render pixel grid ─────────────────────────────────────────────
@@ -118,13 +152,14 @@ function OwlPixels({ frame, px, C }) {
   return <>{rects}</>;
 }
 
-
 // ── Component ─────────────────────────────────────────────────────
 export default function PixelOwl({ state = 'idle', size = 8 }) {
   const { mode } = useTheme();
   const isDark = mode !== 'light';
   const C = palette(isDark);
   const [blinking, setBlinking] = useState(false);
+  // Alternate beak open/closed when talking
+  const [beakOpen, setBeakOpen] = useState(false);
 
   // Periodic blink during idle
   useEffect(() => {
@@ -143,13 +178,37 @@ export default function PixelOwl({ state = 'idle', size = 8 }) {
     return () => { alive = false; };
   }, [state]);
 
-  const key   = blinking ? 'blink' : (F[state] ? state : 'idle');
+  // Beak open/close animation when talking
+  useEffect(() => {
+    if (state !== 'talking') { setBeakOpen(false); return; }
+    let alive = true;
+    (async () => {
+      while (alive) {
+        setBeakOpen(true);
+        await new Promise(r => setTimeout(r, 180));
+        if (!alive) break;
+        setBeakOpen(false);
+        await new Promise(r => setTimeout(r, 120 + Math.random() * 100));
+      }
+    })();
+    return () => { alive = false; };
+  }, [state]);
+
+  let key;
+  if (state === 'talking') {
+    key = beakOpen ? 'talking' : 'idle';
+  } else if (blinking) {
+    key = 'blink';
+  } else {
+    key = F[state] ? state : 'idle';
+  }
+
   const frame = F[key];
   const W     = 12 * size;
   const H     = 14 * size;
 
   return (
-    <div className={`pixel-owl pixel-owl--${key}`}>
+    <div className={`pixel-owl pixel-owl--${state === 'talking' ? 'talking' : key}`}>
       <svg
         width={W}
         height={H}

@@ -7,6 +7,8 @@
 @keyframes owl-bob    { 0%, 100% { transform: translateY(0);   } 50% { transform: translateY(-3px); } }
 @keyframes owl-pop    { 0%, 100% { transform: scale(1);        } 50% { transform: scale(1.14);     } }
 @keyframes owl-breathe{ 0%, 100% { transform: translateY(0);   } 50% { transform: translateY(-2px); } }
+@keyframes owl-talk   { 0%, 100% { transform: translateY(0) scale(1);    } 50% { transform: translateY(-2px) scale(1.04); } }
+@keyframes owl-listen { 0%, 100% { transform: rotate(0deg);   } 50% { transform: rotate(4deg);    } }
 
 .pixel-owl               { display: inline-block; }
 .pixel-owl--idle         { animation: owl-float   2.5s  ease-in-out infinite; }
@@ -14,3 +16,5 @@
 .pixel-owl--streaming    { animation: owl-bob     0.32s ease-in-out infinite; }
 .pixel-owl--done         { animation: owl-pop     0.3s  ease-out   2;        }
 .pixel-owl--snore        { animation: owl-breathe 3s    ease-in-out infinite; }
+.pixel-owl--talking      { animation: owl-talk    0.3s  ease-in-out infinite; }
+.pixel-owl--listening    { animation: owl-listen  1.2s  ease-in-out infinite; }

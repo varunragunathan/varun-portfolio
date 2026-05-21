@@ -1,0 +1,284 @@
+import React, { useState, useCallback } from 'react';
+import PixelOwl from '../components/PixelOwl';
+import { useVoiceInterview, INTERVIEW_STATES, owlState } from '../hooks/useVoiceInterview';
+import { useAuth } from '../hooks/useAuth';
+import { Link } from 'react-router-dom';
+import './Interview.css';
+
+// ── Avatar abstraction — swap by changing avatarId later ──────────
+function InterviewerAvatar({ interviewState, size = 14, avatarId = 'hooty' }) {
+  if (avatarId === 'hooty') {
+    return <PixelOwl state={owlState(interviewState)} size={size} />;
+  }
+  return <PixelOwl state={owlState(interviewState)} size={size} />;
+}
+
+// ── Theme cards ───────────────────────────────────────────────────
+const THEMES = [
+  { id: 'frontend',      label: 'Frontend Eng',   icon: '⚛️',  desc: 'React, JS, CSS, perf' },
+  { id: 'backend',       label: 'Backend & Sys',  icon: '⚙️',  desc: 'APIs, databases, infra' },
+  { id: 'system-design', label: 'System Design',  icon: '🏗️',  desc: 'Scale, architecture' },
+  { id: 'behavioral',    label: 'Behavioral',      icon: '🧠',  desc: 'Leadership, STAR method' },
+  { id: 'dsa',           label: 'DSA',             icon: '📊',  desc: 'Algorithms, complexity' },
+  { id: 'fullstack',     label: 'Full Stack',      icon: '🔧',  desc: 'End-to-end engineering' },
+  { id: 'product',       label: 'Product Mgmt',   icon: '📋',  desc: 'Strategy, metrics, users' },
+];
+
+const DURATIONS = [
+  { value: 900,  label: '15 min' },
+  { value: 1800, label: '30 min' },
+  { value: 2700, label: '45 min' },
+  { value: 3600, label: '60 min' },
+];
+
+function fmtTime(secs) {
+  const m = Math.floor(secs / 60).toString().padStart(2, '0');
+  const s = (secs % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function fmtCost(usd) {
+  if (usd < 0.001) return '< $0.001';
+  return `$${usd.toFixed(4)}`;
+}
+
+// ── Setup screen ──────────────────────────────────────────────────
+function SetupView({ onStart, isSupported }) {
+  const [theme,    setTheme]    = useState('frontend');
+  const [duration, setDuration] = useState(1800);
+
+  const randomize = useCallback(() => {
+    const t = THEMES[Math.floor(Math.random() * THEMES.length)];
+    setTheme(t.id);
+  }, []);
+
+  return (
+    <div className="interview-setup">
+      <div className="interview-setup__owl">
+        <InterviewerAvatar interviewState={INTERVIEW_STATES.IDLE} size={16} />
+      </div>
+
+      <h1 className="interview-setup__title">Ready to interview you</h1>
+      <p className="interview-setup__sub">
+        Hooty will ask questions and listen to your answers over voice — just like a phone screen.
+      </p>
+
+      {!isSupported && (
+        <div className="interview-setup__warn">
+          Voice input requires Chrome or Edge. You can still use text mode once started.
+        </div>
+      )}
+
+      <section className="interview-setup__section">
+        <div className="interview-setup__section-header">
+          <span className="interview-setup__label">Theme</span>
+          <button className="interview-setup__random" onClick={randomize} title="Randomise theme">
+            🎲 random
+          </button>
+        </div>
+        <div className="interview-setup__themes">
+          {THEMES.map(t => (
+            <button
+              key={t.id}
+              className={`interview-theme-card${theme === t.id ? ' interview-theme-card--active' : ''}`}
+              onClick={() => setTheme(t.id)}
+            >
+              <span className="interview-theme-card__icon">{t.icon}</span>
+              <span className="interview-theme-card__label">{t.label}</span>
+              <span className="interview-theme-card__desc">{t.desc}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="interview-setup__section">
+        <div className="interview-setup__label">Duration</div>
+        <div className="interview-setup__durations">
+          {DURATIONS.map(d => (
+            <button
+              key={d.value}
+              className={`interview-duration-chip${duration === d.value ? ' interview-duration-chip--active' : ''}`}
+              onClick={() => setDuration(d.value)}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <button
+        className="interview-setup__start"
+        onClick={() => onStart({ theme, duration })}
+      >
+        Start Interview
+      </button>
+    </div>
+  );
+}
+
+// ── Active interview screen ───────────────────────────────────────
+function ActiveView({ state, remaining, lastText, transcript, onEnd }) {
+  const statusLabel = {
+    [INTERVIEW_STATES.OPENING]:    'Hooty is speaking…',
+    [INTERVIEW_STATES.LISTENING]:  'Listening — speak now',
+    [INTERVIEW_STATES.PROCESSING]: 'Thinking…',
+    [INTERVIEW_STATES.RESPONDING]: 'Hooty is speaking…',
+  }[state] ?? '';
+
+  const ringClass = {
+    [INTERVIEW_STATES.LISTENING]:  'interview-active__ring--listening',
+    [INTERVIEW_STATES.OPENING]:    'interview-active__ring--speaking',
+    [INTERVIEW_STATES.RESPONDING]: 'interview-active__ring--speaking',
+  }[state] ?? '';
+
+  return (
+    <div className="interview-active">
+      <div className="interview-active__timer">
+        <span className={`interview-active__timer-dot${state === INTERVIEW_STATES.LISTENING ? ' interview-active__timer-dot--live' : ''}`} />
+        {fmtTime(remaining)} remaining
+      </div>
+
+      <div className={`interview-active__ring ${ringClass}`}>
+        <InterviewerAvatar interviewState={state} size={16} />
+      </div>
+
+      <p className="interview-active__status">{statusLabel}</p>
+
+      {lastText && (
+        <div className="interview-active__last-text">
+          <p>{lastText}</p>
+        </div>
+      )}
+
+      <div className="interview-active__transcript">
+        {transcript.slice(-4).map((t, i) => (
+          <div key={i} className={`interview-active__turn interview-active__turn--${t.role}`}>
+            <span className="interview-active__turn-label">{t.role === 'assistant' ? 'Hooty' : 'You'}</span>
+            <span className="interview-active__turn-text">{t.text}</span>
+          </div>
+        ))}
+      </div>
+
+      <button className="interview-active__end" onClick={onEnd}>
+        End Interview
+      </button>
+    </div>
+  );
+}
+
+// ── Summary screen ────────────────────────────────────────────────
+function SummaryView({ transcript, elapsed, cost, onRestart }) {
+  const [showFull, setShowFull] = useState(false);
+  const turns = transcript.length;
+
+  return (
+    <div className="interview-summary">
+      <div className="interview-summary__owl">
+        <InterviewerAvatar interviewState={INTERVIEW_STATES.ENDED} size={14} />
+      </div>
+
+      <h2 className="interview-summary__title">Interview Complete</h2>
+      <p className="interview-summary__sub">Great session — here's a summary.</p>
+
+      <div className="interview-summary__stats">
+        <div className="interview-summary__stat">
+          <span className="interview-summary__stat-value">{fmtTime(elapsed)}</span>
+          <span className="interview-summary__stat-label">duration</span>
+        </div>
+        <div className="interview-summary__stat">
+          <span className="interview-summary__stat-value">{Math.floor(turns / 2)}</span>
+          <span className="interview-summary__stat-label">questions</span>
+        </div>
+        <div className="interview-summary__stat">
+          <span className="interview-summary__stat-value">{fmtCost(cost)}</span>
+          <span className="interview-summary__stat-label">cost</span>
+        </div>
+      </div>
+
+      <div className="interview-summary__transcript">
+        <div className="interview-summary__transcript-header">
+          <span>Transcript</span>
+          <button
+            className="interview-summary__transcript-toggle"
+            onClick={() => setShowFull(f => !f)}
+          >
+            {showFull ? 'Collapse' : 'Expand'}
+          </button>
+        </div>
+        <div className={`interview-summary__transcript-body${showFull ? ' interview-summary__transcript-body--open' : ''}`}>
+          {transcript.map((t, i) => (
+            <div key={i} className={`interview-summary__turn interview-summary__turn--${t.role}`}>
+              <span className="interview-summary__turn-label">
+                {t.role === 'assistant' ? 'Hooty' : 'You'}
+              </span>
+              <p className="interview-summary__turn-text">{t.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="interview-summary__actions">
+        <button className="interview-summary__restart" onClick={onRestart}>
+          New Interview
+        </button>
+        <Link to="/" className="interview-summary__home">← Home</Link>
+      </div>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────
+export default function InterviewPage() {
+  const { user } = useAuth();
+  const {
+    state, transcript, lastText, error,
+    elapsed, remaining, cost,
+    start, endInterview, isSupported,
+  } = useVoiceInterview();
+
+  if (!user) {
+    return (
+      <div className="interview-gate">
+        <PixelOwl state="idle" size={12} />
+        <p className="interview-gate__text">Sign in to start a voice interview with Hooty.</p>
+        <Link to="/auth" className="interview-gate__link">Sign in</Link>
+      </div>
+    );
+  }
+
+  const isActive = state !== INTERVIEW_STATES.IDLE && state !== INTERVIEW_STATES.ENDED;
+
+  return (
+    <div className="interview-page">
+      {error && (
+        <div className="interview-error">
+          {error}
+          <button onClick={() => {}} className="interview-error__dismiss">✕</button>
+        </div>
+      )}
+
+      {state === INTERVIEW_STATES.IDLE && (
+        <SetupView onStart={start} isSupported={isSupported} />
+      )}
+
+      {isActive && (
+        <ActiveView
+          state={state}
+          remaining={remaining}
+          lastText={lastText}
+          transcript={transcript}
+          onEnd={endInterview}
+        />
+      )}
+
+      {state === INTERVIEW_STATES.ENDED && (
+        <SummaryView
+          transcript={transcript}
+          elapsed={elapsed}
+          cost={cost}
+          onRestart={() => window.location.reload()}
+        />
+      )}
+    </div>
+  );
+}
