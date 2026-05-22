@@ -17,6 +17,7 @@ Personal portfolio and engineering showcase. The site itself is the product — 
 | Database | Cloudflare D1 (SQLite at the edge) |
 | Session / preferences | Cloudflare KV (session tokens, UI preference sync) |
 | AI / RAG | Cloudflare AI (embeddings) + Vectorize + llama-3.3-70b |
+| Voice Interview | Web Speech API (STT) + OpenAI TTS-1 via Worker proxy + Web Audio API (waveform FFT) |
 | Auth | WebAuthn passkeys via SimpleWebAuthn — zero passwords |
 | Email | Resend |
 | Testing | Playwright (E2E), Storybook + Vitest (components), axe-core (accessibility) |
@@ -101,6 +102,15 @@ yarn ingest:upsert   # Upsert docs (update existing embeddings)
 yarn export:docs     # Export docs to a flat format
 ```
 
+**Required Worker secrets** (set once via `wrangler secret put <NAME>`):
+
+| Secret | Purpose |
+|---|---|
+| `ANTHROPIC_API_KEY` | Claude API — interview AI + RAG chat |
+| `ENCRYPTION_SECRET` | AES-256-GCM master key for user API key encryption (`openssl rand -hex 32`) |
+| `ADMIN_EMAIL` | Email address granted admin role |
+| `RESEND_API_KEY` | Transactional email |
+
 ---
 
 ## Roadmap
@@ -112,7 +122,19 @@ yarn export:docs     # Export docs to a flat format
 - [x] Phase 5: Playwright E2E + CI/CD
 - [x] Phase 6: Storybook + component tests + accessibility enforcement
 - [x] Phase 7: Lighthouse CI + Gemini-powered AI fix workflow
-- [ ] Phase 8: Math visualizations + interactive demos
+- [x] Phase 8: Voice interview — Hooty AI interviewer with real-time waveform, Worker-proxied OpenAI TTS, and AES-256-GCM encrypted API key storage
+- [ ] Phase 9: Math visualizations + interactive demos
+
+---
+
+## Voice interview
+
+Hooty (the site's pixel-owl mascot) conducts live voice interviews. Theme (frontend, backend, system design, DSA, behavioral, product, fullstack) and duration (15–60 min) are configurable.
+
+- **STT**: browser `SpeechRecognition` — Chrome/Edge only
+- **TTS**: OpenAI TTS-1 via Worker proxy (user adds key in Settings → Account) with real Web Audio FFT waveform visualization, or browser `SpeechSynthesis` with word-boundary-driven animation fallback
+- **Security**: raw API key never enters browser JS — Worker decrypts per-request behind `connect-src 'self'` CSP
+- **Cost tracking**: Haiku input/output tokens accumulated per session, shown on summary screen
 
 ---
 
