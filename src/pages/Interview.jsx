@@ -204,28 +204,37 @@ function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, on
         {/* Text input fallback */}
         {showText && (
           <form className="interview-active__text-form" onSubmit={handleTextSubmit}>
-            <input
+            <textarea
               ref={inputRef}
               className="interview-active__text-input"
               value={typed}
               onChange={e => setTyped(e.target.value)}
-              placeholder="Type your answer…"
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (typed.trim()) handleTextSubmit(e);
+                }
+              }}
+              placeholder="Type your answer… (Shift+Enter for new line)"
               autoComplete="off"
+              rows={3}
             />
-            <button
-              type="submit"
-              className="interview-ctrl interview-ctrl--send"
-              disabled={!typed.trim()}
-            >
-              Send
-            </button>
-            <button
-              type="button"
-              className="interview-ctrl interview-ctrl--text"
-              onClick={() => setShowText(false)}
-            >
-              Use mic
-            </button>
+            <div className="interview-active__text-actions">
+              <button
+                type="submit"
+                className="interview-ctrl interview-ctrl--send"
+                disabled={!typed.trim()}
+              >
+                Send
+              </button>
+              <button
+                type="button"
+                className="interview-ctrl interview-ctrl--text"
+                onClick={() => setShowText(false)}
+              >
+                Use mic
+              </button>
+            </div>
           </form>
         )}
       </div>

@@ -651,27 +651,35 @@
 /* ── Text input fallback form ─────────────────────────────────── */
 .interview-active__text-form {
   display: flex;
+  flex-direction: column;
   gap: 8px;
   width: 100%;
   max-width: 480px;
-  flex-wrap: wrap;
-  justify-content: center;
 }
 
 .interview-active__text-input {
-  flex: 1;
-  min-width: 200px;
-  padding: 11px 18px;
-  border-radius: 100px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 16px;
+  border-radius: 12px;
   border: 1.5px solid var(--border);
   background: var(--card-bg);
   color: var(--text-1);
   font-size: 13px;
+  font-family: inherit;
+  line-height: 1.55;
+  resize: vertical;
   outline: none;
   transition: border-color 0.15s;
 }
 .interview-active__text-input::placeholder { color: var(--text-3); }
 .interview-active__text-input:focus       { border-color: #6366f1; }
+
+.interview-active__text-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
 
 /* ── Light mode: card icon filter to prevent emoji darkness ──── */
 [data-theme="light"] .interview-theme-card--active {
