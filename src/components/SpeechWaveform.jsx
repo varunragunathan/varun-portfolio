@@ -12,7 +12,10 @@ const GAP  = 3;
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
-const SpeechWaveform = forwardRef(function SpeechWaveform({ mode = 'speaking' }, ref) {
+// externalAnalyserRef — optional ref to an AnalyserNode created outside this
+// component (e.g. from the OpenAI TTS AudioContext in useVoiceInterview).
+// When set, speaking mode uses real FFT instead of the synthetic pulse animation.
+const SpeechWaveform = forwardRef(function SpeechWaveform({ mode = 'speaking', externalAnalyserRef }, ref) {
   const canvasRef   = useRef(null);
   const rafRef      = useRef(null);
   const analyserRef = useRef(null);
@@ -79,24 +82,35 @@ const SpeechWaveform = forwardRef(function SpeechWaveform({ mode = 'speaking' },
       const smooth = smoothRef.current;
 
       if (mode === 'speaking') {
-        // Decay the last pulse amplitude over ~220 ms
-        const age      = performance.now() - pulseRef.current.time;
-        const pDecay   = Math.exp(-age / 220);
-        const pAmp     = pulseRef.current.amp * pDecay;
+        if (externalAnalyserRef?.current) {
+          // Real FFT from OpenAI TTS audio — most accurate
+          const freq = new Uint8Array(externalAnalyserRef.current.frequencyBinCount);
+          externalAnalyserRef.current.getByteFrequencyData(freq);
+          for (let i = 0; i < BARS; i++) {
+            const idx  = Math.floor((i / BARS) * freq.length * 0.70);
+            target[i]  = Math.max(0.03, freq[idx] / 255);
+          }
+          for (let i = 0; i < BARS; i++) {
+            smooth[i] = lerp(smooth[i], target[i], 0.22);
+          }
+        } else {
+          // Fallback: word-boundary pulse decay (SpeechSynthesis path)
+          const age    = performance.now() - pulseRef.current.time;
+          const pDecay = Math.exp(-age / 220);
+          const pAmp   = pulseRef.current.amp * pDecay;
 
-        for (let i = 0; i < BARS; i++) {
-          const pos      = i / (BARS - 1);
-          const envelope = Math.sin(pos * Math.PI); // quieter at edges
-          // Low-amplitude base movement so it never looks completely frozen
-          const w1 = Math.sin(t * 1.6  + i * 0.44) * 0.14;
-          const w2 = Math.sin(t * 2.9  + i * 0.71 + 1.2) * 0.10;
-          const w3 = Math.sin(t * 0.9  + i * 0.30 + 2.4) * 0.09;
-          // pAmp drives the main height; base sines ride on top
-          const raw = (0.18 + pAmp * 0.72 + w1 + w2 + w3) * envelope;
-          target[i] = Math.max(0.03, Math.min(0.96, raw));
-        }
-        for (let i = 0; i < BARS; i++) {
-          smooth[i] = lerp(smooth[i], target[i], 0.14);
+          for (let i = 0; i < BARS; i++) {
+            const pos      = i / (BARS - 1);
+            const envelope = Math.sin(pos * Math.PI);
+            const w1 = Math.sin(t * 1.6  + i * 0.44) * 0.14;
+            const w2 = Math.sin(t * 2.9  + i * 0.71 + 1.2) * 0.10;
+            const w3 = Math.sin(t * 0.9  + i * 0.30 + 2.4) * 0.09;
+            const raw = (0.18 + pAmp * 0.72 + w1 + w2 + w3) * envelope;
+            target[i] = Math.max(0.03, Math.min(0.96, raw));
+          }
+          for (let i = 0; i < BARS; i++) {
+            smooth[i] = lerp(smooth[i], target[i], 0.14);
+          }
         }
       } else {
         // Listening: real mic FFT data, or gentle idle if mic unavailable

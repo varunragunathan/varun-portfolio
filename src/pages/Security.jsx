@@ -6,6 +6,7 @@ import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { ThemeToggle } from '../components/UI';
 import { useResponsive } from '../hooks/useResponsive';
+import ApiKeySettings from '../components/ApiKeySettings';
 
 async function patchPreferences(body) {
   return fetch('/api/auth/account/preferences', {
@@ -1247,6 +1248,10 @@ export default function Settings() {
       {/* ── Account tab ── */}
       {tab === 'account' && (
         <>
+          <Section title="API Keys" subtitle="Power high-quality voice for the interview feature">
+            <ApiKeySettings />
+          </Section>
+
           <Section title="Appearance" subtitle="Display and accessibility preferences">
             <Row>
               <div style={{ flex: 1 }}>

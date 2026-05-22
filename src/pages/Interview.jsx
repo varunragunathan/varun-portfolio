@@ -112,7 +112,7 @@ function SetupView({ onStart, isSupported }) {
 }
 
 // ── Active interview ──────────────────────────────────────────────
-function ActiveView({ state, remaining, lastText, transcript, onEnd, onStopRecording, onInterrupt, onSendText }) {
+function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, onEnd, onStopRecording, onInterrupt, onSendText }) {
   const [showText, setShowText] = useState(false);
   const [typed,    setTyped]    = useState('');
   const inputRef = useRef(null);
@@ -149,7 +149,7 @@ function ActiveView({ state, remaining, lastText, transcript, onEnd, onStopRecor
         {/* Waveform — shown while Hooty is speaking */}
         {isSpeaking && (
           <div className="interview-active__waveform-wrap">
-            <SpeechWaveform mode="speaking" />
+            <SpeechWaveform mode="speaking" externalAnalyserRef={ttsAnalyserRef} />
             <p className="interview-active__stage-label">Hooty is speaking…</p>
           </div>
         )}
@@ -193,7 +193,7 @@ function ActiveView({ state, remaining, lastText, transcript, onEnd, onStopRecor
         {isListening && !showText && (
           <>
             <button className="interview-ctrl interview-ctrl--stop" onClick={onStopRecording}>
-              ⏹ Stop
+              ✓ Done
             </button>
             <button className="interview-ctrl interview-ctrl--text" onClick={handleShowText}>
               ⌨️ Type instead
@@ -307,7 +307,7 @@ export default function InterviewPage() {
   const { user } = useAuth();
   const {
     state, transcript, lastText, error,
-    elapsed, remaining, cost,
+    elapsed, remaining, cost, ttsAnalyserRef,
     start, endInterview, stopRecording, interrupt, sendText, clearError, isSupported,
   } = useVoiceInterview();
 
@@ -342,6 +342,7 @@ export default function InterviewPage() {
           remaining={remaining}
           lastText={lastText}
           transcript={transcript}
+          ttsAnalyserRef={ttsAnalyserRef}
           onEnd={endInterview}
           onStopRecording={stopRecording}
           onInterrupt={interrupt}

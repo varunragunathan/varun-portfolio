@@ -37,6 +37,9 @@ import {
   createInterviewSession, sendInterviewMessage, endInterviewSession,
   listInterviewSessions, getInterviewSession,
 } from './interview.js';
+import {
+  handleGetKeyStatus, handleSaveKey, handleDeleteKey, handleProxyTTS,
+} from './keys.js';
 import { checkIpRateLimit } from './rateLimit.js';
 import { getMetrics } from './metrics.js';
 import { logEndpointRequest, getEndpointMetrics } from './endpointMetrics.js';
@@ -260,6 +263,12 @@ async function handleRequest(request, env) {
         response = await submitUpgradeRequest(request, env);
       } else if (path === '/api/user/upgrade-request' && method === 'GET') {
         response = await getUpgradeRequest(request, env);
+      } else if (path === '/api/user/key/status' && method === 'GET') {
+        response = await handleGetKeyStatus(request, env);
+      } else if (path === '/api/user/key' && method === 'POST') {
+        response = await handleSaveKey(request, env);
+      } else if (path === '/api/user/key' && method === 'DELETE') {
+        response = await handleDeleteKey(request, env);
       } else {
         response = new Response(JSON.stringify({ error: 'Not found' }), {
           status: 404,
@@ -273,6 +282,27 @@ async function handleRequest(request, env) {
       return new Response(JSON.stringify({ error: 'Internal server error' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json', ...cors },
+      });
+    }
+  }
+
+  // ── /api/proxy (Worker-side upstream proxies) ────────────────
+  if (url.pathname.startsWith('/api/proxy/')) {
+    try {
+      const path = url.pathname;
+      let response;
+      if (path === '/api/proxy/tts' && request.method === 'POST') {
+        response = await handleProxyTTS(request, env);
+      } else {
+        response = new Response(JSON.stringify({ error: 'Not found' }), {
+          status: 404, headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return withCors(response, cors);
+    } catch (err) {
+      console.error('Proxy error:', err);
+      return new Response(JSON.stringify({ error: 'Internal server error' }), {
+        status: 500, headers: { 'Content-Type': 'application/json', ...cors },
       });
     }
   }
@@ -510,7 +540,32 @@ async function handleRequest(request, env) {
   }
 
   // All non-API requests → serve the React static build
-  return env.ASSETS.fetch(request);
+  // Inject security headers on HTML responses
+  const asset = await env.ASSETS.fetch(request);
+  const ct    = asset.headers.get('Content-Type') || '';
+  if (!ct.includes('text/html')) return asset;
+
+  const headers = new Headers(asset.headers);
+  // connect-src 'self' enforces the proxy pattern at browser level —
+  // the browser cannot call api.openai.com directly; all traffic goes
+  // through our Worker which requires auth before touching any API key.
+  headers.set('Content-Security-Policy', [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "connect-src 'self'",
+    "img-src 'self' data: blob:",
+    "media-src 'self' blob:",
+    "font-src 'self' data:",
+    "worker-src 'self' blob:",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join('; '));
+  headers.set('X-Frame-Options',        'DENY');
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('Referrer-Policy',        'strict-origin-when-cross-origin');
+  return new Response(asset.body, { status: asset.status, headers });
 }
 
 export default {

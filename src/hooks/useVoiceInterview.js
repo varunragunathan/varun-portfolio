@@ -1,6 +1,11 @@
 // ── useVoiceInterview ─────────────────────────────────────────────
 // Orchestrates the full voice interview loop:
-//   SpeechRecognition (STT) → API → SSE stream → SpeechSynthesis (TTS)
+//   SpeechRecognition (STT) → API → SSE stream → TTS
+//
+// TTS priority:
+//   1. OpenAI TTS via Worker proxy (/api/proxy/tts) — real audio stream,
+//      drives the waveform with actual FFT data (requires stored API key)
+//   2. Browser SpeechSynthesis — word-boundary pulse fallback (free, lower quality)
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -34,17 +39,28 @@ export function useVoiceInterview() {
   const [cost,       setCost]       = useState(0);
   const [duration,   setDuration]   = useState(1800);
 
-  const sessionRef   = useRef(null);
-  const timerRef     = useRef(null);
-  const recogRef     = useRef(null);
-  const synthRef     = useRef(window.speechSynthesis);
-  const durationRef  = useRef(1800);
-  const startTimeRef = useRef(null);
-  const stateRef     = useRef(INTERVIEW_STATES.IDLE);
+  const sessionRef     = useRef(null);
+  const timerRef       = useRef(null);
+  const recogRef       = useRef(null);
+  const synthRef       = useRef(window.speechSynthesis);
+  const durationRef    = useRef(1800);
+  const startTimeRef   = useRef(null);
+  const stateRef       = useRef(INTERVIEW_STATES.IDLE);
   // Set when onresult fires so onend doesn't restart listening unnecessarily
-  const gotResultRef = useRef(false);
+  const gotResultRef   = useRef(false);
   // Set when user explicitly stops recording so onend doesn't restart
-  const manualStopRef = useRef(false);
+  const manualStopRef  = useRef(false);
+  // Accumulates interim speech text so Stop can submit whatever was said
+  const partialRef     = useRef('');
+
+  // OpenAI TTS — set on start() if user has a stored key
+  const hasOpenAIKeyRef  = useRef(false);
+  // Persisted AudioContext (one per session)
+  const audioCtxRef      = useRef(null);
+  // Current AnalyserNode while OpenAI audio is playing — read by SpeechWaveform
+  const ttsAnalyserRef   = useRef(null);
+  // Current BufferSourceNode so we can stop it on interrupt
+  const ttsSourceRef     = useRef(null);
 
   // Refs to break circular useCallback dependencies
   const handleUserTurnRef  = useRef(null);
@@ -56,8 +72,49 @@ export function useVoiceInterview() {
     setState(s);
   }, []);
 
-  // ── TTS ─────────────────────────────────────────────────────────
-  const speak = useCallback((text) => {
+  // ── TTS — OpenAI proxy (real audio) ──────────────────────────────
+  const speakOpenAI = useCallback(async (text) => {
+    const res = await fetch('/api/proxy/tts', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ text, voice: 'fable' }),
+    });
+    if (!res.ok) throw new Error(`TTS ${res.status}`);
+
+    const arrayBuffer = await res.arrayBuffer();
+
+    // Lazily create one AudioContext per session
+    if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+      audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    const audioCtx = audioCtxRef.current;
+    await audioCtx.resume();
+
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+    // Wire up analyser so SpeechWaveform gets real FFT data
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize               = 128;
+    analyser.smoothingTimeConstant = 0.78;
+    ttsAnalyserRef.current = analyser;
+
+    return new Promise((resolve) => {
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(analyser);
+      analyser.connect(audioCtx.destination);
+      ttsSourceRef.current = source;
+      source.onended = () => {
+        ttsAnalyserRef.current = null;
+        ttsSourceRef.current   = null;
+        resolve();
+      };
+      source.start();
+    });
+  }, []);
+
+  // ── TTS — browser SpeechSynthesis fallback (word-boundary pulses) ─
+  const speakSynthesis = useCallback((text) => {
     return new Promise((resolve) => {
       synthRef.current.cancel();
       const utt = new SpeechSynthesisUtterance(text);
@@ -80,6 +137,18 @@ export function useVoiceInterview() {
     });
   }, []);
 
+  // ── TTS — dispatch to whichever engine is available ──────────────
+  const speak = useCallback(async (text) => {
+    if (hasOpenAIKeyRef.current) {
+      try {
+        return await speakOpenAI(text);
+      } catch {
+        // Fall through to SpeechSynthesis if proxy fails
+      }
+    }
+    return speakSynthesis(text);
+  }, [speakOpenAI, speakSynthesis]);
+
   // ── STT ──────────────────────────────────────────────────────────
   const startListening = useCallback(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -90,18 +159,23 @@ export function useVoiceInterview() {
 
     gotResultRef.current  = false;
     manualStopRef.current = false;
+    partialRef.current    = '';
 
     const recog = new SR();
     recog.lang           = 'en-US';
     recog.continuous     = false;
-    recog.interimResults = false;
+    recog.interimResults = true;  // track partial so Stop can submit them
     recogRef.current     = recog;
     setStateSynced(INTERVIEW_STATES.LISTENING);
 
     recog.onresult = (e) => {
-      const text = e.results[e.results.length - 1][0].transcript.trim();
-      if (text) {
+      if (gotResultRef.current) return; // already submitted (e.g. via Stop)
+      const result = e.results[e.results.length - 1];
+      const text   = result[0].transcript.trim();
+      partialRef.current = text;
+      if (result.isFinal && text) {
         gotResultRef.current = true;
+        partialRef.current   = '';
         handleUserTurnRef.current?.(text);
       }
     };
@@ -133,17 +207,30 @@ export function useVoiceInterview() {
     recog.start();
   }, [setStateSynced]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Stop recording (user explicitly stops, optionally sending partial) ─
+  // ── Stop recording — submits whatever was said, or leaves mic dead
+  //    so the user can type. Renamed "Done" in the UI to signal intent.
   const stopRecording = useCallback(() => {
+    const partial = partialRef.current.trim();
+    if (partial) {
+      // Submit what was captured before the user pressed Done
+      gotResultRef.current = true;
+      partialRef.current   = '';
+      handleUserTurnRef.current?.(partial);
+    }
     manualStopRef.current = true;
     recogRef.current?.stop();
-    // Stay in listening state — user can re-tap mic or type
-    // If they stopped without speaking, don't process an empty turn
-  }, []);
+    // If nothing was captured, state stays LISTENING — user sees text input
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Interrupt Hooty mid-speech ───────────────────────────────────
   const interrupt = useCallback(() => {
     synthRef.current.cancel();
+    if (ttsSourceRef.current) {
+      ttsSourceRef.current.onended = null;
+      ttsSourceRef.current.stop();
+      ttsSourceRef.current   = null;
+      ttsAnalyserRef.current = null;
+    }
     startListeningRef.current?.();
   }, []);
 
@@ -236,6 +323,14 @@ export function useVoiceInterview() {
   const endInterview = useCallback(async () => {
     clearInterval(timerRef.current);
     synthRef.current.cancel();
+    if (ttsSourceRef.current) {
+      ttsSourceRef.current.onended = null;
+      ttsSourceRef.current.stop();
+      ttsSourceRef.current   = null;
+      ttsAnalyserRef.current = null;
+    }
+    audioCtxRef.current?.close().catch(() => {});
+    audioCtxRef.current = null;
     manualStopRef.current = true;
     recogRef.current?.stop();
     setStateSynced(INTERVIEW_STATES.ENDED);
@@ -268,6 +363,15 @@ export function useVoiceInterview() {
     setCost(0);
     durationRef.current = duration;
     setDuration(duration);
+
+    // Check once whether user has an OpenAI key stored
+    try {
+      const ks = await fetch('/api/user/key/status').then(r => r.json());
+      hasOpenAIKeyRef.current = ks?.configured === true;
+    } catch {
+      hasOpenAIKeyRef.current = false;
+    }
+
     setStateSynced(INTERVIEW_STATES.OPENING);
 
     startTimeRef.current = Date.now();
@@ -298,6 +402,11 @@ export function useVoiceInterview() {
     return () => {
       clearInterval(timerRef.current);
       synth?.cancel();
+      if (ttsSourceRef.current) {
+        ttsSourceRef.current.onended = null;
+        ttsSourceRef.current.stop();
+      }
+      audioCtxRef.current?.close().catch(() => {});
       manualStopRef.current = true;
       recogRef.current?.stop();
     };
@@ -316,6 +425,7 @@ export function useVoiceInterview() {
     elapsed,
     remaining,
     cost,
+    ttsAnalyserRef,
     start,
     endInterview,
     stopRecording,
