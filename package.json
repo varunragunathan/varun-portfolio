@@ -1,7 +1,7 @@
 {
   "name": "engineering-portfolio",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -20,7 +20,9 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test:storybook": "vitest run --project=storybook",
-    "chromatic": "npx chromatic --project-token=$CHROMATIC_PROJECT_TOKEN"
+    "chromatic": "npx chromatic --project-token=$CHROMATIC_PROJECT_TOKEN",
+    "seed:discussion-page": "node scripts/seed-discussion-page.js",
+    "seed:discussion-page:prod": "node scripts/seed-discussion-page.js --remote"
   },
   "dependencies": {
     "@simplewebauthn/browser": "^13.3.0",
