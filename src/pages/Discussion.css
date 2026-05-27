@@ -338,6 +338,25 @@
   gap: 8px;
 }
 
+/* ── Infinite scroll ─────────────────────────────────────────── */
+.disc-sentinel {
+  height: 1px;
+  margin-top: 4px;
+}
+.disc-loading-more {
+  text-align: center;
+  padding: 20px 0 8px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+.disc-list-end {
+  text-align: center;
+  padding: 20px 0 8px;
+  font-size: 12px;
+  color: var(--text-3);
+  letter-spacing: 0.03em;
+}
+
 /* ── Empty / auth states ──────────────────────────────────────── */
 .disc-empty {
   text-align: center;

@@ -1,7 +1,9 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import './Discussion.css';
+
+const PAGE_SIZE = 50;
 
 function fmtDate(iso) {
   const d = new Date(iso);
@@ -9,17 +11,17 @@ function fmtDate(iso) {
 }
 
 function NewTopicForm({ onCreated, onCancel }) {
-  const [title,    setTitle]    = useState('');
-  const [body,     setBody]     = useState('');
-  const [error,    setError]    = useState('');
-  const [loading,  setLoading]  = useState(false);
+  const [title,   setTitle]   = useState('');
+  const [body,    setBody]    = useState('');
+  const [error,   setError]   = useState('');
+  const [loading, setLoading] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
     if (!title.trim() || !body.trim()) { setError('Both fields required.'); return; }
     setLoading(true);
     setError('');
-    const res = await fetch('/api/discussion/topics', {
+    const res  = await fetch('/api/discussion/topics', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ title: title.trim(), body: body.trim() }),
@@ -61,21 +63,68 @@ function NewTopicForm({ onCreated, onCancel }) {
 }
 
 export default function DiscussionPage() {
-  const { user }    = useAuth();
-  const navigate    = useNavigate();
-  const [topics,    setTopics]    = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [showForm,  setShowForm]  = useState(false);
+  const { user }  = useAuth();
+  const navigate  = useNavigate();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const res  = await fetch('/api/discussion/topics');
-    const data = await res.json();
-    setTopics(data.topics || []);
-    setLoading(false);
+  const [topics,      setTopics]      = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore,     setHasMore]     = useState(false);
+  const [showForm,    setShowForm]    = useState(false);
+
+  // Stable refs so the IntersectionObserver callback never goes stale
+  const offsetRef     = useRef(0);
+  const hasMoreRef    = useRef(false);
+  const loadingRef    = useRef(false);
+  const sentinelRef   = useRef(null);
+  const limitRef      = useRef(PAGE_SIZE);
+
+  const fetchPage = useCallback(async (offset, append) => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    if (append) setLoadingMore(true); else setLoading(true);
+
+    try {
+      const res  = await fetch(
+        `/api/discussion/topics?limit=${limitRef.current}&offset=${offset}`
+      );
+      const data = await res.json();
+      const next = data.topics || [];
+
+      if (append) setTopics(prev => [...prev, ...next]);
+      else        setTopics(next);
+
+      offsetRef.current  = offset + next.length;
+      hasMoreRef.current = data.hasMore ?? false;
+      setHasMore(data.hasMore ?? false);
+    } finally {
+      loadingRef.current = false;
+      if (append) setLoadingMore(false); else setLoading(false);
+    }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // Initial load
+  useEffect(() => {
+    offsetRef.current = 0;
+    fetchPage(0, false);
+  }, [fetchPage]);
+
+  // Infinite scroll — observe sentinel; reads live values from refs, no stale closure
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMoreRef.current && !loadingRef.current) {
+          fetchPage(offsetRef.current, true);
+        }
+      },
+      { rootMargin: '300px' } // start loading 300px before sentinel enters viewport
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [fetchPage]); // fetchPage is stable (no deps), so this runs once
 
   const handleCreated = (id) => navigate(`/discussion/${id}`);
 
@@ -107,24 +156,34 @@ export default function DiscussionPage() {
           No topics yet.{user ? ' Be the first to start one.' : ' Sign in to start one.'}
         </div>
       ) : (
-        <ul className="disc-topic-list">
-          {topics.map(t => (
-            <li key={t.id}>
-              <Link to={`/discussion/${t.id}`} className="disc-topic-card">
-                {t.pinned && <span className="disc-topic-card__pin">Pinned</span>}
-                <span className="disc-topic-card__title">{t.title}</span>
-                <span className="disc-topic-card__meta">
-                  {t.author} · {fmtDate(t.created_at)}
-                  {t.comment_count > 0 && (
-                    <span className="disc-topic-card__count">
-                      {t.comment_count} {t.comment_count === 1 ? 'reply' : 'replies'}
-                    </span>
-                  )}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="disc-topic-list">
+            {topics.map(t => (
+              <li key={t.id}>
+                <Link to={`/discussion/${t.id}`} className="disc-topic-card">
+                  {t.pinned && <span className="disc-topic-card__pin">Pinned</span>}
+                  <span className="disc-topic-card__title">{t.title}</span>
+                  <span className="disc-topic-card__meta">
+                    {t.author} · {fmtDate(t.created_at)}
+                    {t.comment_count > 0 && (
+                      <span className="disc-topic-card__count">
+                        {t.comment_count} {t.comment_count === 1 ? 'reply' : 'replies'}
+                      </span>
+                    )}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          {/* Sentinel — IntersectionObserver fires when this enters view */}
+          <div ref={sentinelRef} className="disc-sentinel" />
+
+          {loadingMore && <div className="disc-loading-more">Loading…</div>}
+          {!hasMore && topics.length > 0 && (
+            <p className="disc-list-end">You've reached the end.</p>
+          )}
+        </>
       )}
 
       {!user && (

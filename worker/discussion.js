@@ -24,18 +24,24 @@ function displayName(row) {
   return row.nickname || row.email.split('@')[0];
 }
 
-// GET /api/discussion/topics
+// GET /api/discussion/topics?limit=N&offset=N
 export async function listTopics(request, env) {
+  const url    = new URL(request.url);
+  const limit  = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit')  || '30')));
+  const offset = Math.max(0,              parseInt(url.searchParams.get('offset') || '0'));
+
+  // Fetch one extra to determine whether more pages exist
   const rows = await env.DB.prepare(`
     SELECT t.id, t.title, t.created_at, t.comment_count, t.pinned,
            u.nickname, u.email
     FROM   discussion_topics t
     JOIN   users u ON u.id = t.author_id
     ORDER  BY t.pinned DESC, t.created_at DESC
-    LIMIT  50
-  `).all();
+    LIMIT  ? OFFSET ?
+  `).bind(limit + 1, offset).all();
 
-  const topics = rows.results.map(r => ({
+  const hasMore = rows.results.length > limit;
+  const topics  = rows.results.slice(0, limit).map(r => ({
     id:            r.id,
     title:         r.title,
     created_at:    r.created_at,
@@ -44,7 +50,7 @@ export async function listTopics(request, env) {
     author:        displayName(r),
   }));
 
-  return json({ topics });
+  return json({ topics, hasMore });
 }
 
 // POST /api/discussion/topics  { title, body }
