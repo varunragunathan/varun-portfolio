@@ -11,17 +11,22 @@ import '../src/index.css';
  *  theme background instead of Storybook's default white canvas.
  */
 export const decorators = [
-  (Story) => (
-    <ThemeProvider>
-      <AuthProvider>
-        <MemoryRouter>
-          <div style={{ padding: '24px', background: 'var(--bg)', minHeight: '100vh' }}>
-            <Story />
-          </div>
-        </MemoryRouter>
-      </AuthProvider>
-    </ThemeProvider>
-  ),
+  // context.parameters.routerEntries lets individual stories set the
+  // MemoryRouter's initialEntries without nesting a second <Router>.
+  (Story, context) => {
+    const entries = context.parameters?.routerEntries ?? ['/'];
+    return (
+      <ThemeProvider>
+        <AuthProvider>
+          <MemoryRouter initialEntries={entries}>
+            <div style={{ padding: '24px', background: 'var(--bg)', minHeight: '100vh' }}>
+              <Story />
+            </div>
+          </MemoryRouter>
+        </AuthProvider>
+      </ThemeProvider>
+    );
+  },
 ];
 
 export const parameters = {

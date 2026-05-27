@@ -1,7 +1,6 @@
 import React from 'react';
 import { expect, within, waitFor } from '@storybook/test';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { AuthProvider } from '../hooks/useAuth.jsx';
+import { Route, Routes } from 'react-router-dom';
 import DiscussionThread from '../pages/DiscussionThread.jsx';
 import '../pages/Discussion.css';
 
@@ -54,18 +53,15 @@ const COMMENTS_WITH_DELETED = [
   },
 ];
 
-// ── Decorator: MemoryRouter seeded to the thread route ─────────────
+// ── Decorator: Routes only — MemoryRouter is provided by the global
+// decorator, configured via parameters.routerEntries per story. ─────
 
-function withThread(topicData, Story) {
+function withThread(Story) {
   return (
-    <AuthProvider>
-      <MemoryRouter initialEntries={['/discussion/topic-1']}>
-        <Routes>
-          <Route path="/discussion/:id" element={<Story />} />
-          <Route path="/discussion" element={<div>Discussion list</div>} />
-        </Routes>
-      </MemoryRouter>
-    </AuthProvider>
+    <Routes>
+      <Route path="/discussion/:id" element={<Story />} />
+      <Route path="/discussion" element={<div>Discussion list</div>} />
+    </Routes>
   );
 }
 
@@ -102,7 +98,8 @@ export default {
 
 /** Full thread with nested reply */
 export const WithComments = {
-  decorators: [(Story) => withThread(TOPIC, Story)],
+  parameters: { routerEntries: ['/discussion/topic-1'] },
+  decorators: [(Story) => withThread(Story)],
   beforeEach() {
     return mockThreadFetch(TOPIC, COMMENTS);
   },
@@ -120,7 +117,8 @@ export const WithComments = {
 
 /** Thread with a deleted comment renders [deleted] placeholder */
 export const WithDeletedComment = {
-  decorators: [(Story) => withThread(TOPIC, Story)],
+  parameters: { routerEntries: ['/discussion/topic-1'] },
+  decorators: [(Story) => withThread(Story)],
   beforeEach() {
     return mockThreadFetch(TOPIC, COMMENTS_WITH_DELETED);
   },
@@ -133,7 +131,8 @@ export const WithDeletedComment = {
 
 /** Empty thread — shows "No comments yet" state */
 export const EmptyThread = {
-  decorators: [(Story) => withThread({ ...TOPIC, comment_count: 0 }, Story)],
+  parameters: { routerEntries: ['/discussion/topic-1'] },
+  decorators: [(Story) => withThread(Story)],
   beforeEach() {
     return mockThreadFetch({ ...TOPIC, comment_count: 0 }, []);
   },
@@ -146,7 +145,8 @@ export const EmptyThread = {
 
 /** 404 — topic not found */
 export const NotFound = {
-  decorators: [(Story) => withThread(null, Story)],
+  parameters: { routerEntries: ['/discussion/topic-1'] },
+  decorators: [(Story) => withThread(Story)],
   beforeEach() {
     const orig = globalThis.fetch;
     globalThis.fetch = async (url, ...args) => {
