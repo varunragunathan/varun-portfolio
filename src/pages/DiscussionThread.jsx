@@ -90,8 +90,10 @@ function InlineReplyForm({ topicId, parentId, onPosted, onCancel }) {
 
   return (
     <div className="disc-inline-reply">
-      {error && <p className="disc-inline-reply__error">{error}</p>}
+      {error && <p className="disc-inline-reply__error" role="alert">{error}</p>}
+      <label htmlFor={`disc-reply-${parentId}`} className="disc-sr-only">Write a reply</label>
       <textarea
+        id={`disc-reply-${parentId}`}
         ref={ref}
         className="disc-inline-reply__input"
         placeholder="Write a reply…"
@@ -238,10 +240,11 @@ function AddCommentForm({ topicId, onPosted }) {
 
   return (
     <div className="disc-add-comment">
-      <p className="disc-add-comment__label">Add a comment</p>
-      {error && <p className="disc-inline-reply__error">{error}</p>}
+      <label htmlFor="disc-add-comment-input" className="disc-add-comment__label">Add a comment</label>
+      {error && <p className="disc-inline-reply__error" role="alert">{error}</p>}
       <div className="disc-add-comment__row">
         <textarea
+          id="disc-add-comment-input"
           className="disc-add-comment__input"
           placeholder="Write a comment…"
           value={body}
@@ -283,7 +286,33 @@ export default function DiscussionThread() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading)  return <div className="disc-page disc-empty">Loading…</div>;
+  // SEO: update title + meta once topic is loaded
+  useEffect(() => {
+    if (!topic) return;
+    const prevTitle = document.title;
+    document.title = `${topic.title} — Discussion — varunr.dev`;
+    const metaDesc = document.querySelector('meta[name="description"]');
+    const ogTitle  = document.querySelector('meta[property="og:title"]');
+    const ogDesc   = document.querySelector('meta[property="og:description"]');
+    const ogUrl    = document.querySelector('meta[property="og:url"]');
+    const prevDesc = metaDesc?.getAttribute('content');
+    const prevOgT  = ogTitle?.getAttribute('content');
+    const prevOgD  = ogDesc?.getAttribute('content');
+    const desc = topic.body.length > 150 ? topic.body.slice(0, 147) + '…' : topic.body;
+    if (metaDesc) metaDesc.setAttribute('content', desc);
+    if (ogTitle)  ogTitle.setAttribute('content', `${topic.title} — Discussion — varunr.dev`);
+    if (ogDesc)   ogDesc.setAttribute('content', desc);
+    if (ogUrl)    ogUrl.setAttribute('content', `https://varunr.dev/discussion/${id}`);
+    return () => {
+      document.title = prevTitle;
+      if (metaDesc && prevDesc) metaDesc.setAttribute('content', prevDesc);
+      if (ogTitle  && prevOgT)  ogTitle.setAttribute('content', prevOgT);
+      if (ogDesc   && prevOgD)  ogDesc.setAttribute('content', prevOgD);
+      if (ogUrl)                ogUrl.setAttribute('content', 'https://varunr.dev');
+    };
+  }, [topic, id]);
+
+  if (loading)  return <div className="disc-page disc-empty" role="status" aria-live="polite">Loading…</div>;
   if (notFound) return (
     <div className="disc-page disc-empty">
       Topic not found. <Link to="/discussion">Back to discussion</Link>

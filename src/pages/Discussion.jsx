@@ -35,15 +35,19 @@ function NewTopicForm({ onCreated, onCancel }) {
   return (
     <form className="disc-new-form" onSubmit={submit}>
       <h2 className="disc-new-form__title">Start a topic</h2>
-      {error && <p className="disc-new-form__error">{error}</p>}
+      {error && <p className="disc-new-form__error" role="alert">{error}</p>}
+      <label htmlFor="disc-new-title" className="disc-sr-only">Topic title</label>
       <input
+        id="disc-new-title"
         className="disc-new-form__input"
         placeholder="Title"
         value={title}
         onChange={e => setTitle(e.target.value)}
         maxLength={200}
       />
+      <label htmlFor="disc-new-body" className="disc-sr-only">Topic body</label>
       <textarea
+        id="disc-new-body"
         className="disc-new-form__body"
         placeholder="What's on your mind?"
         value={body}
@@ -71,6 +75,30 @@ export default function DiscussionPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore,     setHasMore]     = useState(false);
   const [showForm,    setShowForm]    = useState(false);
+
+  // SEO: page title + meta
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = 'Discussion — varunr.dev';
+    const metaDesc   = document.querySelector('meta[name="description"]');
+    const ogTitle    = document.querySelector('meta[property="og:title"]');
+    const ogDesc     = document.querySelector('meta[property="og:description"]');
+    const ogUrl      = document.querySelector('meta[property="og:url"]');
+    const prevDesc   = metaDesc?.getAttribute('content');
+    const prevOgT    = ogTitle?.getAttribute('content');
+    const prevOgD    = ogDesc?.getAttribute('content');
+    if (metaDesc) metaDesc.setAttribute('content', 'Open discussion board on varunr.dev. Anyone can read; sign in to start a topic or leave a reply.');
+    if (ogTitle)  ogTitle.setAttribute('content', 'Discussion — varunr.dev');
+    if (ogDesc)   ogDesc.setAttribute('content', 'Open discussion board on varunr.dev. Anyone can read; sign in to participate.');
+    if (ogUrl)    ogUrl.setAttribute('content', 'https://varunr.dev/discussion');
+    return () => {
+      document.title = prevTitle;
+      if (metaDesc && prevDesc) metaDesc.setAttribute('content', prevDesc);
+      if (ogTitle  && prevOgT)  ogTitle.setAttribute('content', prevOgT);
+      if (ogDesc   && prevOgD)  ogDesc.setAttribute('content', prevOgD);
+      if (ogUrl)                ogUrl.setAttribute('content', 'https://varunr.dev');
+    };
+  }, []);
 
   // Stable refs so the IntersectionObserver callback never goes stale
   const offsetRef     = useRef(0);
@@ -150,7 +178,7 @@ export default function DiscussionPage() {
       )}
 
       {loading ? (
-        <div className="disc-empty">Loading…</div>
+        <div className="disc-empty" role="status" aria-live="polite">Loading…</div>
       ) : topics.length === 0 ? (
         <div className="disc-empty">
           No topics yet.{user ? ' Be the first to start one.' : ' Sign in to start one.'}
@@ -179,7 +207,7 @@ export default function DiscussionPage() {
           {/* Sentinel — IntersectionObserver fires when this enters view */}
           <div ref={sentinelRef} className="disc-sentinel" />
 
-          {loadingMore && <div className="disc-loading-more">Loading…</div>}
+          {loadingMore && <div className="disc-loading-more" role="status" aria-live="polite">Loading…</div>}
           {!hasMore && topics.length > 0 && (
             <p className="disc-list-end">You've reached the end.</p>
           )}

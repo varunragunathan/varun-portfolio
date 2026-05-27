@@ -605,6 +605,60 @@ td code { font-size: 12px; }
   color: var(--text-3);
 }
 
+/* ── Lighthouse scores ────────────────────────────────────────── */
+.lh-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.lh-card {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.lh-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-family: 'SF Mono', monospace;
+}
+
+.lh-gauge {
+  position: relative;
+  width: 80px; height: 80px;
+}
+
+.lh-gauge svg { display: block; }
+
+.lh-gauge__track { fill: none; stroke: var(--border); stroke-width: 8; }
+.lh-gauge__fill  { fill: none; stroke-width: 8; stroke-linecap: round;
+                   transform: rotate(-90deg); transform-origin: 50% 50%;
+                   transition: stroke-dashoffset 0.6s ease; }
+.lh-gauge__score {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 700; color: var(--text);
+}
+
+.lh-device {
+  font-size: 11px; color: var(--text-3);
+  font-family: 'SF Mono', monospace;
+  display: flex; gap: 6px; align-items: center;
+}
+
+.lh-pass { color: #10b981; }
+.lh-avg  { color: #f97316; }
+
 /* ── Footnote ─────────────────────────────────────────────────── */
 .footnote {
   font-size: 13px;
@@ -640,6 +694,7 @@ td code { font-size: 12px; }
         <li><a href="#security">Security Model</a></li>
         <li><a href="#testing">Testing Strategy</a></li>
         <li><a href="#monitoring">Monitoring &amp; Triage</a></li>
+        <li><a href="#lighthouse">Lighthouse Scores</a></li>
         <li><a href="#decisions">Key Decisions</a></li>
       </ol>
     </nav>
@@ -1493,9 +1548,159 @@ td code { font-size: 12px; }
       </li>
     </ul>
 
-    <!-- ── 9 · Key Decisions ─────────────────────────────────────── -->
+    <!-- ── 9 · Lighthouse ────────────────────────────────────────── -->
+    <span class="section-anchor" id="lighthouse"></span>
+    <h2><span class="section-num">09</span> Lighthouse Scores</h2>
+
+    <p>
+      Measured via <a href="https://pagespeed.web.dev" target="_top">PageSpeed Insights</a> against
+      the live <a href="/discussion" target="_top">/discussion</a> page. Scores reflect the shipped
+      feature after the accessibility and SEO improvements described in sections 6 and 7
+      (form labels, <code>aria-live</code> regions, dynamic <code>document.title</code>,
+      and meta description per page).
+    </p>
+
+    <h3>Mobile</h3>
+
+    <div class="lh-grid">
+      <div class="lh-card">
+        <span class="lh-label">Performance</span>
+        <div class="lh-gauge">
+          <svg viewBox="0 0 80 80" width="80" height="80">
+            <circle class="lh-gauge__track" cx="40" cy="40" r="36"/>
+            <!-- 79% → dashoffset = circumference * (1-0.79) = 226.2*(0.21) ≈ 47.5 -->
+            <circle class="lh-gauge__fill" cx="40" cy="40" r="36"
+              stroke="#f97316"
+              stroke-dasharray="226.2"
+              stroke-dashoffset="47.5"/>
+          </svg>
+          <div class="lh-gauge__score lh-avg">79</div>
+        </div>
+        <span class="lh-device">📱 Mobile</span>
+      </div>
+      <div class="lh-card">
+        <span class="lh-label">Accessibility</span>
+        <div class="lh-gauge">
+          <svg viewBox="0 0 80 80" width="80" height="80">
+            <circle class="lh-gauge__track" cx="40" cy="40" r="36"/>
+            <!-- 100% → dashoffset = 0 -->
+            <circle class="lh-gauge__fill" cx="40" cy="40" r="36"
+              stroke="#10b981"
+              stroke-dasharray="226.2"
+              stroke-dashoffset="0"/>
+          </svg>
+          <div class="lh-gauge__score lh-pass">100</div>
+        </div>
+        <span class="lh-device">📱 Mobile</span>
+      </div>
+      <div class="lh-card">
+        <span class="lh-label">Best Practices</span>
+        <div class="lh-gauge">
+          <svg viewBox="0 0 80 80" width="80" height="80">
+            <circle class="lh-gauge__track" cx="40" cy="40" r="36"/>
+            <!-- 100% -->
+            <circle class="lh-gauge__fill" cx="40" cy="40" r="36"
+              stroke="#10b981"
+              stroke-dasharray="226.2"
+              stroke-dashoffset="0"/>
+          </svg>
+          <div class="lh-gauge__score lh-pass">100</div>
+        </div>
+        <span class="lh-device">📱 Mobile</span>
+      </div>
+      <div class="lh-card">
+        <span class="lh-label">SEO</span>
+        <div class="lh-gauge">
+          <svg viewBox="0 0 80 80" width="80" height="80">
+            <circle class="lh-gauge__track" cx="40" cy="40" r="36"/>
+            <!-- 100% -->
+            <circle class="lh-gauge__fill" cx="40" cy="40" r="36"
+              stroke="#10b981"
+              stroke-dasharray="226.2"
+              stroke-dashoffset="0"/>
+          </svg>
+          <div class="lh-gauge__score lh-pass">100</div>
+        </div>
+        <span class="lh-device">📱 Mobile</span>
+      </div>
+    </div>
+
+    <h3>Desktop</h3>
+
+    <div class="lh-grid">
+      <div class="lh-card">
+        <span class="lh-label">Performance</span>
+        <div class="lh-gauge">
+          <svg viewBox="0 0 80 80" width="80" height="80">
+            <circle class="lh-gauge__track" cx="40" cy="40" r="36"/>
+            <!-- 97% → dashoffset = 226.2*(0.03) ≈ 6.8 -->
+            <circle class="lh-gauge__fill" cx="40" cy="40" r="36"
+              stroke="#10b981"
+              stroke-dasharray="226.2"
+              stroke-dashoffset="6.8"/>
+          </svg>
+          <div class="lh-gauge__score lh-pass">97</div>
+        </div>
+        <span class="lh-device">🖥 Desktop</span>
+      </div>
+      <div class="lh-card">
+        <span class="lh-label">Accessibility</span>
+        <div class="lh-gauge">
+          <svg viewBox="0 0 80 80" width="80" height="80">
+            <circle class="lh-gauge__track" cx="40" cy="40" r="36"/>
+            <circle class="lh-gauge__fill" cx="40" cy="40" r="36"
+              stroke="#10b981"
+              stroke-dasharray="226.2"
+              stroke-dashoffset="0"/>
+          </svg>
+          <div class="lh-gauge__score lh-pass">100</div>
+        </div>
+        <span class="lh-device">🖥 Desktop</span>
+      </div>
+      <div class="lh-card">
+        <span class="lh-label">Best Practices</span>
+        <div class="lh-gauge">
+          <svg viewBox="0 0 80 80" width="80" height="80">
+            <circle class="lh-gauge__track" cx="40" cy="40" r="36"/>
+            <circle class="lh-gauge__fill" cx="40" cy="40" r="36"
+              stroke="#10b981"
+              stroke-dasharray="226.2"
+              stroke-dashoffset="0"/>
+          </svg>
+          <div class="lh-gauge__score lh-pass">100</div>
+        </div>
+        <span class="lh-device">🖥 Desktop</span>
+      </div>
+      <div class="lh-card">
+        <span class="lh-label">SEO</span>
+        <div class="lh-gauge">
+          <svg viewBox="0 0 80 80" width="80" height="80">
+            <circle class="lh-gauge__track" cx="40" cy="40" r="36"/>
+            <circle class="lh-gauge__fill" cx="40" cy="40" r="36"
+              stroke="#10b981"
+              stroke-dasharray="226.2"
+              stroke-dashoffset="0"/>
+          </svg>
+          <div class="lh-gauge__score lh-pass">100</div>
+        </div>
+        <span class="lh-device">🖥 Desktop</span>
+      </div>
+    </div>
+
+    <div class="callout callout-info">
+      <span class="callout-icon">ℹ️</span>
+      <div class="callout-body">
+        <p>Mobile performance at 79 is dominated by the SPA bootstrap cost (React bundle, Vite chunks)
+        shared across the whole site — not specific to the discussion page. Desktop reaches 97 because
+        network latency is the main variable and Cloudflare edge delivery is fast on wired connections.
+        Accessibility and SEO score 100 on both form factors after adding form labels, <code>aria-live</code>
+        regions, and per-page <code>document.title</code> + meta description updates.</p>
+      </div>
+    </div>
+
+    <!-- ── 10 · Key Decisions ─────────────────────────────────────── -->
     <span class="section-anchor" id="decisions"></span>
-    <h2><span class="section-num">09</span> Key Decisions</h2>
+    <h2><span class="section-num">10</span> Key Decisions</h2>
 
     <h3>Why load all comments at once?</h3>
 

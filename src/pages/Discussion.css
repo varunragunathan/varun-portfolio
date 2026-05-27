@@ -1,3 +1,14 @@
+/* ── Screen-reader only utility ──────────────────────────────── */
+.disc-sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ── Discussion page ──────────────────────────────────────────── */
 .disc-page {
   max-width: 720px;
@@ -376,10 +387,11 @@
 }
 
 .disc-add-comment__label {
+  display: block;
   font-size: 14px;
   font-weight: 600;
   color: var(--text-1);
-  margin: 0;
+  margin: 0 0 10px;
 }
 
 .disc-add-comment__row {
