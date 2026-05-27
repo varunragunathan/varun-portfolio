@@ -60,6 +60,7 @@ const PublicPage         = lazy(() => import('./pages/PublicPage'));
 const InterviewPage      = lazy(() => import('./pages/Interview'));
 const DiscussionPage     = lazy(() => import('./pages/Discussion'));
 const DiscussionThread   = lazy(() => import('./pages/DiscussionThread'));
+const DiscussionAdmin    = lazy(() => import('./pages/DiscussionAdmin'));
 
 function Loading() {
   return (
@@ -171,6 +172,7 @@ function Shell() {
             <Route path="/interview" element={<InterviewPage />} />
             <Route path="/discussion" element={<DiscussionPage />} />
             <Route path="/discussion/:id" element={<DiscussionThread />} />
+            <Route path="/admin/discussion" element={<DiscussionAdmin />} />
           </Routes>
         </Suspense>
       </main>

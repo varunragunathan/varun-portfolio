@@ -3,7 +3,7 @@
 // Redirects to / if user is not admin (detected via 403 on first fetch).
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
 import { startAuthentication } from '@simplewebauthn/browser';
@@ -222,9 +222,23 @@ function MetricsTab({ t }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.15em', color: t.text3, textTransform: 'uppercase' }}>
-          {updatedAt ? `Updated ${timeAgo(updatedAt)}` : ''}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ fontFamily: M, fontSize: 10, letterSpacing: '0.15em', color: t.text3, textTransform: 'uppercase' }}>
+            {updatedAt ? `Updated ${timeAgo(updatedAt)}` : ''}
+          </div>
+          <Link
+            to="/admin/discussion"
+            style={{
+              fontFamily: M, fontSize: 11, letterSpacing: '0.06em',
+              padding: '5px 14px', borderRadius: 8,
+              border: `1px solid ${t.border}`,
+              color: t.accent, textDecoration: 'none',
+              background: 'transparent', transition: 'all 0.15s',
+            }}
+          >
+            Discussion →
+          </Link>
         </div>
         <button
           onClick={load}

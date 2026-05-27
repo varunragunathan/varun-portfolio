@@ -41,6 +41,9 @@ import {
   listTopics, createTopic, getTopic, addComment, deleteComment,
 } from './discussion.js';
 import {
+  getDiscussionMetrics, getDiscussionTriage,
+} from './discussionMetrics.js';
+import {
   handleGetKeyStatus, handleSaveKey, handleDeleteKey, handleProxyTTS,
 } from './keys.js';
 import { checkIpRateLimit } from './rateLimit.js';
@@ -307,6 +310,30 @@ async function handleRequest(request, env) {
       return new Response(JSON.stringify({ error: 'Internal server error' }), {
         status: 500, headers: { 'Content-Type': 'application/json', ...cors },
       });
+    }
+  }
+
+  // ── /api/admin/discussion (must come before /api/admin block) ──
+  if (url.pathname.startsWith('/api/admin/discussion')) {
+    try {
+      const p = url.pathname;
+      const m = request.method;
+      let response;
+      if (p === '/api/admin/discussion/metrics' && m === 'GET') {
+        response = await getDiscussionMetrics(request, env);
+      } else if (p === '/api/admin/discussion/triage' && m === 'GET') {
+        response = await getDiscussionTriage(request, env);
+      } else {
+        response = new Response(JSON.stringify({ error: 'Not found' }), {
+          status: 404, headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return withCors(response, cors);
+    } catch (err) {
+      console.error('Discussion metrics error:', err);
+      return withCors(new Response(JSON.stringify({ error: 'Internal server error' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' },
+      }), cors);
     }
   }
 
