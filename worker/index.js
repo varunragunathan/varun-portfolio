@@ -38,6 +38,9 @@ import {
   listInterviewSessions, getInterviewSession,
 } from './interview.js';
 import {
+  listTopics, createTopic, getTopic, addComment, deleteComment,
+} from './discussion.js';
+import {
   handleGetKeyStatus, handleSaveKey, handleDeleteKey, handleProxyTTS,
 } from './keys.js';
 import { checkIpRateLimit } from './rateLimit.js';
@@ -304,6 +307,35 @@ async function handleRequest(request, env) {
       return new Response(JSON.stringify({ error: 'Internal server error' }), {
         status: 500, headers: { 'Content-Type': 'application/json', ...cors },
       });
+    }
+  }
+
+  // ── /api/discussion ─────────────────────────────────────────
+  if (url.pathname.startsWith('/api/discussion')) {
+    try {
+      const p  = url.pathname;
+      const m  = request.method;
+      const topicsPath  = /^\/api\/discussion\/topics$/.test(p);
+      const topicMatch  = p.match(/^\/api\/discussion\/topics\/([^/]+)$/);
+      const commentPath = p.match(/^\/api\/discussion\/topics\/([^/]+)\/comments$/);
+      const deleteMatch = p.match(/^\/api\/discussion\/comments\/([^/]+)$/);
+
+      let response;
+      if      (topicsPath  && m === 'GET')    response = await listTopics(request, env);
+      else if (topicsPath  && m === 'POST')   response = await createTopic(request, env);
+      else if (topicMatch  && m === 'GET')    response = await getTopic(request, env, topicMatch[1]);
+      else if (commentPath && m === 'POST')   response = await addComment(request, env, commentPath[1]);
+      else if (deleteMatch && m === 'DELETE') response = await deleteComment(request, env, deleteMatch[1]);
+      else response = new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404, headers: { 'Content-Type': 'application/json' },
+      });
+
+      return withCors(response, cors);
+    } catch (err) {
+      console.error('Discussion error:', err);
+      return withCors(new Response(JSON.stringify({ error: 'Internal server error' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' },
+      }), cors);
     }
   }
 

@@ -290,6 +290,15 @@ function AvatarMenu({ user, onLogout }) {
             Interview
           </Link>
 
+          {/* Discussion */}
+          <Link
+            to="/discussion"
+            onClick={() => setOpen(false)}
+            className="avatar-menu__link avatar-menu__link--primary"
+          >
+            Discussion
+          </Link>
+
           {/* Settings */}
           <Link
             to="/account/settings"
