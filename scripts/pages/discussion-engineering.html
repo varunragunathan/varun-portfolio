@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Building a Threaded Discussion Board — Engineering Deep Dive</title>
+<style>
+/* ── Reset & base ─────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #ffffff;
+  --bg-alt:     #f9fafb;
+  --text:       #111827;
+  --text-2:     #374151;
+  --text-3:     #6b7280;
+  --border:     #e5e7eb;
+  --border-2:   #d1d5db;
+  --accent:     #6366f1;
+  --accent-bg:  #eef2ff;
+  --accent-dim: rgba(99,102,241,0.12);
+  --green:      #10b981;
+  --green-bg:   #ecfdf5;
+  --red:        #ef4444;
+  --orange:     #f97316;
+  --yellow:     #f59e0b;
+  --code-bg:    #0f1117;
+  --code-text:  #e2e8f0;
+  --code-comment: #64748b;
+  --code-kw:    #a78bfa;
+  --code-str:   #86efac;
+  --code-fn:    #93c5fd;
+  --code-num:   #fbbf24;
+  --code-punct: #94a3b8;
+  --toc-w:      240px;
+  --prose-w:    740px;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ───────────────────────────────────────────────────── */
+.layout {
+  display: grid;
+  grid-template-columns: var(--toc-w) 1fr;
+  max-width: calc(var(--toc-w) + var(--prose-w) + 80px);
+  margin: 0 auto;
+  padding: 0 24px;
+  gap: 0;
+}
+
+.prose {
+  max-width: var(--prose-w);
+  padding: 60px 0 100px 56px;
+  min-width: 0;
+}
+
+/* ── TOC sidebar ──────────────────────────────────────────────── */
+.toc-wrap {
+  padding-top: 100px;
+}
+
+.toc {
+  position: sticky;
+  top: 32px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.toc-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 14px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+.toc ol {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0;
+  counter-reset: toc;
+}
+
+.toc li a {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 10px 5px 8px;
+  color: var(--text-3);
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 12.5px;
+  transition: color 0.15s, background 0.15s;
+  border-left: 2px solid transparent;
+}
+
+.toc li a::before {
+  counter-increment: toc;
+  content: counter(toc);
+  font-family: 'SF Mono', monospace;
+  font-size: 10px;
+  color: var(--text-3);
+  opacity: 0.5;
+  flex-shrink: 0;
+  width: 14px;
+}
+
+.toc li a:hover {
+  color: var(--text);
+  background: var(--bg-alt);
+  border-left-color: var(--border-2);
+}
+
+.toc li.active a {
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-left-color: var(--accent);
+}
+
+/* ── Document header ──────────────────────────────────────────── */
+.doc-header {
+  padding-bottom: 48px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 56px;
+}
+
+.doc-eyebrow {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 16px;
+}
+
+.doc-title {
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: var(--text);
+  margin-bottom: 20px;
+}
+
+.doc-subtitle {
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--text-2);
+  max-width: 560px;
+  margin-bottom: 28px;
+}
+
+.doc-meta {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 13px;
+  color: var(--text-3);
+  font-family: 'SF Mono', monospace;
+  flex-wrap: wrap;
+}
+
+.doc-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'SF Mono', monospace;
+  letter-spacing: 0.04em;
+}
+
+.pill-indigo { background: var(--accent-bg); color: var(--accent); }
+.pill-green  { background: var(--green-bg);  color: var(--green);  }
+
+/* ── Prose typography ─────────────────────────────────────────── */
+h2 {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-top: 64px;
+  margin-bottom: 20px;
+  padding-top: 8px;
+  scroll-margin-top: 32px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+h2 .section-num {
+  font-family: 'SF Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-radius: 6px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  margin-top: 40px;
+  margin-bottom: 14px;
+  scroll-margin-top: 32px;
+}
+
+p {
+  color: var(--text-2);
+  margin-bottom: 18px;
+  font-size: 15.5px;
+}
+
+p:last-child { margin-bottom: 0; }
+
+strong { color: var(--text); font-weight: 600; }
+em { font-style: italic; color: var(--text-2); }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+ul, ol {
+  padding-left: 24px;
+  margin-bottom: 18px;
+  color: var(--text-2);
+  font-size: 15.5px;
+}
+
+li { margin-bottom: 6px; }
+li:last-child { margin-bottom: 0; }
+
+hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 48px 0;
+}
+
+/* ── Inline code ──────────────────────────────────────────────── */
+code {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 13.5px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 6px;
+  color: var(--accent);
+}
+
+/* ── Code blocks ──────────────────────────────────────────────── */
+.code-block {
+  background: var(--code-bg);
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 24px 0;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.code-block-filename {
+  font-family: 'SF Mono', monospace;
+  font-size: 11.5px;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.04em;
+}
+
+.code-block-lang {
+  font-family: 'SF Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.25);
+}
+
+.code-block pre {
+  overflow-x: auto;
+  padding: 22px 24px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--code-text);
+  -webkit-overflow-scrolling: touch;
+}
+
+.code-block pre::-webkit-scrollbar { height: 4px; }
+.code-block pre::-webkit-scrollbar-track { background: transparent; }
+.code-block pre::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+/* Syntax tokens */
+.kw  { color: var(--code-kw); }
+.str { color: var(--code-str); }
+.fn  { color: var(--code-fn); }
+.cm  { color: var(--code-comment); font-style: italic; }
+.num { color: var(--code-num); }
+.op  { color: var(--code-punct); }
+.id  { color: #f8d78b; }
+
+/* ── Callout boxes ────────────────────────────────────────────── */
+.callout {
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin: 24px 0;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  font-size: 14.5px;
+}
+
+.callout-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.callout-body { flex: 1; }
+.callout-body p { font-size: 14.5px; margin-bottom: 8px; }
+.callout-body p:last-child { margin-bottom: 0; }
+
+.callout-info    { background: var(--accent-bg); color: var(--text-2); border: 1px solid #c7d2fe; }
+.callout-tip     { background: var(--green-bg);  color: var(--text-2); border: 1px solid #a7f3d0; }
+.callout-warn    { background: #fff7ed;          color: var(--text-2); border: 1px solid #fed7aa; }
+.callout-danger  { background: #fef2f2;          color: var(--text-2); border: 1px solid #fecaca; }
+
+/* ── Tables ───────────────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; margin: 24px 0; border-radius: 10px; border: 1px solid var(--border); }
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+
+thead { background: var(--bg-alt); }
+
+th {
+  text-align: left;
+  padding: 12px 16px;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+td {
+  padding: 12px 16px;
+  color: var(--text-2);
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+  vertical-align: top;
+}
+
+tr:last-child td { border-bottom: none; }
+
+td code { font-size: 12px; }
+.mono { font-family: 'SF Mono', monospace; font-size: 12.5px; }
+
+.method-get    { color: #10b981; font-weight: 700; }
+.method-post   { color: #f97316; font-weight: 700; }
+.method-delete { color: #ef4444; font-weight: 700; }
+.method-patch  { color: #f59e0b; font-weight: 700; }
+
+/* ── Section divider ──────────────────────────────────────────── */
+.section-anchor { display: block; height: 1px; visibility: hidden; }
+
+/* ── Diagram ──────────────────────────────────────────────────── */
+.diagram {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 32px 24px;
+  margin: 24px 0;
+  overflow-x: auto;
+}
+
+/* ── Live UI demos ────────────────────────────────────────────── */
+.demo {
+  background: #1a1b2e;
+  border-radius: 14px;
+  padding: 24px;
+  margin: 24px 0;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.demo-label {
+  font-family: 'SF Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.3);
+  margin-bottom: 18px;
+}
+
+.dc { background: #1e2030; border: 1px solid rgba(255,255,255,0.09); border-radius: 14px; padding: 16px 18px; }
+.dc + .dc { margin-top: 8px; }
+
+.dc-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+
+.av {
+  border-radius: 50%;
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: #fff;
+  flex-shrink: 0; letter-spacing: 0.02em;
+}
+
+.dc-names { display: flex; flex-direction: column; gap: 2px; }
+.dc-author { font-size: 14px; font-weight: 600; color: #f1f5f9; }
+.dc-time   { font-size: 12px; color: rgba(255,255,255,0.35); }
+.dc-body   { font-size: 14px; line-height: 1.65; color: #cbd5e1; margin-bottom: 10px; }
+.dc-acts   { display: flex; gap: 14px; }
+.dc-act    { font-size: 13px; color: rgba(255,255,255,0.35); cursor: pointer; font-family: inherit; background: none; border: none; padding: 0; }
+
+.dc-replies {
+  margin-left: 18px;
+  padding-left: 18px;
+  border-left: 2px solid rgba(255,255,255,0.09);
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.add-comment-box {
+  background: #1e2030;
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+
+.add-comment-label { font-size: 14px; font-weight: 600; color: #f1f5f9; margin-bottom: 10px; }
+
+.add-comment-row { display: flex; gap: 10px; }
+
+.add-comment-input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.5);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.add-comment-post {
+  padding: 10px 22px;
+  background: rgba(255,255,255,0.08);
+  color: #f1f5f9;
+  border: 1.5px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+/* ── Inline reply demo ────────────────────────────────────────── */
+.inline-reply {
+  border-top: 1px solid rgba(255,255,255,0.07);
+  padding-top: 10px;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inline-reply textarea {
+  width: 100%;
+  padding: 9px 13px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.5);
+  font-size: 13px;
+  font-family: inherit;
+  resize: none;
+  box-sizing: border-box;
+}
+
+.inline-reply-acts { display: flex; gap: 8px; }
+
+.btn-sm-pri {
+  padding: 6px 14px;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-sm-ghost {
+  padding: 6px 14px;
+  background: transparent;
+  color: rgba(255,255,255,0.35);
+  border: 1.5px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* ── Architecture diagram SVG helpers ────────────────────────── */
+.arch-svg { width: 100%; max-width: 600px; display: block; margin: 0 auto; }
+
+/* ── KPI grid ─────────────────────────────────────────────────── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin: 24px 0;
+}
+
+.kpi-card {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.kpi-label {
+  font-family: 'SF Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 8px;
+}
+
+.kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.kpi-sub {
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: 'SF Mono', monospace;
+}
+
+/* ── Tree diagram ─────────────────────────────────────────────── */
+.tree {
+  font-family: 'SF Mono', monospace;
+  font-size: 13px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin: 20px 0;
+  color: var(--text-2);
+  line-height: 1.8;
+}
+
+.tree .node-root  { color: var(--accent); font-weight: 700; }
+.tree .node-l1    { color: var(--green); }
+.tree .node-l2    { color: var(--orange); }
+.tree .tree-line  { color: var(--text-3); }
+
+/* ── Tag chips ────────────────────────────────────────────────── */
+.tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: 'SF Mono', monospace;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  color: var(--text-3);
+}
+
+/* ── Footnote ─────────────────────────────────────────────────── */
+.footnote {
+  font-size: 13px;
+  color: var(--text-3);
+  border-top: 1px solid var(--border);
+  margin-top: 64px;
+  padding-top: 24px;
+  font-style: italic;
+}
+
+/* ── Mobile ───────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .layout { grid-template-columns: 1fr; }
+  .toc-wrap { display: none; }
+  .prose { padding: 40px 0 80px; }
+}
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ── Table of contents ──────────────────────────────────────── -->
+  <aside class="toc-wrap">
+    <nav class="toc" aria-label="Table of contents">
+      <div class="toc-label">Contents</div>
+      <ol>
+        <li><a href="#overview">Feature Overview</a></li>
+        <li><a href="#data">Data Architecture</a></li>
+        <li><a href="#api">API Design</a></li>
+        <li><a href="#frontend">Frontend Architecture</a></li>
+        <li><a href="#visual">Visual Design System</a></li>
+        <li><a href="#security">Security Model</a></li>
+        <li><a href="#testing">Testing Strategy</a></li>
+        <li><a href="#monitoring">Monitoring &amp; Triage</a></li>
+        <li><a href="#bugs">Production Incident</a></li>
+        <li><a href="#decisions">Key Decisions</a></li>
+      </ol>
+    </nav>
+  </aside>
+
+  <!-- ── Main prose ─────────────────────────────────────────────── -->
+  <main class="prose">
+
+    <!-- Header -->
+    <header class="doc-header">
+      <div class="doc-eyebrow">Engineering · varunr.dev</div>
+      <h1 class="doc-title">Building a Threaded&nbsp;Discussion Board</h1>
+      <p class="doc-subtitle">
+        A full-stack deep dive into building Reddit-style threaded comments on Cloudflare's edge stack — from
+        recursive data structures and React component trees to IntersectionObserver pagination,
+        soft deletes, and production monitoring.
+      </p>
+      <div class="tags">
+        <span class="tag">Cloudflare D1</span>
+        <span class="tag">React 18</span>
+        <span class="tag">Cloudflare Workers</span>
+        <span class="tag">SQLite</span>
+        <span class="tag">Playwright</span>
+        <span class="tag">Storybook</span>
+      </div>
+      <div class="doc-meta">
+        <span class="doc-meta-item">
+          <span class="pill pill-green">shipped</span>
+        </span>
+        <span class="doc-meta-item">May 2026</span>
+        <span class="doc-meta-item">~18 min read</span>
+      </div>
+    </header>
+
+    <!-- ── 1 · Overview ──────────────────────────────────────────── -->
+    <span class="section-anchor" id="overview"></span>
+    <h2><span class="section-num">01</span> Feature Overview</h2>
+
+    <p>
+      The discussion board is a lightweight, threaded forum embedded in this portfolio site.
+      It follows the same permission model as most developer communities:
+      <strong>anyone can read, signed-in users can write</strong>.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Action</th><th>Who</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Browse topic list</td><td>Public</td><td>Infinite scroll, 50 per page</td></tr>
+          <tr><td>Read a thread</td><td>Public</td><td>Full comment tree loaded at once</td></tr>
+          <tr><td>Start a topic</td><td>Signed-in</td><td>Title + body (plain text)</td></tr>
+          <tr><td>Post a comment</td><td>Signed-in</td><td>Can reply to any comment, any depth</td></tr>
+          <tr><td>Delete a comment</td><td>Own author only</td><td>Soft delete — tree structure preserved</td></tr>
+          <tr><td>Pin a topic</td><td>Admin</td><td>Pinned topics sort first</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      The feature lives at <a href="/discussion" target="_top"><code>/discussion</code></a> for the topic list and
+      <code>/discussion/:id</code> for each thread. The key design goal was
+      <strong>no depth limit on replies</strong> — any comment can be replied to, and that
+      reply can itself be replied to, forever.
+    </p>
+
+    <!-- ── 2 · Data Architecture ─────────────────────────────────── -->
+    <span class="section-anchor" id="data"></span>
+    <h2><span class="section-num">02</span> Data Architecture</h2>
+
+    <p>
+      The data lives in <strong>Cloudflare D1</strong> — a SQLite-compatible database running
+      at Cloudflare's edge. Two tables: one for topics and one for comments.
+    </p>
+
+    <h3>Schema</h3>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-filename">worker/migrations/006-discussion.sql</span>
+        <span class="code-block-lang">SQL</span>
+      </div>
+      <pre><span class="kw">CREATE TABLE</span> <span class="id">discussion_topics</span> (
+  <span class="id">id</span>            <span class="kw">TEXT</span>    <span class="kw">PRIMARY KEY</span>,
+  <span class="id">title</span>         <span class="kw">TEXT</span>    <span class="kw">NOT NULL</span>,
+  <span class="id">body</span>          <span class="kw">TEXT</span>    <span class="kw">NOT NULL</span>,
+  <span class="id">author_id</span>     <span class="kw">TEXT</span>    <span class="kw">NOT NULL REFERENCES</span> users(id),
+  <span class="id">created_at</span>    <span class="kw">TEXT</span>    <span class="kw">NOT NULL</span>,  <span class="cm">-- ISO 8601 string</span>
+  <span class="id">updated_at</span>    <span class="kw">TEXT</span>    <span class="kw">NOT NULL</span>,
+  <span class="id">comment_count</span> <span class="kw">INTEGER NOT NULL DEFAULT</span> <span class="num">0</span>,  <span class="cm">-- denormalized</span>
+  <span class="id">pinned</span>        <span class="kw">INTEGER NOT NULL DEFAULT</span> <span class="num">0</span>
+);
+
+<span class="kw">CREATE TABLE</span> <span class="id">discussion_comments</span> (
+  <span class="id">id</span>         <span class="kw">TEXT</span>    <span class="kw">PRIMARY KEY</span>,
+  <span class="id">topic_id</span>   <span class="kw">TEXT</span>    <span class="kw">NOT NULL REFERENCES</span> discussion_topics(id),
+  <span class="id">parent_id</span>  <span class="kw">TEXT</span>             <span class="kw">REFERENCES</span> discussion_comments(id),
+  <span class="id">depth</span>      <span class="kw">INTEGER NOT NULL DEFAULT</span> <span class="num">0</span>,
+  <span class="id">author_id</span>  <span class="kw">TEXT</span>    <span class="kw">NOT NULL REFERENCES</span> users(id),
+  <span class="id">body</span>       <span class="kw">TEXT</span>    <span class="kw">NOT NULL</span>,
+  <span class="id">created_at</span> <span class="kw">TEXT</span>    <span class="kw">NOT NULL</span>,
+  <span class="id">updated_at</span> <span class="kw">TEXT</span>    <span class="kw">NOT NULL</span>,
+  <span class="id">deleted</span>    <span class="kw">INTEGER NOT NULL DEFAULT</span> <span class="num">0</span>
+);
+
+<span class="kw">CREATE INDEX</span> idx_comments_topic  <span class="kw">ON</span> discussion_comments(topic_id);
+<span class="kw">CREATE INDEX</span> idx_comments_parent <span class="kw">ON</span> discussion_comments(parent_id);</pre>
+    </div>
+
+    <h3>Design decisions</h3>
+
+    <p><strong>Self-referential <code>parent_id</code>.</strong> A comment row references its parent comment
+    in the same table. <code>NULL</code> means it's a root-level comment on the topic. This naturally
+    supports any depth without needing a separate table per level.</p>
+
+    <p><strong>Denormalized <code>comment_count</code>.</strong> Incrementing a counter column at write time
+    costs one <code>UPDATE</code>, but buying the topic list page an O(n) query instead of an O(n) + n×COUNT aggregation.
+    At the scale of this board (hundreds of topics, not millions), the tradeoff is clear.</p>
+
+    <p><strong>Stored depth.</strong> The <code>depth</code> column is computed at insert time
+    (<code>parent.depth + 1</code>) and stored. This avoids a recursive query at read time — depth
+    is just a field you read, not something you compute.</p>
+
+    <p><strong>Soft delete.</strong> When a user deletes their comment, the row isn't removed.
+    Instead <code>deleted = 1</code> and <code>body = ''</code> are set. The comment node remains
+    in the tree, so existing replies aren't orphaned. The API returns <code>body: null</code> and
+    <code>author: '[deleted]'</code> for deleted entries — the UI renders a greyed-out placeholder.</p>
+
+    <div class="callout callout-info">
+      <span class="callout-icon">💡</span>
+      <div class="callout-body">
+        <p>Why ISO strings for <code>created_at</code> instead of epoch milliseconds?
+        The rest of the codebase (users, sessions) uses epoch integers for D1 queries with
+        numeric range comparisons. For discussion, ISO strings work fine because they're
+        lexicographically sortable — <code>ORDER BY created_at DESC</code> does the right thing
+        without any conversion.</p>
+      </div>
+    </div>
+
+    <h3>Comment tree structure</h3>
+
+    <p>In the database, comments are <em>flat rows</em> linked by <code>parent_id</code>.
+    A thread with two root comments, one with a nested reply, looks like this:</p>
+
+    <div class="tree">
+<span class="tree-line">── Topic "Thought of the day"</span>
+<span class="tree-line">   │</span>
+<span class="node-l1">   ├── Comment c1</span>  <span class="cm">parent_id=null  depth=0</span>
+<span class="tree-line">   │     "Really resonates with me."</span>
+<span class="tree-line">   │     │</span>
+<span class="node-l2">   │     └── Comment c2</span>  <span class="cm">parent_id=c1  depth=1</span>
+<span class="tree-line">   │           "Especially the focus part."</span>
+<span class="tree-line">   │           │</span>
+<span class="tree-line">   │           └── <span style="color:#f97316">Comment c3</span>  <span class="cm">parent_id=c2  depth=2</span>
+<span class="tree-line">   │                 "Agreed, depth 2 reply."</span>
+<span class="tree-line">   │</span>
+<span class="node-l1">   └── Comment c4</span>  <span class="cm">parent_id=null  depth=0</span>
+<span class="tree-line">         "Another top-level comment."</span>
+    </div>
+
+    <!-- ── 3 · API Design ─────────────────────────────────────────── -->
+    <span class="section-anchor" id="api"></span>
+    <h2><span class="section-num">03</span> API Design</h2>
+
+    <h3>Endpoints</h3>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Auth</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="method-get mono">GET</td>
+            <td><code>/api/discussion/topics</code></td>
+            <td>Public</td>
+            <td>Paginated topic list. Accepts <code>?limit=50&amp;offset=0</code>.</td>
+          </tr>
+          <tr>
+            <td class="method-post mono">POST</td>
+            <td><code>/api/discussion/topics</code></td>
+            <td>Signed-in</td>
+            <td>Create a new topic. Body: <code>{ title, body }</code>.</td>
+          </tr>
+          <tr>
+            <td class="method-get mono">GET</td>
+            <td><code>/api/discussion/topics/:id</code></td>
+            <td>Public</td>
+            <td>Topic metadata + all comments (flat, ordered by <code>created_at ASC</code>).</td>
+          </tr>
+          <tr>
+            <td class="method-post mono">POST</td>
+            <td><code>/api/discussion/topics/:id/comments</code></td>
+            <td>Signed-in</td>
+            <td>Add a comment. Body: <code>{ body, parent_id? }</code>.</td>
+          </tr>
+          <tr>
+            <td class="method-delete mono">DELETE</td>
+            <td><code>/api/discussion/comments/:id</code></td>
+            <td>Own author</td>
+            <td>Soft-delete a comment. Only the author can delete their own.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>The auth guard pattern</h3>
+
+    <p>Every write operation runs through a shared <code>guardAuth</code> helper.
+    Sessions are stored in <strong>Cloudflare KV</strong>, keyed by a hashed token that arrives
+    as an <code>HttpOnly</code> cookie. Invalidating a session is immediate — just delete the KV key.</p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-filename">worker/discussion.js</span>
+        <span class="code-block-lang">JavaScript</span>
+      </div>
+      <pre><span class="kw">async function</span> <span class="fn">guardAuth</span>(request, env) {
+  <span class="kw">const</span> session = <span class="kw">await</span> <span class="fn">getSession</span>(env.KV, request);
+  <span class="kw">if</span> (!session?.userId) <span class="kw">return</span> <span class="fn">json</span>({ error: <span class="str">'Unauthorized'</span> }, <span class="num">401</span>);
+  <span class="kw">return</span> session;          <span class="cm">// ← { userId, email, ... }</span>
+}
+
+<span class="kw">export async function</span> <span class="fn">createTopic</span>(request, env) {
+  <span class="kw">const</span> session = <span class="kw">await</span> <span class="fn">guardAuth</span>(request, env);
+  <span class="kw">if</span> (session <span class="kw">instanceof</span> Response) <span class="kw">return</span> session; <span class="cm">// 401 early return</span>
+
+  <span class="cm">// session.userId is now safely available</span>
+  <span class="kw">const</span> { title, body } = <span class="kw">await</span> request.<span class="fn">json</span>().<span class="fn">catch</span>(() => ({}));
+  <span class="op">...</span>
+}</pre>
+    </div>
+
+    <h3>The limit+1 trick for pagination</h3>
+
+    <p>
+      Knowing whether "there are more pages" without an extra COUNT query: fetch one row
+      beyond the page size. If you get <code>limit + 1</code> rows back, more exist. Slice back to
+      <code>limit</code> before returning.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-filename">worker/discussion.js — listTopics()</span>
+        <span class="code-block-lang">JavaScript</span>
+      </div>
+      <pre><span class="cm">// Fetch one extra to determine whether more pages exist</span>
+<span class="kw">const</span> rows = <span class="kw">await</span> db.<span class="fn">prepare</span>(<span class="str">`
+  SELECT ... FROM discussion_topics ...
+  LIMIT ? OFFSET ?
+`</span>).<span class="fn">bind</span>(limit + <span class="num">1</span>, offset).<span class="fn">all</span>();
+
+<span class="kw">const</span> hasMore = rows.results.length > limit;
+<span class="kw">const</span> topics  = rows.results.<span class="fn">slice</span>(<span class="num">0</span>, limit);
+
+<span class="kw">return</span> <span class="fn">json</span>({ topics, hasMore });</pre>
+    </div>
+
+    <h3>Atomic comment insert</h3>
+
+    <p>
+      Adding a comment needs two writes: INSERT the comment row, and INCREMENT
+      <code>comment_count</code> on its topic. These run inside a single D1 <code>batch()</code>
+      call — Cloudflare's equivalent of a transaction for simple cases.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-filename">worker/discussion.js — addComment()</span>
+        <span class="code-block-lang">JavaScript</span>
+      </div>
+      <pre><span class="kw">await</span> db.<span class="fn">batch</span>([
+  db.<span class="fn">prepare</span>(<span class="str">
+    'INSERT INTO discussion_comments (id, topic_id, parent_id, depth, author_id, body, ...) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)'
+  </span>).<span class="fn">bind</span>(id, topicId, parent_id || <span class="kw">null</span>, depth, session.userId, body, now, now),
+
+  db.<span class="fn">prepare</span>(<span class="str">
+    'UPDATE discussion_topics SET comment_count = comment_count + 1, updated_at = ? WHERE id = ?'
+  </span>).<span class="fn">bind</span>(now, topicId),
+]);</pre>
+    </div>
+
+    <!-- ── 4 · Frontend Architecture ──────────────────────────────── -->
+    <span class="section-anchor" id="frontend"></span>
+    <h2><span class="section-num">04</span> Frontend Architecture</h2>
+
+    <h3>Building the comment tree</h3>
+
+    <p>
+      The API returns comments as a <strong>flat array</strong> sorted by
+      <code>created_at ASC</code>. The client reconstructs the tree in O(n) using two passes.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-filename">src/pages/DiscussionThread.jsx</span>
+        <span class="code-block-lang">JavaScript</span>
+      </div>
+      <pre><span class="kw">function</span> <span class="fn">buildTree</span>(comments) {
+  <span class="kw">const</span> map   = {};
+  <span class="kw">const</span> roots = [];
+
+  <span class="cm">// Pass 1: index every comment by id, add empty replies array</span>
+  <span class="kw">for</span> (<span class="kw">const</span> c <span class="kw">of</span> comments) map[c.id] = { ...c, replies: [] };
+
+  <span class="cm">// Pass 2: wire each comment into its parent's .replies</span>
+  <span class="kw">for</span> (<span class="kw">const</span> c <span class="kw">of</span> comments) {
+    <span class="kw">if</span> (c.parent_id && map[c.parent_id])
+      map[c.parent_id].replies.<span class="fn">push</span>(map[c.id]);
+    <span class="kw">else</span>
+      roots.<span class="fn">push</span>(map[c.id]);
+  }
+
+  <span class="kw">return</span> roots; <span class="cm">// array of root-level nodes, each with .replies</span>
+}</pre>
+    </div>
+
+    <p>
+      Why two passes? The first pass ensures every node exists in <code>map</code> before
+      the second pass tries to look up parents. Since comments arrive ordered by creation time,
+      a parent always appears before its children in the array — but we can't rely on that for
+      correctness (and a single pass would require that invariant to hold).
+    </p>
+
+    <h3>The recursive Comment component</h3>
+
+    <p>
+      Each comment renders itself as a card, then recursively renders its children.
+      No depth limit on the data — every node, at every depth, gets a full
+      <code>&lt;Comment&gt;</code> with its own Reply button and collapse toggle.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-filename">src/pages/DiscussionThread.jsx</span>
+        <span class="code-block-lang">JSX</span>
+      </div>
+      <pre><span class="kw">function</span> <span class="fn">Comment</span>({ comment, topicId, userId, onRefresh, depth = <span class="num">0</span> }) {
+  <span class="kw">const</span> [replying,  setReplying]  = <span class="fn">useState</span>(<span class="kw">false</span>);
+  <span class="kw">const</span> [collapsed, setCollapsed] = <span class="fn">useState</span>(<span class="kw">false</span>);
+
+  <span class="kw">return</span> (
+    &lt;<span class="fn">div</span> className=<span class="str">"disc-comment-wrap"</span>&gt;
+      &lt;<span class="fn">div</span> className=<span class="str">"disc-comment-card"</span>&gt;
+        &lt;<span class="fn">Avatar</span> name={comment.author} /&gt;
+        &lt;<span class="fn">p</span>&gt;{comment.body}&lt;/<span class="fn">p</span>&gt;
+        &lt;<span class="fn">div</span> className=<span class="str">"disc-comment-card__actions"</span>&gt;
+          {userId &amp;&amp; &lt;<span class="fn">button</span> onClick={() =&gt; <span class="fn">setReplying</span>(r =&gt; !r)}&gt;Reply&lt;/<span class="fn">button</span>&gt;}
+        &lt;/<span class="fn">div</span>&gt;
+        {replying &amp;&amp; (
+          &lt;<span class="fn">InlineReplyForm</span>
+            topicId={topicId} parentId={comment.id}
+            onPosted={() =&gt; { <span class="fn">setReplying</span>(<span class="kw">false</span>); <span class="fn">onRefresh</span>(); }}
+          /&gt;
+        )}
+      &lt;/<span class="fn">div</span>&gt;
+
+      <span class="cm">{/* Recursion: each reply renders another &lt;Comment&gt; */}</span>
+      {!collapsed &amp;&amp; comment.replies?.length &gt; <span class="num">0</span> &amp;&amp; (
+        &lt;<span class="fn">div</span> className=<span class="str">"disc-comment-replies"</span>&gt;
+          {comment.replies.<span class="fn">map</span>(r =&gt; (
+            &lt;<span class="fn">Comment</span>
+              key={r.id} comment={r}
+              topicId={topicId} userId={userId}
+              onRefresh={onRefresh}
+              depth={depth + <span class="num">1</span>}
+            /&gt;
+          ))}
+        &lt;/<span class="fn">div</span>&gt;
+      )}
+    &lt;/<span class="fn">div</span>&gt;
+  );
+}</pre>
+    </div>
+
+    <p>
+      Visual indentation is capped at <code>MAX_VISUAL_INDENT = 4</code> levels to prevent content
+      from squeezing off-screen on mobile. But the recursion itself is uncapped — a depth-10 reply
+      still renders, just without additional left margin after level 4.
+    </p>
+
+    <h3>What the rendered thread looks like</h3>
+
+    <div class="demo">
+      <div class="demo-label">Live rendering — threaded comments</div>
+
+      <div class="add-comment-box">
+        <div class="add-comment-label">Add a comment</div>
+        <div class="add-comment-row">
+          <input class="add-comment-input" placeholder="Write a comment…" readonly>
+          <button class="add-comment-post">Post</button>
+        </div>
+      </div>
+
+      <div class="dc">
+        <div class="dc-head">
+          <div class="av" style="background:#6366f1">BB</div>
+          <div class="dc-names">
+            <span class="dc-author">bold-bear-38</span>
+            <span class="dc-time">2h ago</span>
+          </div>
+        </div>
+        <p class="dc-body">"Take up one idea. Make that one idea your life." — Swami Vivekananda</p>
+        <div class="dc-acts">
+          <button class="dc-act">Reply</button>
+        </div>
+      </div>
+
+      <div class="dc-replies">
+        <div class="dc">
+          <div class="dc-head">
+            <div class="av" style="background:#10b981">SF</div>
+            <div class="dc-names">
+              <span class="dc-author">swift-fox-12</span>
+              <span class="dc-time">1h ago</span>
+            </div>
+          </div>
+          <p class="dc-body">Focused work beats scattered effort every time.</p>
+          <div class="dc-acts">
+            <button class="dc-act">Reply</button>
+          </div>
+          <div class="inline-reply">
+            <textarea rows="2" placeholder="Write a reply…"></textarea>
+            <div class="inline-reply-acts">
+              <button class="btn-sm-pri">Post</button>
+              <button class="btn-sm-ghost">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="dc-replies">
+          <div class="dc">
+            <div class="dc-head">
+              <div class="av" style="background:#ec4899">CO</div>
+              <div class="dc-names">
+                <span class="dc-author">calm-owl-55</span>
+                <span class="dc-time">30m ago</span>
+              </div>
+            </div>
+            <p class="dc-body">Especially in the era of constant notifications.</p>
+            <div class="dc-acts">
+              <button class="dc-act">Reply</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dc" style="margin-top:8px">
+        <div class="dc-head">
+          <div class="av" style="background:#f97316">KH</div>
+          <div class="dc-names">
+            <span class="dc-author">keen-hawk-07</span>
+            <span class="dc-time">15m ago</span>
+          </div>
+        </div>
+        <p class="dc-body">Second top-level comment. It also has a Reply button.</p>
+        <div class="dc-acts">
+          <button class="dc-act">Reply</button>
+        </div>
+      </div>
+    </div>
+
+    <h3>Infinite scroll with IntersectionObserver</h3>
+
+    <p>
+      The topic list loads 50 topics at a time. A zero-height sentinel div sits below the
+      last item. When the browser scrolls it into view (actually 300px before, thanks to
+      <code>rootMargin</code>), the next page is fetched.
+    </p>
+
+    <div class="callout callout-warn">
+      <span class="callout-icon">⚠️</span>
+      <div class="callout-body">
+        <p><strong>The stale closure problem.</strong> If the IntersectionObserver callback
+        closed over React state variables (<code>offset</code>, <code>hasMore</code>,
+        <code>loading</code>), it would capture their initial values at the time the
+        observer was created and never see updates. The fix: use refs.</p>
+      </div>
+    </div>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-filename">src/pages/Discussion.jsx — infinite scroll pattern</span>
+        <span class="code-block-lang">JavaScript</span>
+      </div>
+      <pre><span class="cm">// Refs stay current without causing re-renders</span>
+<span class="kw">const</span> offsetRef  = <span class="fn">useRef</span>(<span class="num">0</span>);
+<span class="kw">const</span> hasMoreRef = <span class="fn">useRef</span>(<span class="kw">false</span>);
+<span class="kw">const</span> loadingRef = <span class="fn">useRef</span>(<span class="kw">false</span>);
+
+<span class="kw">const</span> fetchPage = <span class="fn">useCallback</span>(<span class="kw">async</span> (offset, append) =&gt; {
+  <span class="kw">if</span> (loadingRef.current) <span class="kw">return</span>;
+  loadingRef.current = <span class="kw">true</span>;
+  <span class="cm">// ... fetch, update offsetRef.current, hasMoreRef.current ...</span>
+}, []);  <span class="cm">// stable — no deps needed because we read refs, not state</span>
+
+<span class="fn">useEffect</span>(() =&gt; {
+  <span class="kw">const</span> observer = <span class="kw">new</span> <span class="fn">IntersectionObserver</span>(
+    (entries) =&gt; {
+      <span class="cm">// reads live ref values — never stale</span>
+      <span class="kw">if</span> (entries[<span class="num">0</span>].isIntersecting
+          &amp;&amp; hasMoreRef.current
+          &amp;&amp; !loadingRef.current) {
+        <span class="fn">fetchPage</span>(offsetRef.current, <span class="kw">true</span>);
+      }
+    },
+    { rootMargin: <span class="str">'300px'</span> }  <span class="cm">// start 300px before sentinel enters view</span>
+  );
+  observer.<span class="fn">observe</span>(sentinelRef.current);
+  <span class="kw">return</span> () =&gt; observer.<span class="fn">disconnect</span>();
+}, [fetchPage]);  <span class="cm">// fetchPage is stable, so this runs once</span></pre>
+    </div>
+
+    <p>
+      Every time a page loads, <code>offsetRef</code> is updated to <code>offset + next.length</code>
+      and <code>hasMoreRef</code> is set from the API's <code>hasMore</code> flag.
+      The observer always reads the <em>current</em> values, not the ones captured at creation.
+    </p>
+
+    <!-- ── 5 · Visual Design ───────────────────────────────────────── -->
+    <span class="section-anchor" id="visual"></span>
+    <h2><span class="section-num">05</span> Visual Design System</h2>
+
+    <h3>Deterministic avatar colors</h3>
+
+    <p>
+      Each user gets a colored avatar circle. The color is deterministic — the same username
+      always maps to the same color across every page load, every device. No server call needed,
+      no storage required.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-filename">src/pages/DiscussionThread.jsx</span>
+        <span class="code-block-lang">JavaScript</span>
+      </div>
+      <pre><span class="kw">const</span> AVATAR_COLORS = [
+  <span class="str">'#6366f1'</span>, <span class="str">'#ec4899'</span>, <span class="str">'#f97316'</span>, <span class="str">'#10b981'</span>,
+  <span class="str">'#3b82f6'</span>, <span class="str">'#8b5cf6'</span>, <span class="str">'#ef4444'</span>, <span class="str">'#14b8a6'</span>,
+];
+
+<span class="kw">function</span> <span class="fn">avatarColor</span>(name) {
+  <span class="kw">let</span> h = <span class="num">0</span>;
+  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i &lt; name.length; i++)
+    h = (h * <span class="num">31</span> + name.<span class="fn">charCodeAt</span>(i)) &gt;&gt;&gt; <span class="num">0</span>;  <span class="cm">// djb2-style, unsigned</span>
+  <span class="kw">return</span> AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+
+<span class="kw">function</span> <span class="fn">getInitials</span>(name) {
+  <span class="kw">const</span> parts = name.<span class="fn">split</span>(<span class="str">/[-_\s]/</span>);
+  <span class="kw">return</span> ((parts[<span class="num">0</span>]?.[<span class="num">0</span>] ?? <span class="str">''</span>) + (parts[<span class="num">1</span>]?.[<span class="num">0</span>] ?? <span class="str">''</span>)).<span class="fn">toUpperCase</span>();
+}</pre>
+    </div>
+
+    <p>
+      The <code>&gt;&gt;&gt; 0</code> coerces to an unsigned 32-bit integer, preventing the hash from
+      going negative and producing a valid modulo result. The hash is a simplified djb2 variant:
+      multiply by 31 and add the character code at each step.
+    </p>
+
+    <div class="diagram" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;padding:24px">
+      <div class="av" style="background:#6366f1;width:44px;height:44px;font-size:15px">BB</div>
+      <div class="av" style="background:#10b981;width:44px;height:44px;font-size:15px">SF</div>
+      <div class="av" style="background:#ec4899;width:44px;height:44px;font-size:15px">CO</div>
+      <div class="av" style="background:#f97316;width:44px;height:44px;font-size:15px">KH</div>
+      <div class="av" style="background:#3b82f6;width:44px;height:44px;font-size:15px">WF</div>
+      <div class="av" style="background:#8b5cf6;width:44px;height:44px;font-size:15px">BW</div>
+      <div class="av" style="background:#ef4444;width:44px;height:44px;font-size:15px">QL</div>
+      <div class="av" style="background:#14b8a6;width:44px;height:44px;font-size:15px">VO</div>
+      <p style="color:var(--text-3);font-size:13px;margin:0;margin-left:4px">
+        Same username → same color. Always. No state needed.
+      </p>
+    </div>
+
+    <h3>Relative timestamps</h3>
+
+    <p>
+      "May 26, 2026" tells you less than "2 hours ago" for a recent conversation.
+      Absolute dates only appear when content is older than 30 days.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-filename">src/pages/DiscussionThread.jsx</span>
+        <span class="code-block-lang">JavaScript</span>
+      </div>
+      <pre><span class="kw">function</span> <span class="fn">timeAgo</span>(iso) {
+  <span class="kw">const</span> diff = Date.<span class="fn">now</span>() - <span class="kw">new</span> <span class="fn">Date</span>(iso).<span class="fn">getTime</span>();
+  <span class="kw">const</span> s = Math.<span class="fn">floor</span>(diff / <span class="num">1000</span>);
+  <span class="kw">if</span> (s &lt; <span class="num">60</span>)  <span class="kw">return</span> <span class="str">'just now'</span>;
+  <span class="kw">const</span> m = Math.<span class="fn">floor</span>(s / <span class="num">60</span>);
+  <span class="kw">if</span> (m &lt; <span class="num">60</span>)  <span class="kw">return</span> <span class="str">`${m}m ago`</span>;
+  <span class="kw">const</span> h = Math.<span class="fn">floor</span>(m / <span class="num">60</span>);
+  <span class="kw">if</span> (h &lt; <span class="num">24</span>)  <span class="kw">return</span> <span class="str">`${h}h ago`</span>;
+  <span class="kw">const</span> d = Math.<span class="fn">floor</span>(h / <span class="num">24</span>);
+  <span class="kw">if</span> (d &lt; <span class="num">30</span>)  <span class="kw">return</span> <span class="str">`${d}d ago`</span>;
+  <span class="kw">return new</span> <span class="fn">Date</span>(iso).<span class="fn">toLocaleDateString</span>(<span class="str">'en-US'</span>, {
+    month: <span class="str">'short'</span>, day: <span class="str">'numeric'</span>, year: <span class="str">'numeric'</span>
+  });
+}</pre>
+    </div>
+
+    <h3>CSS nesting via left border</h3>
+
+    <p>
+      Visual depth is conveyed purely through indentation and a 2px left border — no background
+      tinting or opacity changes. This keeps the nested cards legible at any depth.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-filename">src/pages/Discussion.css</span>
+        <span class="code-block-lang">CSS</span>
+      </div>
+      <pre><span class="id">.disc-comment-replies</span> {
+  margin-left: <span class="num">18px</span>;
+  padding-left: <span class="num">18px</span>;
+  border-left: <span class="num">2px</span> <span class="kw">solid</span> <span class="fn">var</span>(<span class="id">--border</span>);
+  display: flex;
+  flex-direction: column;
+  gap: <span class="num">6px</span>;
+}
+
+<span class="cm">/* After MAX_VISUAL_INDENT (4), stop indenting */</span>
+<span class="id">.disc-comment-replies--flat</span> {
+  margin-left: <span class="num">0</span>;
+  padding-left: <span class="num">0</span>;
+  border-left: none;
+}</pre>
+    </div>
+
+    <!-- ── 6 · Security ───────────────────────────────────────────── -->
+    <span class="section-anchor" id="security"></span>
+    <h2><span class="section-num">06</span> Security Model</h2>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Layer</th><th>Mechanism</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Authentication</strong></td>
+            <td>Session token in <code>HttpOnly</code> cookie, hashed key stored in Cloudflare KV. Revocation is instant — delete the KV entry.</td>
+          </tr>
+          <tr>
+            <td><strong>Authorization</strong></td>
+            <td>
+              Write endpoints verify <code>session.userId</code> before any DB write. DELETE additionally checks <code>comment.author_id === session.userId</code>.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>XSS prevention</strong></td>
+            <td>Plain text only — no Markdown, no HTML. The API stores raw text and the React renderer displays it via text nodes, not <code>dangerouslySetInnerHTML</code>.</td>
+          </tr>
+          <tr>
+            <td><strong>SQL injection</strong></td>
+            <td>All D1 queries use <code>.bind()</code> parameterization. Zero string concatenation into SQL.</td>
+          </tr>
+          <tr>
+            <td><strong>Soft delete</strong></td>
+            <td>Deleted comments set <code>deleted=1</code> and clear <code>body=''</code>. Original content is gone; audit trail remains.</td>
+          </tr>
+          <tr>
+            <td><strong>CSP</strong></td>
+            <td><code>connect-src 'self'</code> on all HTML responses prevents browser-side exfiltration of session tokens to third-party endpoints.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-tip">
+      <span class="callout-icon">🔐</span>
+      <div class="callout-body">
+        <p><strong>Why plain text only?</strong> Markdown rendering introduces an XSS surface.
+        A user who posts <code>[click me](javascript:evil())</code> could execute arbitrary JS if
+        the renderer isn't hardened. Plain text sidesteps the problem entirely — and for a
+        discussion board focused on conversation, Markdown is rarely needed anyway.</p>
+      </div>
+    </div>
+
+    <!-- ── 7 · Testing ────────────────────────────────────────────── -->
+    <span class="section-anchor" id="testing"></span>
+    <h2><span class="section-num">07</span> Testing Strategy</h2>
+
+    <p>Three testing layers, each catching a different class of bug:</p>
+
+    <h3>Playwright E2E tests</h3>
+
+    <p>
+      Fourteen tests cover the topic list and thread pages. The key technique:
+      <code>page.route()</code> intercepts network requests and returns mock JSON,
+      so tests never need a live database.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-filename">tests/e2e/discussion.spec.js</span>
+        <span class="code-block-lang">JavaScript</span>
+      </div>
+      <pre><span class="cm">// Mock the API — no live D1 database needed</span>
+<span class="kw">await</span> page.<span class="fn">route</span>(<span class="str">'**/api/discussion/topics?**'</span>, route =>
+  route.<span class="fn">fulfill</span>({
+    status: <span class="num">200</span>,
+    contentType: <span class="str">'application/json'</span>,
+    body: <span class="fn">JSON.stringify</span>({ topics: MOCK_TOPICS, hasMore: <span class="kw">false</span> }),
+  })
+);
+
+<span class="kw">await</span> page.<span class="fn">goto</span>(<span class="str">'/discussion'</span>);
+<span class="kw">await</span> <span class="fn">expect</span>(page.<span class="fn">locator</span>(<span class="str">'text=Thought of the day'</span>)).<span class="fn">toBeVisible</span>({ timeout: <span class="num">5000</span> });
+<span class="kw">await</span> <span class="fn">expect</span>(page.<span class="fn">locator</span>(<span class="str">'text=Pinned'</span>).<span class="fn">first</span>()).<span class="fn">toBeVisible</span>();</pre>
+    </div>
+
+    <p>Scenarios covered:</p>
+    <ul>
+      <li>Topic list renders — pinned badge, reply counts, auth nudge</li>
+      <li>Empty board state</li>
+      <li>Thread renders — title, body, avatar initials, time-ago format</li>
+      <li>Back navigation from thread to list</li>
+      <li>404 state for unknown topic</li>
+      <li>Click-through from topic card to thread</li>
+      <li>Axe accessibility checks on both pages (WCAG 2.0 A + AA)</li>
+    </ul>
+
+    <h3>Storybook component stories</h3>
+
+    <p>
+      Each story mocks <code>globalThis.fetch</code> in a <code>beforeEach</code> hook and
+      uses a <code>play()</code> function to assert the rendered DOM with
+      <code>@storybook/test</code> matchers.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-filename">src/stories/DiscussionThread.stories.jsx</span>
+        <span class="code-block-lang">JSX</span>
+      </div>
+      <pre><span class="kw">export const</span> <span class="id">WithComments</span> = {
+  <span class="fn">beforeEach</span>() {
+    <span class="kw">const</span> orig = globalThis.fetch;
+    globalThis.fetch = <span class="kw">async</span> (url) =&gt; {
+      <span class="kw">if</span> (<span class="fn">String</span>(url).<span class="fn">includes</span>(<span class="str">'/api/discussion/topics/'</span>)) {
+        <span class="kw">return new</span> <span class="fn">Response</span>(<span class="fn">JSON.stringify</span>({ topic: TOPIC, comments: COMMENTS }), {
+          status: <span class="num">200</span>, headers: { <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span> },
+        });
+      }
+      <span class="kw">return</span> <span class="fn">orig</span>(url);
+    };
+    <span class="kw">return</span> () =&gt; { globalThis.fetch = orig; };
+  },
+  play: <span class="kw">async</span> ({ canvasElement }) =&gt; {
+    <span class="kw">const</span> canvas = <span class="fn">within</span>(canvasElement);
+    <span class="kw">await</span> <span class="fn">waitFor</span>(() =&gt; canvas.<span class="fn">getByText</span>(<span class="str">'Thought of the day'</span>), { timeout: <span class="num">3000</span> });
+    <span class="kw">await</span> <span class="fn">expect</span>(canvas.<span class="fn">getByText</span>(<span class="str">'SF'</span>)).<span class="fn">toBeInTheDocument</span>(); <span class="cm">// avatar initials</span>
+  },
+};</pre>
+    </div>
+
+    <p>Stories exist for: <em>WithTopics</em>, <em>EmptyBoard</em>, <em>Loading</em>,
+    <em>HasMore</em> (list page) and <em>WithComments</em>, <em>WithDeletedComment</em>,
+    <em>EmptyThread</em>, <em>NotFound</em> (thread page).</p>
+
+    <h3>Storybook publishing</h3>
+
+    <p>
+      Storybook is published via Chromatic (<code>@chromatic-com/storybook</code>). Run
+      <code>yarn chromatic</code> with a <code>CHROMATIC_PROJECT_TOKEN</code> environment variable
+      to push visual snapshots and run the story test suite on Chromatic's infrastructure.
+    </p>
+
+    <!-- ── 8 · Monitoring ─────────────────────────────────────────── -->
+    <span class="section-anchor" id="monitoring"></span>
+    <h2><span class="section-num">08</span> Monitoring &amp; Triage</h2>
+
+    <p>
+      A dedicated admin dashboard at <code>/admin/discussion</code> gives two views:
+      a <strong>Monitoring</strong> tab for health KPIs and a <strong>Triage</strong> tab for
+      moderation and community-health signals.
+    </p>
+
+    <h3>Monitoring KPIs</h3>
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Total Topics</div>
+        <div class="kpi-value">42</div>
+        <div class="kpi-sub">all time</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Topics This Week</div>
+        <div class="kpi-value" style="color:#10b981">8</div>
+        <div class="kpi-sub">↑3 vs prev week</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Total Comments</div>
+        <div class="kpi-value">187</div>
+        <div class="kpi-sub">non-deleted</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Active Users/Week</div>
+        <div class="kpi-value" style="color:#ec4899">12</div>
+        <div class="kpi-sub">posted topic or comment</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Reply Rate</div>
+        <div class="kpi-value">73%</div>
+        <div class="kpi-sub">topics with ≥1 reply</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Avg Comments</div>
+        <div class="kpi-value">4.5</div>
+        <div class="kpi-sub">per topic, all time</div>
+      </div>
+    </div>
+
+    <p>These are powered by two admin-only API endpoints that batch all D1 queries:</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Endpoint</th><th>Data returned</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code class="mono">GET /api/admin/discussion/metrics</code></td>
+            <td>KPI totals, weekly deltas, 7-day daily trend (topics + comments), top 5 topics by reply count</td>
+          </tr>
+          <tr>
+            <td><code class="mono">GET /api/admin/discussion/triage</code></td>
+            <td>Hot threads (most new comments this week), orphaned topics (0 replies &gt;24h), deleted comment log, top contributors</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Triage signals</h3>
+
+    <p>The triage tab is built for two concerns:</p>
+
+    <ul>
+      <li>
+        <strong>Orphaned topics</strong> — a topic older than 24 hours with zero replies is a
+        community health signal. The triage tab surfaces these so the site owner can seed the
+        conversation or archive the topic.
+      </li>
+      <li>
+        <strong>Deleted comment log</strong> — soft deletes preserve the author and timestamp.
+        The log shows who deleted what and when, in case a moderation review is needed.
+      </li>
+    </ul>
+
+    <!-- ── 9 · Production incident ──────────────────────────────── -->
+    <span class="section-anchor" id="bugs"></span>
+    <h2><span class="section-num">09</span> Production Incident</h2>
+
+    <p>
+      After the first production deploy, every discussion API call returned <strong>500 Internal
+      Server Error</strong>. The database migration had run successfully. Logs pointed to the
+      Worker throwing during the first DB call.
+    </p>
+
+    <h3>Root cause</h3>
+
+    <p>
+      <code>discussion.js</code> was written using <code>env.DB</code> as the D1 binding name.
+      But the actual binding name in <code>wrangler.toml</code> is <code>varun_portfolio_auth</code> —
+      the same name used by every other worker file. <code>env.DB</code> was <code>undefined</code>.
+      Every <code>env.DB.prepare(...)</code> call threw <em>Cannot read properties of undefined</em>.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-filename">wrangler.toml — actual binding name</span>
+        <span class="code-block-lang">TOML</span>
+      </div>
+      <pre>[[d1_databases]]
+<span class="id">binding</span>      = <span class="str">"varun_portfolio_auth"</span>  <span class="cm"># ← this, not "DB"</span>
+database_name = <span class="str">"varun-portfolio-auth"</span>
+database_id   = <span class="str">"329e850c-..."</span></pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-filename">The fix — 12 occurrences in discussion.js</span>
+        <span class="code-block-lang">Diff</span>
+      </div>
+      <pre><span style="color:#ef4444">- const rows = await env.DB.prepare(`...</span>
+<span style="color:#10b981">+ const rows = await env.varun_portfolio_auth.prepare(`...</span></pre>
+    </div>
+
+    <div class="callout callout-danger">
+      <span class="callout-icon">💥</span>
+      <div class="callout-body">
+        <p><strong>Lesson:</strong> Worker binding names are runtime configuration, not validated
+        at build time. TypeScript might have caught this (binding names would appear as typed
+        properties on <code>Env</code>). Consider generating a typed <code>Env</code> interface
+        from <code>wrangler.toml</code> for worker code.</p>
+      </div>
+    </div>
+
+    <!-- ── 10 · Key Decisions ─────────────────────────────────────── -->
+    <span class="section-anchor" id="decisions"></span>
+    <h2><span class="section-num">10</span> Key Decisions</h2>
+
+    <h3>Why load all comments at once?</h3>
+
+    <p>
+      The thread page fetches the full comment tree in a single request. Most threads will have
+      tens of comments, not thousands — the discussion board is for a personal portfolio site,
+      not Reddit. Paginating comments adds complexity (cursor management, tree reconstruction
+      across pages) with no practical benefit at this scale.
+    </p>
+
+    <p>
+      If a thread grows to hundreds of comments, the right move is lazy-loading subtrees, not
+      paginating the flat array. That would be a future optimization.
+    </p>
+
+    <h3>Why not Markdown?</h3>
+
+    <p>
+      Every Markdown renderer is a potential XSS vector. The safe path is to sanitize HTML after
+      rendering. The popular sanitizers (<code>DOMPurify</code>, <code>sanitize-html</code>) add
+      bundle weight and need to be kept up to date. For a first version, plain text with
+      <code>white-space: pre-wrap</code> is correct by construction.
+    </p>
+
+    <h3>Why Cloudflare D1 over a traditional Postgres?</h3>
+
+    <p>
+      The entire stack runs on Cloudflare: Workers for compute, KV for sessions, D1 for
+      relational data, Vectorize for embeddings. Adding a Postgres instance would mean:
+      a separate hosting provider, connection pooling (Workers don't hold TCP connections
+      between requests), and higher operational overhead. D1's limitations (SQLite semantics,
+      no full-text search) are acceptable for a discussion board of this scale.
+    </p>
+
+    <h3>Why store depth in the comment row?</h3>
+
+    <p>
+      The alternative is to compute depth at query time with a recursive CTE. In SQLite this
+      works but is expensive and complex. Storing depth as a denormalized column (computed once
+      at INSERT time, queried as a plain integer thereafter) is a textbook denormalization
+      tradeoff — a small write cost for a zero read cost.
+    </p>
+
+    <hr>
+
+    <div class="footnote">
+      Built and documented by Varun Ragunathan. The discussion board is live at
+      <a href="/discussion">/discussion</a>. The monitoring dashboard is at
+      <a href="/admin/discussion">/admin/discussion</a> (admin access required).
+      Source code lives in <code>worker/discussion.js</code>,
+      <code>src/pages/Discussion.jsx</code>, and
+      <code>src/pages/DiscussionThread.jsx</code>.
+    </div>
+
+  </main>
+</div>
+
+</body>
+</html>

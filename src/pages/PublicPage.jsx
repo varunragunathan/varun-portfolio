@@ -50,7 +50,7 @@ export default function PublicPage() {
     <iframe
       ref={iframeRef}
       srcDoc={page.content}
-      sandbox="allow-scripts allow-same-origin allow-popups"
+      sandbox="allow-scripts allow-same-origin allow-popups allow-top-navigation-by-user-activation"
       title={page.title}
       style={{ display: 'block', width: '100%', border: 'none', minHeight: '100vh' }}
     />

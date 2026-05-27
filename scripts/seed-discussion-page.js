@@ -21,18 +21,18 @@ const html = readFileSync(htmlPath, 'utf-8');
 
 const slug  = 'discussion-engineering';
 const title = 'Building a Threaded Discussion Board — Engineering Deep Dive';
-const now   = new Date().toISOString();
+const nowMs = Date.now();
 
 // Escape single quotes for SQL string literal
 const escaped = html.replace(/'/g, "''");
 const titleEsc = title.replace(/'/g, "''");
 
 const sql = `
-INSERT INTO pages (slug, title, html, created_at, updated_at)
-VALUES ('${slug}', '${titleEsc}', '${escaped}', '${now}', '${now}')
+INSERT INTO pages (slug, title, content, created_at, updated_at)
+VALUES ('${slug}', '${titleEsc}', '${escaped}', ${nowMs}, ${nowMs})
 ON CONFLICT(slug) DO UPDATE SET
   title      = excluded.title,
-  html       = excluded.html,
+  content    = excluded.content,
   updated_at = excluded.updated_at;
 `.trim();
 
