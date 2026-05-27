@@ -124,8 +124,8 @@ export const WithDeletedComment = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await waitFor(() => canvas.getByText('[deleted]'), { timeout: 3000 });
-    await expect(canvas.getByText('[deleted]')).toBeInTheDocument();
+    await waitFor(() => canvas.getByText('[deleted]', { selector: 'p' }), { timeout: 3000 });
+    await expect(canvas.getByText('[deleted]', { selector: 'p' })).toBeInTheDocument();
   },
 };
 
