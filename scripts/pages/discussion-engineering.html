@@ -640,7 +640,6 @@ td code { font-size: 12px; }
         <li><a href="#security">Security Model</a></li>
         <li><a href="#testing">Testing Strategy</a></li>
         <li><a href="#monitoring">Monitoring &amp; Triage</a></li>
-        <li><a href="#bugs">Production Incident</a></li>
         <li><a href="#decisions">Key Decisions</a></li>
       </ol>
     </nav>
@@ -651,12 +650,16 @@ td code { font-size: 12px; }
 
     <!-- Header -->
     <header class="doc-header">
-      <div class="doc-eyebrow">Engineering · varunr.dev</div>
+      <div class="doc-eyebrow">Engineering · <a href="/" target="_top">varunr.dev</a></div>
       <h1 class="doc-title">Building a Threaded&nbsp;Discussion Board</h1>
       <p class="doc-subtitle">
         A full-stack deep dive into building Reddit-style threaded comments on Cloudflare's edge stack — from
         recursive data structures and React component trees to IntersectionObserver pagination,
         soft deletes, and production monitoring.
+      </p>
+      <p style="font-size:14.5px;color:var(--text-3);margin-bottom:20px;margin-top:-8px">
+        Written by <strong style="color:var(--text-2)">Varun Ragunathan</strong> — Staff Software Engineer candidate.
+        <a href="/" target="_top">Full portfolio →</a>
       </p>
       <div class="tags">
         <span class="tag">Cloudflare D1</span>
@@ -671,7 +674,7 @@ td code { font-size: 12px; }
           <span class="pill pill-green">shipped</span>
         </span>
         <span class="doc-meta-item">May 2026</span>
-        <span class="doc-meta-item">~18 min read</span>
+        <span class="doc-meta-item">~10 min read</span>
       </div>
     </header>
 
@@ -1303,6 +1306,10 @@ td code { font-size: 12px; }
             <td><strong>CSP</strong></td>
             <td><code>connect-src 'self'</code> on all HTML responses prevents browser-side exfiltration of session tokens to third-party endpoints.</td>
           </tr>
+          <tr>
+            <td><strong>Rate limiting</strong></td>
+            <td>Not yet implemented at the application layer. The path forward is Cloudflare's built-in rate limiting rules (per-IP, per-route) applied in <code>wrangler.toml</code> — no Worker code needed.</td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -1486,71 +1493,23 @@ td code { font-size: 12px; }
       </li>
     </ul>
 
-    <!-- ── 9 · Production incident ──────────────────────────────── -->
-    <span class="section-anchor" id="bugs"></span>
-    <h2><span class="section-num">09</span> Production Incident</h2>
-
-    <p>
-      After the first production deploy, every discussion API call returned <strong>500 Internal
-      Server Error</strong>. The database migration had run successfully. Logs pointed to the
-      Worker throwing during the first DB call.
-    </p>
-
-    <h3>Root cause</h3>
-
-    <p>
-      <code>discussion.js</code> was written using <code>env.DB</code> as the D1 binding name.
-      But the actual binding name in <code>wrangler.toml</code> is <code>varun_portfolio_auth</code> —
-      the same name used by every other worker file. <code>env.DB</code> was <code>undefined</code>.
-      Every <code>env.DB.prepare(...)</code> call threw <em>Cannot read properties of undefined</em>.
-    </p>
-
-    <div class="code-block">
-      <div class="code-block-header">
-        <span class="code-block-filename">wrangler.toml — actual binding name</span>
-        <span class="code-block-lang">TOML</span>
-      </div>
-      <pre>[[d1_databases]]
-<span class="id">binding</span>      = <span class="str">"varun_portfolio_auth"</span>  <span class="cm"># ← this, not "DB"</span>
-database_name = <span class="str">"varun-portfolio-auth"</span>
-database_id   = <span class="str">"329e850c-..."</span></pre>
-    </div>
-
-    <div class="code-block">
-      <div class="code-block-header">
-        <span class="code-block-filename">The fix — 12 occurrences in discussion.js</span>
-        <span class="code-block-lang">Diff</span>
-      </div>
-      <pre><span style="color:#ef4444">- const rows = await env.DB.prepare(`...</span>
-<span style="color:#10b981">+ const rows = await env.varun_portfolio_auth.prepare(`...</span></pre>
-    </div>
-
-    <div class="callout callout-danger">
-      <span class="callout-icon">💥</span>
-      <div class="callout-body">
-        <p><strong>Lesson:</strong> Worker binding names are runtime configuration, not validated
-        at build time. TypeScript might have caught this (binding names would appear as typed
-        properties on <code>Env</code>). Consider generating a typed <code>Env</code> interface
-        from <code>wrangler.toml</code> for worker code.</p>
-      </div>
-    </div>
-
-    <!-- ── 10 · Key Decisions ─────────────────────────────────────── -->
+    <!-- ── 9 · Key Decisions ─────────────────────────────────────── -->
     <span class="section-anchor" id="decisions"></span>
-    <h2><span class="section-num">10</span> Key Decisions</h2>
+    <h2><span class="section-num">09</span> Key Decisions</h2>
 
     <h3>Why load all comments at once?</h3>
 
     <p>
-      The thread page fetches the full comment tree in a single request. Most threads will have
-      tens of comments, not thousands — the discussion board is for a personal portfolio site,
-      not Reddit. Paginating comments adds complexity (cursor management, tree reconstruction
-      across pages) with no practical benefit at this scale.
+      The thread page fetches the full comment tree in a single request. This eliminates N+1
+      fetches, simplifies client state, and keeps the initial render fast — a single round-trip
+      to the edge. Paginating comments would add cursor management and complicate tree
+      reconstruction across page boundaries without meaningful benefit at current thread depths.
     </p>
 
     <p>
-      If a thread grows to hundreds of comments, the right move is lazy-loading subtrees, not
-      paginating the flat array. That would be a future optimization.
+      The natural evolution at higher scale is lazy-loading subtrees on demand: load root comments
+      immediately, defer deep replies behind a "load more" control. That keeps the initial payload
+      bounded while preserving the single-request fast path for typical threads.
     </p>
 
     <h3>Why not Markdown?</h3>
@@ -1566,11 +1525,18 @@ database_id   = <span class="str">"329e850c-..."</span></pre>
 
     <p>
       The entire stack runs on Cloudflare: Workers for compute, KV for sessions, D1 for
-      relational data, Vectorize for embeddings. Adding a Postgres instance would mean:
-      a separate hosting provider, connection pooling (Workers don't hold TCP connections
-      between requests), and higher operational overhead. D1's limitations (SQLite semantics,
-      no full-text search) are acceptable for a discussion board of this scale.
+      relational data, Vectorize for embeddings. The tradeoffs were deliberate:
     </p>
+    <ul>
+      <li><strong>What D1 gives up:</strong> no full-text search, no advisory locks, SQLite's limited
+      <code>ALTER TABLE</code> support, and a single-writer model that makes hot write paths a concern at scale.</li>
+      <li><strong>What D1 buys:</strong> zero connection pooling (Workers are stateless — TCP connections
+      between requests don't persist, making traditional Postgres connection limits a real operational problem),
+      colocation with Worker compute at the edge, and no separate hosting provider to operate.</li>
+      <li><strong>Migration trigger:</strong> the moment full-text search on thread bodies or
+      high-throughput write bursts become requirements, Postgres via Hyperdrive (Cloudflare's connection
+      pooling proxy) is the right next step — the schema is portable SQLite-compatible SQL.</li>
+    </ul>
 
     <h3>Why store depth in the comment row?</h3>
 
