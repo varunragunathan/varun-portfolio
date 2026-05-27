@@ -386,7 +386,7 @@ td code { font-size: 12px; }
 .method-patch  { color: #f59e0b; font-weight: 700; }
 
 /* ── Section divider ──────────────────────────────────────────── */
-.section-anchor { display: block; height: 1px; visibility: hidden; }
+.section-anchor { display: block; height: 0; visibility: hidden; scroll-margin-top: 80px; }
 
 /* ── Diagram ──────────────────────────────────────────────────── */
 .diagram {
@@ -1955,6 +1955,46 @@ td code { font-size: 12px; }
 
   </main>
 </div>
+
+<script>
+(function () {
+  // Intercept TOC anchor clicks — prevent srcDoc hash navigation (which reloads
+  // the iframe in some browsers) and instead use scrollIntoView so the outer
+  // window scrolls correctly to the section.
+  document.querySelectorAll('.toc a[href^="#"]').forEach(function (link) {
+    link.addEventListener('click', function (e) {
+      e.preventDefault();
+      var id = link.getAttribute('href').slice(1);
+      var target = document.getElementById(id);
+      if (!target) return;
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Update URL fragment without triggering navigation
+      try { history.replaceState(null, '', '#' + id); } catch (_) {}
+    });
+  });
+
+  // Scroll-spy: mark the active TOC item as the user scrolls.
+  var sections = Array.from(document.querySelectorAll('.section-anchor[id]'));
+  var links    = {};
+  sections.forEach(function (s) {
+    var a = document.querySelector('.toc a[href="#' + s.id + '"]');
+    if (a) links[s.id] = a.closest('li');
+  });
+
+  function setActive(id) {
+    Object.values(links).forEach(function (li) { li.classList.remove('active'); });
+    if (id && links[id]) links[id].classList.add('active');
+  }
+
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) setActive(entry.target.id);
+    });
+  }, { rootMargin: '-10% 0px -80% 0px' });
+
+  sections.forEach(function (s) { observer.observe(s); });
+})();
+</script>
 
 </body>
 </html>
