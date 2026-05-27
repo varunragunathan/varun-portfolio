@@ -170,8 +170,8 @@ test.describe('Discussion thread page', () => {
     await mockDiscussionRoutes(page);
     await page.goto('/discussion/topic-abc');
     await expect(page.locator('text=swift-fox-12')).toBeVisible({ timeout: 5000 });
-    // Time-ago format
-    await expect(page.locator('text=/ago|just now/')).toBeVisible();
+    // Time-ago format — scoped to comment card to avoid matching topic meta time
+    await expect(page.locator('.disc-comment-card__time').first()).toBeVisible();
   });
 
   test('back link navigates to discussion list', async ({ page }) => {
