@@ -2,7 +2,7 @@
 .disc-page {
   max-width: 720px;
   margin: 0 auto;
-  padding: 48px 24px 80px;
+  padding: 88px 24px 80px; /* 52px fixed nav + 36px breathing room */
   width: 100%;
 }
 
