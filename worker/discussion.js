@@ -31,7 +31,7 @@ export async function listTopics(request, env) {
   const offset = Math.max(0,              parseInt(url.searchParams.get('offset') || '0'));
 
   // Fetch one extra to determine whether more pages exist
-  const rows = await env.DB.prepare(`
+  const rows = await env.varun_portfolio_auth.prepare(`
     SELECT t.id, t.title, t.created_at, t.comment_count, t.pinned,
            u.nickname, u.email
     FROM   discussion_topics t
@@ -66,7 +66,7 @@ export async function createTopic(request, env) {
   const id  = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  await env.DB.prepare(`
+  await env.varun_portfolio_auth.prepare(`
     INSERT INTO discussion_topics (id, title, body, author_id, created_at, updated_at, comment_count, pinned)
     VALUES (?, ?, ?, ?, ?, ?, 0, 0)
   `).bind(id, title.trim(), body.trim(), session.userId, now, now).run();
@@ -76,7 +76,7 @@ export async function createTopic(request, env) {
 
 // GET /api/discussion/topics/:id
 export async function getTopic(request, env, topicId) {
-  const topic = await env.DB.prepare(`
+  const topic = await env.varun_portfolio_auth.prepare(`
     SELECT t.id, t.title, t.body, t.created_at, t.comment_count, t.pinned,
            u.nickname, u.email
     FROM   discussion_topics t
@@ -86,7 +86,7 @@ export async function getTopic(request, env, topicId) {
 
   if (!topic) return json({ error: 'Not found' }, 404);
 
-  const rows = await env.DB.prepare(`
+  const rows = await env.varun_portfolio_auth.prepare(`
     SELECT c.id, c.parent_id, c.depth, c.body, c.created_at, c.deleted, c.author_id,
            u.nickname, u.email
     FROM   discussion_comments c
@@ -126,13 +126,13 @@ export async function addComment(request, env, topicId) {
   const { body, parent_id } = await request.json().catch(() => ({}));
   if (!body?.trim()) return json({ error: 'Body required' }, 400);
 
-  const topic = await env.DB.prepare('SELECT id FROM discussion_topics WHERE id = ?')
+  const topic = await env.varun_portfolio_auth.prepare('SELECT id FROM discussion_topics WHERE id = ?')
     .bind(topicId).first();
   if (!topic) return json({ error: 'Topic not found' }, 404);
 
   let depth = 0;
   if (parent_id) {
-    const parent = await env.DB.prepare(
+    const parent = await env.varun_portfolio_auth.prepare(
       'SELECT depth FROM discussion_comments WHERE id = ? AND topic_id = ?'
     ).bind(parent_id, topicId).first();
     if (!parent) return json({ error: 'Parent comment not found' }, 404);
@@ -142,11 +142,11 @@ export async function addComment(request, env, topicId) {
   const id  = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  await env.DB.batch([
-    env.DB.prepare(
+  await env.varun_portfolio_auth.batch([
+    env.varun_portfolio_auth.prepare(
       'INSERT INTO discussion_comments (id, topic_id, parent_id, depth, author_id, body, created_at, updated_at, deleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)'
     ).bind(id, topicId, parent_id || null, depth, session.userId, body.trim(), now, now),
-    env.DB.prepare(
+    env.varun_portfolio_auth.prepare(
       'UPDATE discussion_topics SET comment_count = comment_count + 1, updated_at = ? WHERE id = ?'
     ).bind(now, topicId),
   ]);
@@ -159,13 +159,13 @@ export async function deleteComment(request, env, commentId) {
   const session = await guardAuth(request, env);
   if (session instanceof Response) return session;
 
-  const comment = await env.DB.prepare(
+  const comment = await env.varun_portfolio_auth.prepare(
     'SELECT author_id FROM discussion_comments WHERE id = ? AND deleted = 0'
   ).bind(commentId).first();
   if (!comment)                          return json({ error: 'Not found' }, 404);
   if (comment.author_id !== session.userId) return json({ error: 'Forbidden' }, 403);
 
-  await env.DB.prepare(
+  await env.varun_portfolio_auth.prepare(
     "UPDATE discussion_comments SET deleted = 1, body = '', updated_at = ? WHERE id = ?"
   ).bind(new Date().toISOString(), commentId).run();
 
