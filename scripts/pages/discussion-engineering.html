@@ -1461,6 +1461,83 @@ td code { font-size: 12px; }
     <em>HasMore</em> (list page) and <em>WithComments</em>, <em>WithDeletedComment</em>,
     <em>EmptyThread</em>, <em>NotFound</em> (thread page).</p>
 
+    <h3>Axe accessibility testing</h3>
+
+    <p>
+      Every Storybook story runs an automated <a href="https://github.com/dequelabs/axe-core" target="_blank" rel="noopener noreferrer">axe-core</a> accessibility audit
+      via <code>@storybook/addon-a11y</code>. A single line in <code>.storybook/preview.jsx</code>
+      promotes violations from warnings to test failures:
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-filename">.storybook/preview.jsx</span>
+        <span class="code-block-lang">JSX</span>
+      </div>
+      <pre><span class="kw">export const</span> parameters = {
+  a11y: {
+    test: <span class="str">'error'</span>,  <span class="cm">// axe violations fail the story test run in CI</span>
+  },
+};</pre>
+    </div>
+
+    <p>
+      This caught real issues during development that manual review would have missed:
+    </p>
+
+    <ul>
+      <li>
+        <strong>Colour contrast failures</strong> — avatar initials (white on pink/orange/teal) were
+        rendering at 3.5:1 instead of the WCAG 4.5:1 minimum. Axe flagged the exact element and
+        colour pair; the fix was darkening the palette from Tailwind -500 to -700 shades.
+      </li>
+      <li>
+        <strong>Missing form labels</strong> — the reply textarea and top-level comment input had no
+        programmatic label. Fixed with visually-hidden <code>&lt;label&gt;</code> elements using
+        a <code>.disc-sr-only</code> utility class (position:absolute; width:1px; height:1px; clip:…).
+      </li>
+      <li>
+        <strong>Link-in-text-block</strong> — "Sign in to join the discussion" rendered the "Sign in"
+        link without an underline. Axe flagged it as indistinguishable from surrounding text for
+        colour-blind users. Fixed with <code>text-decoration: underline</code>.
+      </li>
+    </ul>
+
+    <p>
+      Axe also runs in Playwright via <code>@axe-core/playwright</code>
+      (<code>AxeBuilder</code>) on the live-rendered pages, giving a second pass at the integration
+      level that catches issues isolated stories cannot — for example, interactive state after a
+      real fetch.
+    </p>
+
+    <h3>ESLint static analysis</h3>
+
+    <p>
+      <code>yarn lint</code> runs ESLint across all source files. Two plugins do the
+      accessibility and correctness heavy lifting:
+    </p>
+
+    <ul>
+      <li>
+        <strong><code>eslint-plugin-jsx-a11y</code></strong> — enforces ARIA roles, interactive
+        element semantics, and label associations at the AST level. For example, it flags a
+        <code>&lt;div onClick&gt;</code> that should be a <code>&lt;button&gt;</code>, or an
+        <code>&lt;img&gt;</code> without <code>alt</code>.
+      </li>
+      <li>
+        <strong><code>eslint-plugin-react-hooks</code></strong> — enforces the Rules of Hooks
+        (no conditional hook calls, exhaustive <code>useEffect</code> dependency arrays).
+        Missing deps that would cause stale-closure bugs surface as warnings during development,
+        so they never silently slip into production.
+      </li>
+    </ul>
+
+    <p>
+      CI enforces <strong>zero errors</strong> — warnings are pre-existing and tracked separately.
+      The lint gate blocks the pre-push hook, so discussion components cannot be pushed with
+      broken accessibility semantics.
+    </p>
+
     <h3>Storybook publishing</h3>
 
     <p>
