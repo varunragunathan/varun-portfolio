@@ -576,13 +576,13 @@
 <header>
   <div class="wrap">
     <h1>Manifest Debugger</h1>
-    <div class="summary"><a class="filter-pill all" data-k="all" href="#filter-all">All</a><span class="filter-pill ok" aria-disabled="true">7 components ok</span><a class="filter-pill info" data-k="infos" href="#filter-infos">4/7 infos</a><span class="filter-pill ok" aria-disabled="true">26 stories ok</span></div>
+    <div class="summary"><a class="filter-pill all" data-k="all" href="#filter-all">All</a><span class="filter-pill ok" aria-disabled="true">9 components ok</span><a class="filter-pill info" data-k="infos" href="#filter-infos">6/9 infos</a><span class="filter-pill ok" aria-disabled="true">34 stories ok</span></div>
   </div>
 </header>
 <main>
   <div class="wrap">
     <div class="note info" style="margin-bottom: 16px;">
-            <strong>Tip:</strong> You are using <code>react-docgen</code> (the default). Generation took <strong>0.2s</strong>. For higher quality prop types, consider switching to <code>react-docgen-typescript</code> in your <code>main.ts</code>:
+            <strong>Tip:</strong> You are using <code>react-docgen</code> (the default). Generation took <strong>0.6s</strong>. For higher quality prop types, consider switching to <code>react-docgen-typescript</code> in your <code>main.ts</code>:
             <pre><code>typescript: {
   reactDocgen: 'react-docgen-typescript',
 }</code></pre>
@@ -692,14 +692,205 @@
   no-story-error
   no-doc-error"
   role="listitem"
+  aria-label="DiscussionPage">
+  <div class="head">
+    <div class="title">
+      <h2><span class="status-dot dot-ok"></span> DiscussionPage</h2>
+      <div class="badges">
+        
+        <label for="c-1-discussion-topiclist-info" class="badge info as-toggle">1 info</label>
+        <label for="c-1-discussion-topiclist-stories" class="badge ok as-toggle">4 stories</label>
+        
+      </div>
+    </div>
+    <div class="meta" title="./src/stories/Discussion.stories.jsx">discussion-topiclist · ./src/stories/Discussion.stories.jsx</div>
+    
+    
+    
+  </div>
+
+  <!-- ⬇️ Hidden toggles must be siblings BEFORE .panels -->
+  
+  <input id="c-1-discussion-topiclist-info" class="tg tg-info" type="checkbox" hidden />
+  <input id="c-1-discussion-topiclist-stories" class="tg tg-stories" type="checkbox" hidden />
+  
+  
+
+  <div class="panels">
+    
+    
+        <div class="panel panel-info">
+          
+    <div class="note info">
+      <div class="note-title">Info</div>
+      <div class="note-body">No description found. Write a jsdoc comment such as /** Component description */.</div>
+    </div>
+        </div>
+    
+    
+        <div class="panel panel-stories">
+          
+          
+          
+          <div class="note ok">
+                <div class="row">
+                  <span class="ex-name">Imports</span>
+                </div>
+                <pre><code>import { AuthProvider, DiscussionPage } from "engineering-portfolio";</code></pre>
+              </div>
+          
+          
+            <div class="note ok">
+              <div class="row">
+                <span class="ex-name">With Topics</span>
+                <span class="badge ok">story ok</span>
+              </div>
+              
+              <div class="hint">Topics loaded — shows pinned badge, reply counts, and the list</div>
+              <pre><code>const WithTopics = () =&gt; &lt;DiscussionPage /&gt;;</code></pre>
+            </div>
+            <div class="note ok">
+              <div class="row">
+                <span class="ex-name">Empty Board</span>
+                <span class="badge ok">story ok</span>
+              </div>
+              
+              <div class="hint">Empty board — guest-friendly message</div>
+              <pre><code>const EmptyBoard = () =&gt; &lt;DiscussionPage /&gt;;</code></pre>
+            </div>
+            <div class="note ok">
+              <div class="row">
+                <span class="ex-name">Has More</span>
+                <span class="badge ok">story ok</span>
+              </div>
+              
+              <div class="hint">Pagination available — shows that more topics exist beyond this page</div>
+              <pre><code>const HasMore = () =&gt; &lt;DiscussionPage /&gt;;</code></pre>
+            </div>
+            <div class="note ok">
+              <div class="row">
+                <span class="ex-name">Loading</span>
+                <span class="badge ok">story ok</span>
+              </div>
+              
+              <div class="hint">Loading state — spinner before data arrives</div>
+              <pre><code>const Loading = () =&gt; &lt;DiscussionPage /&gt;;</code></pre>
+            </div>
+        </div>
+    
+  </div>
+</article>
+<article
+  class="card 
+  no-error 
+  has-info 
+  no-story-error
+  no-doc-error"
+  role="listitem"
+  aria-label="DiscussionThread">
+  <div class="head">
+    <div class="title">
+      <h2><span class="status-dot dot-ok"></span> DiscussionThread</h2>
+      <div class="badges">
+        
+        <label for="c-2-discussion-thread-info" class="badge info as-toggle">1 info</label>
+        <label for="c-2-discussion-thread-stories" class="badge ok as-toggle">4 stories</label>
+        
+      </div>
+    </div>
+    <div class="meta" title="./src/stories/DiscussionThread.stories.jsx">discussion-thread · ./src/stories/DiscussionThread.stories.jsx</div>
+    
+    
+    
+  </div>
+
+  <!-- ⬇️ Hidden toggles must be siblings BEFORE .panels -->
+  
+  <input id="c-2-discussion-thread-info" class="tg tg-info" type="checkbox" hidden />
+  <input id="c-2-discussion-thread-stories" class="tg tg-stories" type="checkbox" hidden />
+  
+  
+
+  <div class="panels">
+    
+    
+        <div class="panel panel-info">
+          
+    <div class="note info">
+      <div class="note-title">Info</div>
+      <div class="note-body">No description found. Write a jsdoc comment such as /** Component description */.</div>
+    </div>
+        </div>
+    
+    
+        <div class="panel panel-stories">
+          
+          
+          
+          <div class="note ok">
+                <div class="row">
+                  <span class="ex-name">Imports</span>
+                </div>
+                <pre><code>import { DiscussionThread } from "engineering-portfolio";
+import { Route, Routes } from "react-router-dom";</code></pre>
+              </div>
+          
+          
+            <div class="note ok">
+              <div class="row">
+                <span class="ex-name">With Comments</span>
+                <span class="badge ok">story ok</span>
+              </div>
+              
+              <div class="hint">Full thread with nested reply</div>
+              <pre><code>const WithComments = () =&gt; &lt;DiscussionThread /&gt;;</code></pre>
+            </div>
+            <div class="note ok">
+              <div class="row">
+                <span class="ex-name">With Deleted Comment</span>
+                <span class="badge ok">story ok</span>
+              </div>
+              
+              <div class="hint">Thread with a deleted comment renders [deleted] placeholder</div>
+              <pre><code>const WithDeletedComment = () =&gt; &lt;DiscussionThread /&gt;;</code></pre>
+            </div>
+            <div class="note ok">
+              <div class="row">
+                <span class="ex-name">Empty Thread</span>
+                <span class="badge ok">story ok</span>
+              </div>
+              
+              <div class="hint">Empty thread — shows &quot;No comments yet&quot; state</div>
+              <pre><code>const EmptyThread = () =&gt; &lt;DiscussionThread /&gt;;</code></pre>
+            </div>
+            <div class="note ok">
+              <div class="row">
+                <span class="ex-name">Not Found</span>
+                <span class="badge ok">story ok</span>
+              </div>
+              
+              <div class="hint">404 — topic not found</div>
+              <pre><code>const NotFound = () =&gt; &lt;DiscussionThread /&gt;;</code></pre>
+            </div>
+        </div>
+    
+  </div>
+</article>
+<article
+  class="card 
+  no-error 
+  has-info 
+  no-story-error
+  no-doc-error"
+  role="listitem"
   aria-label="FeedbackForm">
   <div class="head">
     <div class="title">
       <h2><span class="status-dot dot-ok"></span> FeedbackForm</h2>
       <div class="badges">
-        <label for="c-1-feedback-feedbackform-props" class="badge ok as-toggle">1 prop type</label>
-        <label for="c-1-feedback-feedbackform-info" class="badge info as-toggle">1 info</label>
-        <label for="c-1-feedback-feedbackform-stories" class="badge ok as-toggle">4 stories</label>
+        <label for="c-3-feedback-feedbackform-props" class="badge ok as-toggle">1 prop type</label>
+        <label for="c-3-feedback-feedbackform-info" class="badge info as-toggle">1 info</label>
+        <label for="c-3-feedback-feedbackform-stories" class="badge ok as-toggle">4 stories</label>
         
       </div>
     </div>
@@ -711,10 +902,10 @@
 
   <!-- ⬇️ Hidden toggles must be siblings BEFORE .panels -->
   
-  <input id="c-1-feedback-feedbackform-info" class="tg tg-info" type="checkbox" hidden />
-  <input id="c-1-feedback-feedbackform-stories" class="tg tg-stories" type="checkbox" hidden />
+  <input id="c-3-feedback-feedbackform-info" class="tg tg-info" type="checkbox" hidden />
+  <input id="c-3-feedback-feedbackform-stories" class="tg tg-stories" type="checkbox" hidden />
   
-  <input id="c-1-feedback-feedbackform-props" class="tg tg-props" type="checkbox" hidden />
+  <input id="c-3-feedback-feedbackform-props" class="tg tg-props" type="checkbox" hidden />
 
   <div class="panels">
     
@@ -805,7 +996,7 @@
       <div class="badges">
         
         
-        <label for="c-2-ui-skiplink-stories" class="badge ok as-toggle">1 story</label>
+        <label for="c-4-ui-skiplink-stories" class="badge ok as-toggle">1 story</label>
         
       </div>
     </div>
@@ -818,7 +1009,7 @@
   <!-- ⬇️ Hidden toggles must be siblings BEFORE .panels -->
   
   
-  <input id="c-2-ui-skiplink-stories" class="tg tg-stories" type="checkbox" hidden />
+  <input id="c-4-ui-skiplink-stories" class="tg tg-stories" type="checkbox" hidden />
   
   
 
@@ -866,7 +1057,7 @@
       <div class="badges">
         
         
-        <label for="c-3-ui-themetoggle-stories" class="badge ok as-toggle">4 stories</label>
+        <label for="c-5-ui-themetoggle-stories" class="badge ok as-toggle">4 stories</label>
         
       </div>
     </div>
@@ -879,7 +1070,7 @@
   <!-- ⬇️ Hidden toggles must be siblings BEFORE .panels -->
   
   
-  <input id="c-3-ui-themetoggle-stories" class="tg tg-stories" type="checkbox" hidden />
+  <input id="c-5-ui-themetoggle-stories" class="tg tg-stories" type="checkbox" hidden />
   
   
 
@@ -953,8 +1144,8 @@
       <h2><span class="status-dot dot-ok"></span> UpdatePrompt</h2>
       <div class="badges">
         
-        <label for="c-4-ui-updateprompt-info" class="badge info as-toggle">1 info</label>
-        <label for="c-4-ui-updateprompt-stories" class="badge ok as-toggle">1 story</label>
+        <label for="c-6-ui-updateprompt-info" class="badge info as-toggle">1 info</label>
+        <label for="c-6-ui-updateprompt-stories" class="badge ok as-toggle">1 story</label>
         
       </div>
     </div>
@@ -966,8 +1157,8 @@
 
   <!-- ⬇️ Hidden toggles must be siblings BEFORE .panels -->
   
-  <input id="c-4-ui-updateprompt-info" class="tg tg-info" type="checkbox" hidden />
-  <input id="c-4-ui-updateprompt-stories" class="tg tg-stories" type="checkbox" hidden />
+  <input id="c-6-ui-updateprompt-info" class="tg tg-info" type="checkbox" hidden />
+  <input id="c-6-ui-updateprompt-stories" class="tg tg-stories" type="checkbox" hidden />
   
   
 
@@ -1020,9 +1211,9 @@
     <div class="title">
       <h2><span class="status-dot dot-ok"></span> VersionBadge</h2>
       <div class="badges">
-        <label for="c-5-ui-versionbadge-props" class="badge ok as-toggle">1 prop type</label>
-        <label for="c-5-ui-versionbadge-info" class="badge info as-toggle">1 info</label>
-        <label for="c-5-ui-versionbadge-stories" class="badge ok as-toggle">4 stories</label>
+        <label for="c-7-ui-versionbadge-props" class="badge ok as-toggle">1 prop type</label>
+        <label for="c-7-ui-versionbadge-info" class="badge info as-toggle">1 info</label>
+        <label for="c-7-ui-versionbadge-stories" class="badge ok as-toggle">4 stories</label>
         
       </div>
     </div>
@@ -1034,10 +1225,10 @@
 
   <!-- ⬇️ Hidden toggles must be siblings BEFORE .panels -->
   
-  <input id="c-5-ui-versionbadge-info" class="tg tg-info" type="checkbox" hidden />
-  <input id="c-5-ui-versionbadge-stories" class="tg tg-stories" type="checkbox" hidden />
+  <input id="c-7-ui-versionbadge-info" class="tg tg-info" type="checkbox" hidden />
+  <input id="c-7-ui-versionbadge-stories" class="tg tg-stories" type="checkbox" hidden />
   
-  <input id="c-5-ui-versionbadge-props" class="tg tg-props" type="checkbox" hidden />
+  <input id="c-7-ui-versionbadge-props" class="tg tg-props" type="checkbox" hidden />
 
   <div class="panels">
     
@@ -1127,8 +1318,8 @@
       <h2><span class="status-dot dot-ok"></span> WelcomeTour</h2>
       <div class="badges">
         
-        <label for="c-6-onboarding-welcometour-info" class="badge info as-toggle">1 info</label>
-        <label for="c-6-onboarding-welcometour-stories" class="badge ok as-toggle">8 stories</label>
+        <label for="c-8-onboarding-welcometour-info" class="badge info as-toggle">1 info</label>
+        <label for="c-8-onboarding-welcometour-stories" class="badge ok as-toggle">8 stories</label>
         
       </div>
     </div>
@@ -1140,8 +1331,8 @@
 
   <!-- ⬇️ Hidden toggles must be siblings BEFORE .panels -->
   
-  <input id="c-6-onboarding-welcometour-info" class="tg tg-info" type="checkbox" hidden />
-  <input id="c-6-onboarding-welcometour-stories" class="tg tg-stories" type="checkbox" hidden />
+  <input id="c-8-onboarding-welcometour-info" class="tg tg-info" type="checkbox" hidden />
+  <input id="c-8-onboarding-welcometour-stories" class="tg tg-stories" type="checkbox" hidden />
   
   
 
