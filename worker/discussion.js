@@ -6,6 +6,7 @@
 //   DELETE /api/discussion/comments/:id        — soft-delete own comment (auth)
 
 import { getSession } from './auth/session.js';
+import { checkUserRateLimit, checkIpRateLimit, DISCUSSION_LIMITS } from './rateLimit.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -24,8 +25,23 @@ function displayName(row) {
   return row.nickname || row.email.split('@')[0];
 }
 
+function discRole(session, env) {
+  return (env.ADMIN_EMAIL && session.email === env.ADMIN_EMAIL) ? 'admin' : 'user';
+}
+
+function tooManyRequests(rl) {
+  return new Response(
+    JSON.stringify({ error: `Rate limit exceeded: ${rl.reason}. Try again in ${rl.retryAfter}s.` }),
+    { status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': String(rl.retryAfter) } }
+  );
+}
+
 // GET /api/discussion/topics?limit=N&offset=N
 export async function listTopics(request, env) {
+  const ip = request.headers.get('CF-Connecting-IP');
+  const rl = await checkIpRateLimit(env.KV, ip, 'disc:list', 60, 60_000);
+  if (!rl.allowed) return tooManyRequests(rl);
+
   const url    = new URL(request.url);
   const limit  = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit')  || '30')));
   const offset = Math.max(0,              parseInt(url.searchParams.get('offset') || '0'));
@@ -58,6 +74,9 @@ export async function createTopic(request, env) {
   const session = await guardAuth(request, env);
   if (session instanceof Response) return session;
 
+  const rl = await checkUserRateLimit(env.KV, session.userId, discRole(session, env), 'disc:topic', DISCUSSION_LIMITS.topic);
+  if (!rl.allowed) return tooManyRequests(rl);
+
   const { title, body } = await request.json().catch(() => ({}));
   if (!title?.trim())         return json({ error: 'Title required' }, 400);
   if (!body?.trim())          return json({ error: 'Body required' }, 400);
@@ -76,6 +95,10 @@ export async function createTopic(request, env) {
 
 // GET /api/discussion/topics/:id
 export async function getTopic(request, env, topicId) {
+  const ip = request.headers.get('CF-Connecting-IP');
+  const rl = await checkIpRateLimit(env.KV, ip, 'disc:thread', 120, 60_000);
+  if (!rl.allowed) return tooManyRequests(rl);
+
   const topic = await env.varun_portfolio_auth.prepare(`
     SELECT t.id, t.title, t.body, t.created_at, t.comment_count, t.pinned,
            u.nickname, u.email
@@ -123,6 +146,9 @@ export async function addComment(request, env, topicId) {
   const session = await guardAuth(request, env);
   if (session instanceof Response) return session;
 
+  const rl = await checkUserRateLimit(env.KV, session.userId, discRole(session, env), 'disc:comment', DISCUSSION_LIMITS.comment);
+  if (!rl.allowed) return tooManyRequests(rl);
+
   const { body, parent_id } = await request.json().catch(() => ({}));
   if (!body?.trim()) return json({ error: 'Body required' }, 400);
 
@@ -158,6 +184,9 @@ export async function addComment(request, env, topicId) {
 export async function deleteComment(request, env, commentId) {
   const session = await guardAuth(request, env);
   if (session instanceof Response) return session;
+
+  const rl = await checkUserRateLimit(env.KV, session.userId, discRole(session, env), 'disc:delete', DISCUSSION_LIMITS.delete);
+  if (!rl.allowed) return tooManyRequests(rl);
 
   const comment = await env.varun_portfolio_auth.prepare(
     'SELECT author_id FROM discussion_comments WHERE id = ? AND deleted = 0'

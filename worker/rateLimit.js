@@ -88,6 +88,61 @@ export async function checkRateLimit(kv, userId, role) {
   return { allowed: true };
 }
 
+// ── Generic per-user sliding-window rate limiter ──────────────────
+// Separate from the chat limiter — uses `rate:{bucket}:{userId}:…` keys.
+//
+// limits shape: { user: { windowMs, windowCount, day }, admin: null, … }
+// Roles not in limits fall back to 'user'.
+export async function checkUserRateLimit(kv, userId, role, bucket, limits) {
+  const roleLimits = limits[role] ?? limits.user;
+  if (roleLimits === null) return { allowed: true };
+
+  const now       = Date.now();
+  const winWindow = Math.floor(now / roleLimits.windowMs);
+  const dayWindow = Math.floor(now / 86_400_000);
+
+  const wKey = `rate:${bucket}:${userId}:w:${winWindow}`;
+  const dKey = `rate:${bucket}:${userId}:d:${dayWindow}`;
+
+  const [wRaw, dRaw] = await Promise.all([kv.get(wKey), kv.get(dKey)]);
+  const wCount = wRaw !== null ? parseInt(wRaw, 10) : 0;
+  const dCount = dRaw !== null ? parseInt(dRaw, 10) : 0;
+
+  if (wCount >= roleLimits.windowCount) {
+    const next       = (winWindow + 1) * roleLimits.windowMs;
+    const retryAfter = Math.ceil((next - now) / 1000);
+    return { allowed: false, retryAfter, reason: `${roleLimits.windowCount} per hour` };
+  }
+  if (dCount >= roleLimits.day) {
+    const nextDay    = (dayWindow + 1) * 86_400_000;
+    const retryAfter = Math.ceil((nextDay - now) / 1000);
+    return { allowed: false, retryAfter, reason: `${roleLimits.day} per day` };
+  }
+
+  const winTtl = Math.ceil(roleLimits.windowMs / 1000) + 60;
+  await Promise.all([
+    kv.put(wKey, String(wCount + 1), { expirationTtl: winTtl }),
+    kv.put(dKey, String(dCount + 1), { expirationTtl: 90000 }),
+  ]);
+  return { allowed: true };
+}
+
+// Limits for discussion write actions
+export const DISCUSSION_LIMITS = {
+  topic: {
+    user:  { windowMs: 3_600_000, windowCount: 5,  day: 20  },
+    admin: null,
+  },
+  comment: {
+    user:  { windowMs: 3_600_000, windowCount: 20, day: 100 },
+    admin: null,
+  },
+  delete: {
+    user:  { windowMs: 3_600_000, windowCount: 10, day: 50 },
+    admin: null,
+  },
+};
+
 // ── IP-based rate limiter ─────────────────────────────────────────
 // bucket   — namespaces the key (e.g. 'auth', 'otp', 'feedback')
 // limit    — max requests allowed in the window
