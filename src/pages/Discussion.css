@@ -95,7 +95,7 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #6366f1;
+  color: #4f46e5; /* darkened from #6366f1 — passes 4.5:1 contrast on white */
   margin-bottom: 2px;
 }
 .disc-topic-card__title {
@@ -117,6 +117,7 @@
   padding: 2px 8px;
   border-radius: 100px;
   font-size: 11px;
+  color: var(--text-2); /* explicit override — var(--text-3) fails 4.5:1 on --surface-alt */
 }
 
 /* ── New topic form ───────────────────────────────────────────── */
@@ -479,6 +480,5 @@
 }
 .disc-auth-nudge a {
   color: var(--accent);
-  text-decoration: none;
+  text-decoration: underline; /* required — link must be distinguishable without relying on color */
 }
-.disc-auth-nudge a:hover { text-decoration: underline; }

@@ -30,8 +30,14 @@ function timeAgo(iso) {
 }
 
 const AVATAR_COLORS = [
-  '#6366f1', '#ec4899', '#f97316', '#10b981',
-  '#3b82f6', '#8b5cf6', '#ef4444', '#14b8a6',
+  '#4338ca', // indigo-700
+  '#be185d', // pink-700
+  '#c2410c', // orange-700
+  '#047857', // emerald-700
+  '#1d4ed8', // blue-700
+  '#6d28d9', // violet-700
+  '#b91c1c', // red-700
+  '#0f766e', // teal-700
 ];
 
 function avatarColor(name) {
