@@ -30,9 +30,17 @@ export function useNumMatchApproval(user) {
         try {
           const msg = JSON.parse(event.data);
           if (msg.type === 'approval_request') {
-            setApproval({ approvalToken: msg.approvalToken, code: msg.code, userAgent: msg.userAgent, deviceNames: msg.deviceNames ?? [] });
+            setApproval({
+              approvalToken: msg.approvalToken,
+              code:          msg.code,
+              userAgent:     msg.userAgent,
+              deviceNames:   msg.deviceNames ?? [],
+              expiresAt:     msg.expires_at ?? (Date.now() + 120_000),
+            });
           } else if (msg.type === 'resolved') {
             setApproval(prev => prev?.approvalToken === msg.approvalToken ? null : prev);
+          } else if (msg.type === 'expired') {
+            setApproval(null);
           }
         } catch { /* ignore */ }
       });

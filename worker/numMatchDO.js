@@ -2,6 +2,11 @@
 // Durable Object that acts as a per-user WebSocket broker for number
 // matching. One DO instance per userId.
 //
+// Lifetime: a 2-minute alarm is set when an approval broadcast arrives.
+// The alarm fires an 'expired' event to all clients, then the DO shuts down.
+// The DO also shuts down quickly when the last client disconnects and no
+// approval is pending.
+//
 // Client types:
 //   'trusted'  — an authenticated trusted session waiting to approve/deny
 //   'waiting'  — the new device waiting for an approval result
@@ -10,49 +15,54 @@
 //   { type: 'respond', approvalToken, approved: bool }  — trusted device responds
 //
 // Message protocol (DO → client):
-//   { type: 'approval_request', approvalToken, code, userAgent } → trusted devices
-//   { type: 'result', approved, pendingToken? }                  → waiting device
-//   { type: 'resolved', approvalToken }                          → trusted devices (cleanup)
+//   { type: 'approval_request', approvalToken, code, userAgent, deviceNames, expires_at }
+//   { type: 'result', approved, pendingToken? }
+//   { type: 'resolved', approvalToken }
+//   { type: 'expired' }
 //
 // Internal HTTP (worker → DO):
-//   POST /broadcast  { approvalToken, code, userAgent, userId }  — new approval arrived
+//   POST /broadcast  { approvalToken, code, userAgent, userId }
 
 import { createPendingSession } from './auth/session.js';
 
+const TIMEOUT_MS = 2 * 60_000; // 2 minutes
+
 export class NumMatchDO {
   constructor(state, env) {
-    this.state = state;
-    this.env   = env;
-    // Map<WebSocket, { type: 'trusted'|'waiting', approvalToken?: string }>
-    this.clients = new Map();
-    // Current pending approval (in-memory; backed by KV as source of truth)
-    this.pending = null; // { approvalToken, code, userAgent }
-    this.userId  = null;
+    this.state   = state;
+    this.env     = env;
+    this.clients = new Map(); // Map<WebSocket, { type, approvalToken? }>
+    this.pending  = null;     // { approvalToken, code, userAgent, deviceNames, expiresAt }
+    this.userId   = null;
   }
 
   async fetch(request) {
     const url = new URL(request.url);
-
-    // Capture userId from any incoming URL (worker always sets it)
     const uid = url.searchParams.get('userId');
     if (uid) this.userId = uid;
 
-    // ── Internal: worker broadcasts new approval to connected trusted clients ──
+    // ── Internal: worker broadcasts new approval ──────────────────
     if (request.method === 'POST' && url.pathname.endsWith('/broadcast')) {
       const { approvalToken, code, userAgent, userId, deviceNames } = await request.json();
       if (userId) this.userId = userId;
-      this.pending = { approvalToken, code, userAgent, deviceNames };
 
-      const msg = JSON.stringify({ type: 'approval_request', approvalToken, code, userAgent, deviceNames });
+      const expiresAt = Date.now() + TIMEOUT_MS;
+      this.pending = { approvalToken, code, userAgent, deviceNames, expiresAt };
+
+      // Set alarm — DO will expire at this time even if clients stay connected
+      await this.state.storage.setAlarm(expiresAt);
+
+      const msg = JSON.stringify({
+        type: 'approval_request', approvalToken, code, userAgent, deviceNames,
+        expires_at: expiresAt,
+      });
       for (const [ws, info] of this.clients) {
-        if (info.type === 'trusted') {
-          try { ws.send(msg); } catch {}
-        }
+        if (info.type === 'trusted') try { ws.send(msg); } catch {}
       }
       return new Response('ok');
     }
 
-    // ── WebSocket upgrade ──────────────────────────────────────────
+    // ── WebSocket upgrade ─────────────────────────────────────────
     if (request.headers.get('Upgrade') !== 'websocket') {
       return new Response('Expected WebSocket upgrade', { status: 426 });
     }
@@ -66,32 +76,33 @@ export class NumMatchDO {
     if (type === 'trusted') {
       this.clients.set(server, { type: 'trusted' });
 
-      // Send any pending approval immediately — covers the case where the
-      // approval arrived before this trusted device connected (or DO restarted)
+      // Send any pending approval immediately (covers DO restart / late connect)
       let toSend = this.pending;
       if (!toSend && this.userId) {
-        // DO may have restarted; fall back to KV
         const raw = await this.env.KV.get(`num_match_for_user:${this.userId}`);
         if (raw) {
           const { approvalToken: at, code, userAgent, deviceNames } = JSON.parse(raw);
-          // Verify it hasn't already been resolved
           const still = await this.env.KV.get(`num_match:${at}`);
           if (still) {
-            toSend = { approvalToken: at, code, userAgent, deviceNames };
+            // Reconstruct expiresAt from the alarm (best-effort: fall back to now+2min)
+            const alarm = await this.state.storage.getAlarm();
+            const expiresAt = alarm ?? (Date.now() + TIMEOUT_MS);
+            toSend = { approvalToken: at, code, userAgent, deviceNames, expiresAt };
             this.pending = toSend;
           }
         }
       }
       if (toSend) {
-        server.send(JSON.stringify({ type: 'approval_request', ...toSend }));
+        server.send(JSON.stringify({
+          type: 'approval_request', ...toSend,
+          expires_at: toSend.expiresAt,
+        }));
       }
 
       server.addEventListener('message', async event => {
         try {
           const msg = JSON.parse(event.data);
-          if (msg.type === 'respond') {
-            await this.handleResponse(msg.approvalToken, msg.approved);
-          }
+          if (msg.type === 'respond') await this.handleResponse(msg.approvalToken, msg.approved);
         } catch {}
       });
 
@@ -99,19 +110,30 @@ export class NumMatchDO {
       this.clients.set(server, { type: 'waiting', approvalToken });
     }
 
-    server.addEventListener('close', () => this.clients.delete(server));
-    server.addEventListener('error', () => this.clients.delete(server));
+    server.addEventListener('close', () => {
+      this.clients.delete(server);
+      this.maybeScheduleCleanup();
+    });
+    server.addEventListener('error', () => {
+      this.clients.delete(server);
+      this.maybeScheduleCleanup();
+    });
 
     return new Response(null, { status: 101, webSocket: client });
   }
 
+  // If no clients remain and nothing is pending, shut down in 5s
+  maybeScheduleCleanup() {
+    if (this.clients.size === 0 && !this.pending) {
+      this.state.storage.setAlarm(Date.now() + 5_000);
+    }
+  }
+
   async handleResponse(approvalToken, approved) {
     const raw = await this.env.KV.get(`num_match:${approvalToken}`);
-    if (!raw) return; // already handled or expired
+    if (!raw) return;
 
     const { userId, email } = JSON.parse(raw);
-
-    // Clean up KV
     await this.env.KV.delete(`num_match:${approvalToken}`);
     await this.env.KV.delete(`num_match_for_user:${userId}`);
 
@@ -119,23 +141,48 @@ export class NumMatchDO {
     if (approved) {
       pendingToken = await createPendingSession(this.env.KV, { userId, email, method: 'passkey+number_match' });
     }
-
     this.pending = null;
 
-    // Notify the waiting device
-    const resultMsg = JSON.stringify({ type: 'result', approved, pendingToken });
+    const resultMsg   = JSON.stringify({ type: 'result', approved, pendingToken });
+    const resolvedMsg = JSON.stringify({ type: 'resolved', approvalToken });
+
     for (const [ws, info] of this.clients) {
       if (info.type === 'waiting' && info.approvalToken === approvalToken) {
         try { ws.send(resultMsg); } catch {}
       }
-    }
-
-    // Notify trusted devices so they can dismiss the modal
-    const resolvedMsg = JSON.stringify({ type: 'resolved', approvalToken });
-    for (const [ws, info] of this.clients) {
       if (info.type === 'trusted') {
         try { ws.send(resolvedMsg); } catch {}
       }
+    }
+
+    // Short alarm — give clients a moment to receive the result, then clean up
+    await this.state.storage.setAlarm(Date.now() + 30_000);
+  }
+
+  // Fires when the approval window expires or the cleanup timer fires
+  async alarm() {
+    if (this.pending) {
+      // Approval window expired — notify all clients
+      const msg = JSON.stringify({ type: 'expired' });
+      for (const [ws] of this.clients) {
+        try { ws.send(msg); } catch {}
+        try { ws.close(1001, 'Expired'); } catch {}
+      }
+      this.clients.clear();
+      this.pending = null;
+      // Clean up KV if the token is still there
+      if (this.userId) {
+        const raw = await this.env.KV.get(`num_match_for_user:${this.userId}`).catch(() => null);
+        if (raw) {
+          const { approvalToken } = JSON.parse(raw);
+          await this.env.KV.delete(`num_match:${approvalToken}`).catch(() => {});
+          await this.env.KV.delete(`num_match_for_user:${this.userId}`).catch(() => {});
+        }
+      }
+    } else {
+      // Post-resolution cleanup or idle shutdown
+      for (const [ws] of this.clients) try { ws.close(1000, 'Done'); } catch {}
+      this.clients.clear();
     }
   }
 }

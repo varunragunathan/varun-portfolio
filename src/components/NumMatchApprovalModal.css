@@ -5,11 +5,30 @@
   display: flex; align-items: center; justify-content: center; padding: 24px;
 }
 .num-match-modal__panel {
+  position: relative;
   background: var(--card-bg); border: 1px solid var(--border);
   border-radius: 20px; padding: 36px 32px;
   max-width: 380px; width: 100%;
   box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+  overflow: hidden;
 }
+
+/* ── Timer progress bar ───────────────────────────────────────── */
+.num-match-modal__timer-track {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 20px 20px 0 0;
+}
+.num-match-modal__timer-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: #22c55e;
+  transition: width 0.5s linear, background 0.4s ease;
+}
+.num-match-modal__timer-bar--warn     { background: #f59e0b; }
+.num-match-modal__timer-bar--critical { background: #ef4444; }
 .num-match-modal__type-label {
   font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.15em;
   text-transform: uppercase; color: #f59e0b; margin-bottom: 16px;
@@ -40,12 +59,30 @@
 
 .num-match-modal__code-display {
   text-align: center; margin-bottom: 32px;
-  background: #111; border-radius: 14px; padding: 24px 0;
+  background: #111; border-radius: 14px; padding: 20px 0 16px;
   border: 1px solid #1f1f1f;
 }
 .num-match-modal__code {
   font-family: var(--font-mono); font-size: 64px; font-weight: 200;
   letter-spacing: 0.3em; color: #ffffff; line-height: 1;
+  margin-bottom: 12px;
+}
+
+/* Countdown text inside code box */
+.num-match-modal__countdown {
+  font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.08em;
+  color: #22c55e; transition: color 0.4s ease;
+}
+.num-match-modal__countdown--warn     { color: #f59e0b; }
+.num-match-modal__countdown--critical {
+  color: #ef4444;
+  animation: countdown-pulse 0.6s ease-in-out infinite;
+}
+.num-match-modal__countdown--expired  { color: #6b7280; }
+
+@keyframes countdown-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
 }
 
 .num-match-modal__actions { display: flex; gap: 10px; }
