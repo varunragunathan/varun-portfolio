@@ -3,14 +3,10 @@ import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import './Discussion.css';
 
-function fmtDate(iso) {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
+// ── Helpers ────────────────────────────────────────────────────────
 
-// Build flat comment array into a tree
 function buildTree(comments) {
-  const map  = {};
+  const map = {};
   const roots = [];
   for (const c of comments) map[c.id] = { ...c, replies: [] };
   for (const c of comments) {
@@ -20,61 +16,113 @@ function buildTree(comments) {
   return roots;
 }
 
-// ── Reply form ────────────────────────────────────────────────────
-function ReplyForm({ topicId, parentId, onPosted, onCancel }) {
+function timeAgo(iso) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60)  return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60)  return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24)  return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30)  return `${d}d ago`;
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+const AVATAR_COLORS = [
+  '#6366f1', '#ec4899', '#f97316', '#10b981',
+  '#3b82f6', '#8b5cf6', '#ef4444', '#14b8a6',
+];
+
+function avatarColor(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+
+function getInitials(name) {
+  const parts = name.split(/[-_\s]/);
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
+}
+
+// ── Avatar ─────────────────────────────────────────────────────────
+
+function Avatar({ name, size = 36 }) {
+  return (
+    <div
+      className="disc-avatar"
+      style={{ width: size, height: size, background: avatarColor(name), fontSize: Math.round(size * 0.36) }}
+      aria-hidden="true"
+    >
+      {getInitials(name)}
+    </div>
+  );
+}
+
+// ── Inline reply textarea (appears inside a comment card) ──────────
+
+function InlineReplyForm({ topicId, parentId, onPosted, onCancel }) {
   const [body,    setBody]    = useState('');
+  const [posting, setPosting] = useState(false);
   const [error,   setError]   = useState('');
-  const [loading, setLoading] = useState(false);
   const ref = useRef(null);
 
   useEffect(() => { ref.current?.focus(); }, []);
 
-  const submit = async (e) => {
-    e.preventDefault();
+  const post = async () => {
     if (!body.trim()) return;
-    setLoading(true);
+    setPosting(true);
     setError('');
-    const res = await fetch(`/api/discussion/topics/${topicId}/comments`, {
+    const res  = await fetch(`/api/discussion/topics/${topicId}/comments`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ body: body.trim(), parent_id: parentId || null }),
     });
     const data = await res.json();
-    setLoading(false);
+    setPosting(false);
     if (!res.ok) { setError(data.error || 'Failed to post.'); return; }
     onPosted();
   };
 
+  const onKey = (e) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) post();
+  };
+
   return (
-    <form className="disc-reply-form" onSubmit={submit}>
-      {error && <p className="disc-reply-form__error">{error}</p>}
+    <div className="disc-inline-reply">
+      {error && <p className="disc-inline-reply__error">{error}</p>}
       <textarea
         ref={ref}
-        className="disc-reply-form__input"
+        className="disc-inline-reply__input"
         placeholder="Write a reply…"
         value={body}
         onChange={e => setBody(e.target.value)}
+        onKeyDown={onKey}
         rows={3}
       />
-      <div className="disc-reply-form__actions">
-        <button type="submit" className="disc-btn disc-btn--primary disc-btn--sm" disabled={loading || !body.trim()}>
-          {loading ? 'Posting…' : 'Reply'}
+      <div className="disc-inline-reply__actions">
+        <button
+          className="disc-btn disc-btn--primary disc-btn--sm"
+          disabled={posting || !body.trim()}
+          onClick={post}
+        >
+          {posting ? 'Posting…' : 'Post'}
         </button>
-        <button type="button" className="disc-btn disc-btn--ghost disc-btn--sm" onClick={onCancel}>
+        <button className="disc-btn disc-btn--ghost disc-btn--sm" onClick={onCancel}>
           Cancel
         </button>
       </div>
-    </form>
+    </div>
   );
 }
 
-// ── Single comment + its children ────────────────────────────────
-const MAX_INDENT = 5;
+// ── Single comment — recursive, every reply can have replies ───────
+
+const MAX_VISUAL_INDENT = 4;
 
 function Comment({ comment, topicId, userId, onRefresh, depth = 0 }) {
   const [replying,  setReplying]  = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const indent = Math.min(depth, MAX_INDENT);
 
   const handleDelete = async () => {
     if (!confirm('Delete this comment?')) return;
@@ -82,48 +130,58 @@ function Comment({ comment, topicId, userId, onRefresh, depth = 0 }) {
     onRefresh();
   };
 
-  return (
-    <div className="disc-comment" style={{ '--indent': indent }}>
-      {indent > 0 && <div className="disc-comment__thread-line" />}
+  const hasReplies = comment.replies?.length > 0;
+  const replyCount = comment.replies?.length ?? 0;
 
-      <div className="disc-comment__body-wrap">
-        <div className="disc-comment__meta">
-          <span className="disc-comment__author">{comment.author}</span>
-          <span className="disc-comment__dot">·</span>
-          <span className="disc-comment__date">{fmtDate(comment.created_at)}</span>
-          {comment.replies?.length > 0 && (
-            <button
-              className="disc-comment__collapse"
-              onClick={() => setCollapsed(c => !c)}
-            >
-              {collapsed ? `[+${comment.replies.length}]` : '[–]'}
-            </button>
-          )}
+  return (
+    <div className="disc-comment-wrap">
+      <div className="disc-comment-card">
+        <div className="disc-comment-card__header">
+          <Avatar name={comment.author} size={36} />
+          <div className="disc-comment-card__name-row">
+            <span className="disc-comment-card__author">{comment.author}</span>
+            <span className="disc-comment-card__time">{timeAgo(comment.created_at)}</span>
+          </div>
         </div>
 
-        {comment.deleted ? (
-          <p className="disc-comment__deleted">[deleted]</p>
-        ) : (
-          <p className="disc-comment__text">{comment.body}</p>
-        )}
+        {comment.deleted
+          ? <p className="disc-comment-card__deleted">[deleted]</p>
+          : <p className="disc-comment-card__text">{comment.body}</p>
+        }
 
         {!comment.deleted && (
-          <div className="disc-comment__actions">
+          <div className="disc-comment-card__actions">
             {userId && (
-              <button className="disc-comment__action" onClick={() => setReplying(r => !r)}>
-                {replying ? 'cancel' : 'reply'}
+              <button
+                className="disc-comment-card__action"
+                onClick={() => setReplying(r => !r)}
+              >
+                {replying ? 'Cancel' : 'Reply'}
               </button>
             )}
             {userId === comment.author_id && (
-              <button className="disc-comment__action disc-comment__action--delete" onClick={handleDelete}>
-                delete
+              <button
+                className="disc-comment-card__action disc-comment-card__action--delete"
+                onClick={handleDelete}
+              >
+                Delete
+              </button>
+            )}
+            {hasReplies && (
+              <button
+                className="disc-comment-card__action disc-comment-card__action--collapse"
+                onClick={() => setCollapsed(c => !c)}
+              >
+                {collapsed
+                  ? `Show ${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}`
+                  : 'Hide replies'}
               </button>
             )}
           </div>
         )}
 
         {replying && (
-          <ReplyForm
+          <InlineReplyForm
             topicId={topicId}
             parentId={comment.id}
             onPosted={() => { setReplying(false); onRefresh(); }}
@@ -132,8 +190,9 @@ function Comment({ comment, topicId, userId, onRefresh, depth = 0 }) {
         )}
       </div>
 
-      {!collapsed && comment.replies?.length > 0 && (
-        <div className="disc-comment__children">
+      {/* Nested replies — visually indented, but recursion is unlimited */}
+      {!collapsed && hasReplies && (
+        <div className={`disc-comment-replies${depth >= MAX_VISUAL_INDENT ? ' disc-comment-replies--flat' : ''}`}>
           {comment.replies.map(r => (
             <Comment
               key={r.id}
@@ -150,7 +209,60 @@ function Comment({ comment, topicId, userId, onRefresh, depth = 0 }) {
   );
 }
 
-// ── Thread page ───────────────────────────────────────────────────
+// ── Top-level comment composer ─────────────────────────────────────
+
+function AddCommentForm({ topicId, onPosted }) {
+  const [body,    setBody]    = useState('');
+  const [posting, setPosting] = useState(false);
+  const [error,   setError]   = useState('');
+
+  const post = async () => {
+    if (!body.trim()) return;
+    setPosting(true);
+    setError('');
+    const res  = await fetch(`/api/discussion/topics/${topicId}/comments`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ body: body.trim(), parent_id: null }),
+    });
+    const data = await res.json();
+    setPosting(false);
+    if (!res.ok) { setError(data.error || 'Failed to post.'); return; }
+    setBody('');
+    onPosted();
+  };
+
+  const onKey = (e) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) post();
+  };
+
+  return (
+    <div className="disc-add-comment">
+      <p className="disc-add-comment__label">Add a comment</p>
+      {error && <p className="disc-inline-reply__error">{error}</p>}
+      <div className="disc-add-comment__row">
+        <textarea
+          className="disc-add-comment__input"
+          placeholder="Write a comment…"
+          value={body}
+          onChange={e => setBody(e.target.value)}
+          onKeyDown={onKey}
+          rows={2}
+        />
+        <button
+          className="disc-add-comment__post"
+          disabled={posting || !body.trim()}
+          onClick={post}
+        >
+          {posting ? '…' : 'Post'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Thread page ────────────────────────────────────────────────────
+
 export default function DiscussionThread() {
   const { id }   = useParams();
   const { user } = useAuth();
@@ -158,7 +270,6 @@ export default function DiscussionThread() {
   const [topic,    setTopic]    = useState(null);
   const [tree,     setTree]     = useState([]);
   const [loading,  setLoading]  = useState(true);
-  const [replying, setReplying] = useState(false);
   const [notFound, setNotFound] = useState(false);
 
   const load = useCallback(async () => {
@@ -188,7 +299,7 @@ export default function DiscussionThread() {
         <div className="disc-topic__meta">
           <span>{topic.author}</span>
           <span className="disc-comment__dot">·</span>
-          <span>{fmtDate(topic.created_at)}</span>
+          <span>{timeAgo(topic.created_at)}</span>
         </div>
         <p className="disc-topic__body">{topic.body}</p>
       </article>
@@ -198,26 +309,19 @@ export default function DiscussionThread() {
           <span className="disc-thread__count">
             {topic.comment_count} {topic.comment_count === 1 ? 'reply' : 'replies'}
           </span>
-          {user && !replying && (
-            <button className="disc-btn disc-btn--primary disc-btn--sm" onClick={() => setReplying(true)}>
-              Add a comment
-            </button>
-          )}
         </div>
 
-        {replying && (
-          <ReplyForm
-            topicId={id}
-            parentId={null}
-            onPosted={() => { setReplying(false); load(); }}
-            onCancel={() => setReplying(false)}
-          />
-        )}
+        {user
+          ? <AddCommentForm topicId={id} onPosted={load} />
+          : (
+            <p className="disc-auth-nudge" style={{ marginBottom: 20, textAlign: 'left' }}>
+              <Link to="/auth">Sign in</Link> to join the discussion.
+            </p>
+          )
+        }
 
         {tree.length === 0 ? (
-          <p className="disc-empty disc-empty--inline">
-            No comments yet.{user ? '' : ' Sign in to be first.'}
-          </p>
+          <p className="disc-empty disc-empty--inline">No comments yet. Be the first!</p>
         ) : (
           <div className="disc-comments">
             {tree.map(c => (
@@ -225,18 +329,12 @@ export default function DiscussionThread() {
                 key={c.id}
                 comment={c}
                 topicId={id}
-                userId={user?.id}
+                userId={user?.userId}
                 onRefresh={load}
                 depth={0}
               />
             ))}
           </div>
-        )}
-
-        {!user && (
-          <p className="disc-auth-nudge">
-            <Link to="/auth">Sign in</Link> to join the discussion.
-          </p>
         )}
       </div>
     </div>
