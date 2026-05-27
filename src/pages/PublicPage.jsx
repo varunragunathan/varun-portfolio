@@ -1,11 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 
 export default function PublicPage() {
   const { slug } = useParams();
-  const [page,    setPage]    = useState(null);
-  const [error,   setError]   = useState(null);
-  const iframeRef = useRef(null);
+  const [page,  setPage]  = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     setPage(null);
@@ -15,18 +14,6 @@ export default function PublicPage() {
       .then(data => setPage(data.page))
       .catch(() => setError('Page not found.'));
   }, [slug]);
-
-  // Grow the iframe to match its content so the outer page scrolls (no double scrollbar)
-  useEffect(() => {
-    const iframe = iframeRef.current;
-    if (!iframe || !page) return;
-    const resize = () => {
-      const h = iframe.contentDocument?.documentElement?.scrollHeight;
-      if (h) iframe.style.height = h + 'px';
-    };
-    iframe.addEventListener('load', resize);
-    return () => iframe.removeEventListener('load', resize);
-  }, [page]);
 
   if (error) {
     return (
@@ -48,11 +35,10 @@ export default function PublicPage() {
 
   return (
     <iframe
-      ref={iframeRef}
       srcDoc={page.content}
       sandbox="allow-scripts allow-same-origin allow-popups allow-top-navigation-by-user-activation"
       title={page.title}
-      style={{ display: 'block', width: '100%', border: 'none', minHeight: '100vh' }}
+      style={{ display: 'block', width: '100%', border: 'none', height: 'calc(100vh - 52px)' }}
     />
   );
 }

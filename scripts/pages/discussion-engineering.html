@@ -70,7 +70,7 @@ body {
 
 .toc {
   position: sticky;
-  top: 32px;
+  top: 24px;
   font-size: 12px;
   line-height: 1.5;
 }
@@ -386,7 +386,7 @@ td code { font-size: 12px; }
 .method-patch  { color: #f59e0b; font-weight: 700; }
 
 /* ── Section divider ──────────────────────────────────────────── */
-.section-anchor { display: block; height: 0; visibility: hidden; scroll-margin-top: 80px; }
+.section-anchor { display: block; height: 0; visibility: hidden; scroll-margin-top: 40px; }
 
 /* ── Diagram ──────────────────────────────────────────────────── */
 .diagram {
@@ -1258,14 +1258,14 @@ td code { font-size: 12px; }
     </p>
 
     <div class="diagram" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;padding:24px">
-      <div class="av" style="background:#6366f1;width:44px;height:44px;font-size:15px">BB</div>
-      <div class="av" style="background:#10b981;width:44px;height:44px;font-size:15px">SF</div>
-      <div class="av" style="background:#ec4899;width:44px;height:44px;font-size:15px">CO</div>
-      <div class="av" style="background:#f97316;width:44px;height:44px;font-size:15px">KH</div>
-      <div class="av" style="background:#3b82f6;width:44px;height:44px;font-size:15px">WF</div>
-      <div class="av" style="background:#8b5cf6;width:44px;height:44px;font-size:15px">BW</div>
-      <div class="av" style="background:#ef4444;width:44px;height:44px;font-size:15px">QL</div>
-      <div class="av" style="background:#14b8a6;width:44px;height:44px;font-size:15px">VO</div>
+      <div class="av" style="background:#4338ca;width:44px;height:44px;font-size:15px">BB</div>
+      <div class="av" style="background:#047857;width:44px;height:44px;font-size:15px">SF</div>
+      <div class="av" style="background:#be185d;width:44px;height:44px;font-size:15px">CO</div>
+      <div class="av" style="background:#c2410c;width:44px;height:44px;font-size:15px">KH</div>
+      <div class="av" style="background:#1d4ed8;width:44px;height:44px;font-size:15px">WF</div>
+      <div class="av" style="background:#6d28d9;width:44px;height:44px;font-size:15px">BW</div>
+      <div class="av" style="background:#b91c1c;width:44px;height:44px;font-size:15px">QL</div>
+      <div class="av" style="background:#0f766e;width:44px;height:44px;font-size:15px">VO</div>
       <p style="color:var(--text-3);font-size:13px;margin:0;margin-left:4px">
         Same username → same color. Always. No state needed.
       </p>
@@ -1327,6 +1327,62 @@ td code { font-size: 12px; }
   border-left: none;
 }</pre>
     </div>
+
+    <h3>Responsive design</h3>
+
+    <p>
+      The discussion board targets a single breakpoint at <strong>768px</strong> —
+      wide enough to hold a two-column layout comfortably, narrow enough to catch every phone
+      and most tablets in portrait orientation.
+    </p>
+
+    <h4>Desktop (≥ 769px)</h4>
+    <p>
+      Two-column grid: a 220px sticky TOC sidebar on the left, the full prose column on the right.
+      The TOC sticks to the viewport as the user scrolls so section navigation is always reachable
+      without scrolling back to the top. Comment cards lay out inline, with action buttons on one
+      row and the collapse toggle pushed to the far right via <code>margin-left: auto</code>.
+    </p>
+
+    <h4>Mobile (&lt; 769px)</h4>
+    <p>
+      The grid collapses to a single column (<code>grid-template-columns: 1fr</code>) and the
+      TOC sidebar is hidden (<code>display: none</code>). Comment card padding and avatar size
+      scale down. Topic card metadata wraps naturally — no horizontal overflow to manage.
+      Fluid type sizing via <code>clamp()</code> means titles reflow without a separate font-size
+      rule:
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-filename">Discussion.css</span>
+        <span class="code-block-lang">CSS</span>
+      </div>
+      <pre><span class="cm">/* Fluid heading — 22px on phones, 28px on wide screens, never outside that range */</span>
+<span class="id">.disc-header__title</span> {
+  font-size: <span class="fn">clamp</span>(<span class="num">22px</span>, <span class="num">4vw</span>, <span class="num">28px</span>);
+}
+
+<span class="cm">/* Thread title same pattern */</span>
+<span class="id">.disc-topic__title</span> {
+  font-size: <span class="fn">clamp</span>(<span class="num">18px</span>, <span class="num">4vw</span>, <span class="num">24px</span>);
+}
+
+<span class="cm">/* Single breakpoint collapses the two-column layout */</span>
+<span class="kw">@media</span> (max-width: <span class="num">768px</span>) {
+  <span class="id">.layout</span>    { grid-template-columns: <span class="num">1fr</span>; }
+  <span class="id">.toc-wrap</span>  { display: none; }
+}</pre>
+    </div>
+
+    <h4>Touch targets</h4>
+    <p>
+      All interactive elements — Reply, Delete, collapse toggle, the Post button — have a minimum
+      touch area of 44px (WCAG 2.5.5 Target Size). Inline action buttons use <code>padding: 0</code>
+      visually but are wrapped in a flex container with enough gap that adjacent taps don't conflict.
+      The comment composer's Post button is a separate <code>&lt;button&gt;</code> at full height
+      of the textarea row — never a small icon-only target.
+    </p>
 
     <!-- ── 6 · Security ───────────────────────────────────────────── -->
     <span class="section-anchor" id="security"></span>
