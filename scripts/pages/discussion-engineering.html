@@ -696,6 +696,7 @@ td code { font-size: 12px; }
         <li><a href="#monitoring">Monitoring &amp; Triage</a></li>
         <li><a href="#lighthouse">Lighthouse Scores</a></li>
         <li><a href="#decisions">Key Decisions</a></li>
+        <li><a href="#roadmap">Roadmap</a></li>
       </ol>
     </nav>
   </aside>
@@ -1827,6 +1828,118 @@ td code { font-size: 12px; }
       works but is expensive and complex. Storing depth as a denormalized column (computed once
       at INSERT time, queried as a plain integer thereafter) is a textbook denormalization
       tradeoff — a small write cost for a zero read cost.
+    </p>
+
+    <!-- ── 11 · Roadmap ───────────────────────────────────────────── -->
+    <span class="section-anchor" id="roadmap"></span>
+    <h2><span class="section-num">11</span> Roadmap</h2>
+
+    <p>
+      The current build is a deliberate MVP — correct, fast, and secure. Below is the
+      prioritised backlog of features a growing product would want next, split by horizon.
+    </p>
+
+    <h3>N+1 — Near-term (next sprint)</h3>
+
+    <h4>Reactions and upvotes</h4>
+    <p>
+      A single emoji-reaction row per comment — thumbs-up, heart, insightful. Stored as a
+      <code>reactions</code> table (<code>comment_id</code>, <code>user_id</code>,
+      <code>emoji</code>, unique together). The reaction count surfaces on every comment card and
+      drives a "top comment" sort order as an alternative to chronological. This is the
+      highest-leverage engagement signal: reactions require zero friction (one click), generate
+      a rich heat-map of which arguments land, and give the moderation dashboard an early-warning
+      signal when a comment is getting bulk down-votes.
+    </p>
+
+    <h4>Real-time comment delivery</h4>
+    <p>
+      When two users are in the same thread simultaneously, new comments currently require a
+      page refresh to appear. The fix: a long-lived Server-Sent Events (SSE) stream at
+      <code>GET /api/discussion/topics/:id/stream</code>. The Worker writes a Durable Object
+      stub per thread; each stub fans out new-comment events to connected SSE clients.
+      This eliminates polling, reduces perceived latency to near-zero, and is a native
+      Cloudflare primitive — no third-party pub/sub required.
+    </p>
+
+    <h4>Reply notifications</h4>
+    <p>
+      Users who post a comment opt in to email notifications (via Resend, already wired for
+      other features). A Worker queue job fires on every <code>addComment</code> call, walks
+      the parent chain, deduplicates, and emails ancestors who have notifications enabled.
+      This closes the engagement loop: the person who started a thread comes back when
+      someone replies, instead of watching the comment count stay at zero.
+    </p>
+
+    <h4>Rate limiting on read paths</h4>
+    <p>
+      Write endpoints already have per-user sliding-window rate limits. The topic list and
+      thread endpoints only have per-IP limits. The next step is wrangler.toml route-level
+      rate limiting rules (Cloudflare's built-in, no KV round-trip) on
+      <code>/api/discussion/*</code> to absorb scraper bursts before they hit D1.
+    </p>
+
+    <h3>N+2 — Medium-term (next quarter)</h3>
+
+    <h4>Full-text search</h4>
+    <p>
+      The most frequently requested feature in any discussion forum. D1's SQLite does not
+      support <code>FTS5</code> (Cloudflare strips it), so the path is Cloudflare Vectorize:
+      embed each topic title and body at write time, serve a search box that queries the
+      vector index and returns semantically similar topics. This reuses the existing RAG
+      embedding infrastructure already deployed for the AI chat feature, making the marginal
+      cost of adding discussion search very low.
+    </p>
+
+    <h4>Markdown with safe rendering</h4>
+    <p>
+      Plain text is correct by construction but limiting for technical content. The safe path:
+      accept Markdown input, render with <code>marked</code> (a fast, well-audited parser),
+      sanitize the HTML output with <code>DOMPurify</code> before setting
+      <code>innerHTML</code>. Code blocks with syntax highlighting (Prism or highlight.js)
+      unlock technical posts with embedded snippets — high value for an engineering audience
+      without meaningful XSS surface if DOMPurify is kept current.
+    </p>
+
+    <h4>Topic categories and pinned tags</h4>
+    <p>
+      A <code>category</code> column on <code>discussion_topics</code> (e.g. "Engineering",
+      "Career", "General") plus a sidebar filter on the list page. Categories let the board
+      scale to 200+ topics without becoming a wall of text, give the admin a moderation lever
+      (move a misclassified topic), and provide segmentation data for the monitoring
+      dashboard. The implementation cost is low — one column, one filter clause, one UI
+      pill — but the product impact scales with volume.
+    </p>
+
+    <h4>User reputation and author profiles</h4>
+    <p>
+      A lightweight reputation score derived from received reactions, topic creation, and
+      comment karma. Displayed as a badge on the avatar. Serves two purposes:
+      (1) social proof — a comment from a "Top Contributor" carries more weight and
+      increases time-on-site; (2) moderation signal — an account with zero karma creating
+      50 topics per hour is a spam pattern, not a power user.
+      A public profile page at <code>/u/:username</code> (their topics, comment history,
+      reputation score) makes the board feel like a community rather than an anonymous feed.
+    </p>
+
+    <h4>Embeddable discussion threads</h4>
+    <p>
+      Any blog post or project page on the portfolio can host a discussion thread by
+      including a <code>&lt;DiscussionEmbed slug="post-slug" /&gt;</code> component.
+      The component fetches or creates a topic by slug, renders the comment tree inline,
+      and handles auth-gated posting. This turns a standalone feature into a first-class
+      content primitive: every write-up, case study, or project page gets a native comment
+      section without a third-party embed (no Disqus, no tracking scripts).
+    </p>
+
+    <h4>Weekly digest email</h4>
+    <p>
+      A scheduled Worker Cron job (Cloudflare's built-in cron trigger) runs every Monday
+      morning, queries the top 5 threads by comment velocity from the past week, and sends
+      a digest email via Resend to opted-in users. This is the re-engagement flywheel:
+      users who haven't visited in a week see that the board is active and have a
+      low-friction reason to return. The infrastructure (Resend + Worker cron) is already
+      in the stack.
     </p>
 
     <hr>
