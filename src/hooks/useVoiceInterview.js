@@ -57,13 +57,17 @@ export function useVoiceInterview() {
   const windingDownRef = useRef(false);
 
   // OpenAI TTS — set on start() if user has a stored key
-  const hasOpenAIKeyRef  = useRef(false);
+  const hasOpenAIKeyRef    = useRef(false);
+  // Explicit TTS mode: 'browser' | 'openai' — set on start()
+  const ttsModeRef         = useRef('browser');
+  // Output device ID for AudioContext.setSinkId (Chrome)
+  const outputDeviceIdRef  = useRef(null);
   // Persisted AudioContext (one per session)
-  const audioCtxRef      = useRef(null);
+  const audioCtxRef        = useRef(null);
   // Current AnalyserNode while OpenAI audio is playing — read by SpeechWaveform
-  const ttsAnalyserRef   = useRef(null);
+  const ttsAnalyserRef     = useRef(null);
   // Current BufferSourceNode so we can stop it on interrupt
-  const ttsSourceRef     = useRef(null);
+  const ttsSourceRef       = useRef(null);
 
   // Refs to break circular useCallback dependencies
   const handleUserTurnRef  = useRef(null);
@@ -90,6 +94,9 @@ export function useVoiceInterview() {
     // Lazily create one AudioContext per session
     if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
       audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      if (outputDeviceIdRef.current && audioCtxRef.current.setSinkId) {
+        await audioCtxRef.current.setSinkId(outputDeviceIdRef.current).catch(() => {});
+      }
     }
     const audioCtx = audioCtxRef.current;
     await audioCtx.resume();
@@ -149,14 +156,10 @@ export function useVoiceInterview() {
     });
   }, []);
 
-  // ── TTS — dispatch to whichever engine is available ──────────────
+  // ── TTS — dispatch based on explicit ttsMode setting ─────────────
   const speak = useCallback(async (text) => {
-    if (hasOpenAIKeyRef.current) {
-      try {
-        return await speakOpenAI(text);
-      } catch {
-        // Fall through to SpeechSynthesis if proxy fails
-      }
+    if (ttsModeRef.current === 'openai' && hasOpenAIKeyRef.current) {
+      try { return await speakOpenAI(text); } catch { /* fall through to browser TTS */ }
     }
     return speakSynthesis(text);
   }, [speakOpenAI, speakSynthesis]);
@@ -383,18 +386,20 @@ export function useVoiceInterview() {
   useEffect(() => { endInterviewRef.current = endInterview; }, [endInterview]);
 
   // ── Start interview ───────────────────────────────────────────────
-  const start = useCallback(async ({ theme, duration }) => {
+  const start = useCallback(async ({ theme, duration, model = 'workers-ai', ttsMode = 'browser', outputDeviceId = null }) => {
     setError(null);
     setTranscript([]);
     setLastText('');
     setElapsed(0);
     setCost(0);
     setHasOpenAIKey(false);
-    windingDownRef.current = false;
-    durationRef.current = duration;
+    windingDownRef.current     = false;
+    ttsModeRef.current         = ttsMode;
+    outputDeviceIdRef.current  = outputDeviceId;
+    durationRef.current        = duration;
     setDuration(duration);
 
-    // Check once whether user has an OpenAI key stored
+    // Check whether user has an OpenAI key (needed for TTS even if ttsMode=openai)
     try {
       const ks = await fetch('/api/user/key/status').then(r => r.json());
       hasOpenAIKeyRef.current = ks?.configured === true;
@@ -427,7 +432,7 @@ export function useVoiceInterview() {
         fetch('/api/interview/sessions', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ theme, duration }),
+          body:    JSON.stringify({ theme, duration, model }),
         })
       );
     } catch (err) {

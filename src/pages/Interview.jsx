@@ -2,11 +2,17 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import PixelOwl from '../components/PixelOwl';
 import SpeechWaveform from '../components/SpeechWaveform';
 import { useVoiceInterview, INTERVIEW_STATES, owlState } from '../hooks/useVoiceInterview';
+import { useAudioDevices } from '../hooks/useAudioDevices';
 import { useAuth } from '../hooks/useAuth';
 import { Link } from 'react-router-dom';
 import './Interview.css';
 
-// ── Avatar wrapper — swap avatarId to change persona later ───────
+// ── Prefs persistence (localStorage) ─────────────────────────────
+const PREFS_KEY = 'iv_prefs_v1';
+const loadPrefs = () => { try { return JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; } catch { return {}; } };
+const savePrefs = (p) => { localStorage.setItem(PREFS_KEY, JSON.stringify(p)); };
+
+// ── Avatar wrapper ────────────────────────────────────────────────
 function InterviewerAvatar({ interviewState, size = 14 }) {
   return (
     <div className="interview-avatar">
@@ -39,18 +45,154 @@ function fmtTime(secs) {
   return `${m}:${s}`;
 }
 function fmtCost(usd) {
+  if (!usd || usd === 0) return 'Free';
   if (usd < 0.001) return '< $0.001';
   return `$${usd.toFixed(4)}`;
 }
 
-// ── Setup screen ──────────────────────────────────────────────────
-function SetupView({ onStart, isSupported }) {
-  const [theme,    setTheme]    = useState('frontend');
-  const [duration, setDuration] = useState(1800);
+// ── Audio devices panel ───────────────────────────────────────────
+function AudioPanel({ audioDevices }) {
+  const {
+    inputs, outputs, granted, micId, speakerId, micLevel, testingMic,
+    requestPermission, selectMic, selectSpeaker, testMic, stopMicTest, testSpeaker,
+  } = audioDevices;
 
-  const randomize = useCallback(() => {
-    setTheme(THEMES[Math.floor(Math.random() * THEMES.length)].id);
-  }, []);
+  if (!granted && inputs.length === 0) {
+    return (
+      <div className="audio-panel">
+        <button className="audio-panel__permit" onClick={requestPermission}>
+          Allow microphone access to configure devices
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="audio-panel">
+      {/* Microphone row */}
+      <div className="audio-panel__row">
+        <label htmlFor="ap-mic" className="audio-panel__label">Microphone</label>
+        <div className="audio-panel__controls">
+          <select
+            id="ap-mic"
+            className="audio-panel__select"
+            value={micId}
+            onChange={e => selectMic(e.target.value)}
+          >
+            <option value="">System default</option>
+            {inputs.map(d => (
+              <option key={d.deviceId} value={d.deviceId}>
+                {d.label || `Mic ${d.deviceId.slice(0, 8)}`}
+              </option>
+            ))}
+          </select>
+          <button
+            className={`audio-panel__test${testingMic ? ' audio-panel__test--stop' : ''}`}
+            onClick={testingMic ? stopMicTest : testMic}
+          >
+            {testingMic ? 'Stop' : 'Test'}
+          </button>
+        </div>
+        {testingMic && (
+          <div className="audio-panel__level-wrap">
+            <div className="audio-panel__level-bar" style={{ width: `${Math.round(micLevel * 100)}%` }} />
+          </div>
+        )}
+      </div>
+
+      {/* Speaker row */}
+      <div className="audio-panel__row">
+        <label htmlFor="ap-spk" className="audio-panel__label">Speaker</label>
+        <div className="audio-panel__controls">
+          <select
+            id="ap-spk"
+            className="audio-panel__select"
+            value={speakerId}
+            onChange={e => selectSpeaker(e.target.value)}
+          >
+            <option value="">System default</option>
+            {outputs.map(d => (
+              <option key={d.deviceId} value={d.deviceId}>
+                {d.label || `Speaker ${d.deviceId.slice(0, 8)}`}
+              </option>
+            ))}
+          </select>
+          <button className="audio-panel__test" onClick={testSpeaker}>
+            Test
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Model + TTS settings panel ────────────────────────────────────
+function SettingsPanel({ prefs, onPrefChange, keyConfigured }) {
+  const model  = prefs.model || 'workers-ai';
+  const tts    = prefs.tts   || 'browser';
+
+  return (
+    <div className="settings-panel">
+      {/* AI Model */}
+      <div className="settings-panel__group">
+        <div className="settings-panel__label">AI Model</div>
+        <div className="settings-panel__toggles">
+          <button
+            className={`settings-toggle${model === 'workers-ai' ? ' settings-toggle--active' : ''}`}
+            onClick={() => onPrefChange('model', 'workers-ai')}
+          >
+            <span className="settings-toggle__name">Llama 3.3</span>
+            <span className="settings-toggle__tag settings-toggle__tag--free">Free</span>
+          </button>
+          <button
+            className={`settings-toggle${model === 'haiku' ? ' settings-toggle--active' : ''}`}
+            onClick={() => onPrefChange('model', 'haiku')}
+          >
+            <span className="settings-toggle__name">Claude Haiku</span>
+            <span className="settings-toggle__tag settings-toggle__tag--paid">~$0.006/session</span>
+          </button>
+        </div>
+      </div>
+
+      {/* TTS — only shown if OpenAI key is configured */}
+      {keyConfigured && (
+        <div className="settings-panel__group">
+          <div className="settings-panel__label">Voice</div>
+          <div className="settings-panel__toggles">
+            <button
+              className={`settings-toggle${tts === 'browser' ? ' settings-toggle--active' : ''}`}
+              onClick={() => onPrefChange('tts', 'browser')}
+            >
+              <span className="settings-toggle__name">Browser voice</span>
+              <span className="settings-toggle__tag settings-toggle__tag--free">Free</span>
+            </button>
+            <button
+              className={`settings-toggle${tts === 'openai' ? ' settings-toggle--active' : ''}`}
+              onClick={() => onPrefChange('tts', 'openai')}
+            >
+              <span className="settings-toggle__name">OpenAI TTS</span>
+              <span className="settings-toggle__tag settings-toggle__tag--paid">Your key</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Setup screen ──────────────────────────────────────────────────
+function SetupView({ prefs, onPrefChange, onStart, isSupported, keyConfigured, audioDevices }) {
+  const [theme,     setTheme]     = useState(prefs.theme    || 'frontend');
+  const [duration,  setDuration]  = useState(prefs.duration || 1800);
+  const [showAudio, setShowAudio] = useState(false);
+
+  const handleTheme = (t) => { setTheme(t); onPrefChange('theme', t); };
+  const handleDuration = (d) => { setDuration(d); onPrefChange('duration', d); };
+
+  const randomize = () => {
+    const t = THEMES[Math.floor(Math.random() * THEMES.length)].id;
+    handleTheme(t);
+  };
 
   return (
     <div className="interview-setup">
@@ -69,6 +211,7 @@ function SetupView({ onStart, isSupported }) {
         </div>
       )}
 
+      {/* Theme */}
       <section className="interview-setup__section">
         <div className="interview-setup__section-header">
           <span className="interview-setup__label">Theme</span>
@@ -79,7 +222,7 @@ function SetupView({ onStart, isSupported }) {
             <button
               key={t.id}
               className={`interview-theme-card${theme === t.id ? ' interview-theme-card--active' : ''}`}
-              onClick={() => setTheme(t.id)}
+              onClick={() => handleTheme(t.id)}
             >
               <span className="interview-theme-card__icon">{t.icon}</span>
               <span className="interview-theme-card__label">{t.label}</span>
@@ -89,6 +232,7 @@ function SetupView({ onStart, isSupported }) {
         </div>
       </section>
 
+      {/* Duration */}
       <section className="interview-setup__section">
         <div className="interview-setup__label">Duration</div>
         <div className="interview-setup__durations">
@@ -96,7 +240,7 @@ function SetupView({ onStart, isSupported }) {
             <button
               key={d.value}
               className={`interview-duration-chip${duration === d.value ? ' interview-duration-chip--active' : ''}`}
-              onClick={() => setDuration(d.value)}
+              onClick={() => handleDuration(d.value)}
             >
               {d.label}
             </button>
@@ -104,23 +248,44 @@ function SetupView({ onStart, isSupported }) {
         </div>
       </section>
 
+      {/* Model + TTS settings */}
+      <section className="interview-setup__section">
+        <div className="interview-setup__label">Settings</div>
+        <SettingsPanel prefs={prefs} onPrefChange={onPrefChange} keyConfigured={keyConfigured} />
+      </section>
+
+      {/* Audio devices */}
+      <section className="interview-setup__section">
+        <button
+          className="interview-setup__audio-toggle"
+          onClick={() => setShowAudio(v => !v)}
+        >
+          🎙 Audio Settings
+          <span className="interview-setup__audio-toggle-arrow">{showAudio ? '▲' : '▼'}</span>
+        </button>
+        {showAudio && <AudioPanel audioDevices={audioDevices} />}
+      </section>
+
       <button className="interview-setup__start" onClick={() => onStart({ theme, duration })}>
         Start Interview
       </button>
 
-      <div className="interview-setup__footer">
-        <a href="/account/settings#api-key" className="interview-setup__api-link">
-          🔑 Setup OpenAI API Key for better voice
-        </a>
-      </div>
+      {!keyConfigured && (
+        <div className="interview-setup__footer">
+          <a href="/account/settings#api-key" className="interview-setup__api-link">
+            🔑 Setup OpenAI API Key for better voice
+          </a>
+        </div>
+      )}
     </div>
   );
 }
 
 // ── Active interview ──────────────────────────────────────────────
-function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, hasOpenAIKey, onEnd, onStopRecording, onInterrupt, onSendText }) {
-  const [showText, setShowText] = useState(false);
-  const [typed,    setTyped]    = useState('');
+function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, hasOpenAIKey, prefs, audioDevices, onEnd, onStopRecording, onInterrupt, onSendText }) {
+  const [showText,  setShowText]  = useState(false);
+  const [typed,     setTyped]     = useState('');
+  const [showAudio, setShowAudio] = useState(false);
   const inputRef = useRef(null);
 
   const isSpeaking  = state === INTERVIEW_STATES.OPENING || state === INTERVIEW_STATES.RESPONDING;
@@ -140,6 +305,8 @@ function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, ha
     setTimeout(() => inputRef.current?.focus(), 50);
   };
 
+  const ttsLabel = prefs?.tts === 'openai' && hasOpenAIKey ? 'OpenAI voice' : null;
+
   return (
     <div className="interview-active">
 
@@ -147,21 +314,17 @@ function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, ha
       <div className="interview-active__timer">
         <span className={`interview-active__timer-dot${isListening ? ' interview-active__timer-dot--live' : ''}`} />
         {fmtTime(remaining)} remaining
-        {hasOpenAIKey && <span className="interview-active__tts-badge">OpenAI voice</span>}
+        {ttsLabel && <span className="interview-active__tts-badge">{ttsLabel}</span>}
       </div>
 
       {/* ── Main visual area ──────────────────────────────────── */}
       <div className="interview-active__stage">
-
-        {/* Waveform — shown while Hooty is speaking */}
         {isSpeaking && (
           <div className="interview-active__waveform-wrap">
             <SpeechWaveform mode="speaking" externalAnalyserRef={ttsAnalyserRef} />
             <p className="interview-active__stage-label">Hooty is speaking…</p>
           </div>
         )}
-
-        {/* Avatar — shown while listening or thinking */}
         {!isSpeaking && (
           <div className="interview-active__avatar-wrap">
             <InterviewerAvatar interviewState={state} size={16} />
@@ -188,15 +351,11 @@ function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, ha
 
       {/* ── Controls ──────────────────────────────────────────── */}
       <div className="interview-active__controls">
-
-        {/* Interrupt button while Hooty is speaking */}
         {isSpeaking && (
           <button className="interview-ctrl interview-ctrl--interrupt" onClick={onInterrupt}>
             <span className="interview-ctrl__icon">🎙</span> Speak now
           </button>
         )}
-
-        {/* Listening controls */}
         {isListening && !showText && (
           <>
             <button className="interview-ctrl interview-ctrl--stop" onClick={onStopRecording}>
@@ -207,8 +366,6 @@ function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, ha
             </button>
           </>
         )}
-
-        {/* Text input fallback */}
         {showText && (
           <form className="interview-active__text-form" onSubmit={handleTextSubmit}>
             <textarea
@@ -262,13 +419,16 @@ function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, ha
         End Interview
       </button>
 
-      {!hasOpenAIKey && (
-        <div className="interview-active__footer">
-          <a href="/account/settings#api-key" className="interview-active__api-link">
-            💡 Better voice? Setup OpenAI API Key
-          </a>
-        </div>
-      )}
+      {/* Audio settings footer */}
+      <div className="interview-active__audio-footer">
+        <button
+          className="interview-active__audio-toggle"
+          onClick={() => setShowAudio(v => !v)}
+        >
+          🎙 Audio Settings {showAudio ? '▲' : '▼'}
+        </button>
+        {showAudio && <AudioPanel audioDevices={audioDevices} />}
+      </div>
     </div>
   );
 }
@@ -278,6 +438,7 @@ function SummaryView({ transcript, elapsed, cost, sessionId, onRestart }) {
   const [showFull,          setShowFull]          = useState(false);
   const [assessment,        setAssessment]        = useState('');
   const [assessmentLoading, setAssessmentLoading] = useState(true);
+  const [copied,            setCopied]            = useState(false);
   const turns = transcript.filter(t => t.role === 'user').length;
 
   useEffect(() => {
@@ -308,6 +469,16 @@ function SummaryView({ transcript, elapsed, cost, sessionId, onRestart }) {
     }
     fetchAssessment();
   }, [sessionId]);
+
+  const copyTranscript = () => {
+    const text = transcript
+      .map(t => `${t.role === 'assistant' ? 'Hooty' : 'You'}: ${t.text}`)
+      .join('\n\n');
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  };
 
   return (
     <div className="interview-summary">
@@ -345,12 +516,18 @@ function SummaryView({ transcript, elapsed, cost, sessionId, onRestart }) {
         )}
       </div>
 
+      {/* Transcript */}
       <div className="interview-summary__transcript">
         <div className="interview-summary__transcript-header">
           <span>Transcript</span>
-          <button className="interview-summary__transcript-toggle" onClick={() => setShowFull(f => !f)}>
-            {showFull ? 'Collapse' : 'Expand'}
-          </button>
+          <div className="interview-summary__transcript-actions">
+            <button className="interview-summary__copy" onClick={copyTranscript}>
+              {copied ? '✓ Copied' : 'Copy'}
+            </button>
+            <button className="interview-summary__transcript-toggle" onClick={() => setShowFull(f => !f)}>
+              {showFull ? 'Collapse' : 'Expand'}
+            </button>
+          </div>
         </div>
         <div className={`interview-summary__transcript-body${showFull ? ' interview-summary__transcript-body--open' : ''}`}>
           {transcript.map((t, i) => (
@@ -373,11 +550,41 @@ function SummaryView({ transcript, elapsed, cost, sessionId, onRestart }) {
 // ── Main page ─────────────────────────────────────────────────────
 export default function InterviewPage() {
   const { user } = useAuth();
+  const [prefs,        setPrefs]        = useState(loadPrefs);
+  const [keyConfigured, setKeyConfigured] = useState(false);
+  const audioDevices = useAudioDevices();
+
   const {
     state, sessionId, transcript, lastText, error,
     elapsed, remaining, cost, hasOpenAIKey, ttsAnalyserRef,
     start, endInterview, stopRecording, interrupt, sendText, clearError, isSupported,
   } = useVoiceInterview();
+
+  useEffect(() => {
+    if (!user) return;
+    fetch('/api/user/key/status')
+      .then(r => r.json())
+      .then(d => setKeyConfigured(d?.configured === true))
+      .catch(() => {});
+  }, [user]);
+
+  const updatePref = useCallback((key, value) => {
+    setPrefs(prev => {
+      const next = { ...prev, [key]: value };
+      savePrefs(next);
+      return next;
+    });
+  }, []);
+
+  const handleStart = ({ theme, duration }) => {
+    start({
+      theme,
+      duration,
+      model:          prefs.model     || 'workers-ai',
+      ttsMode:        prefs.tts       || 'browser',
+      outputDeviceId: audioDevices.speakerId || null,
+    });
+  };
 
   if (!user) {
     return (
@@ -401,7 +608,14 @@ export default function InterviewPage() {
       )}
 
       {state === INTERVIEW_STATES.IDLE && (
-        <SetupView onStart={start} isSupported={isSupported} />
+        <SetupView
+          prefs={prefs}
+          onPrefChange={updatePref}
+          onStart={handleStart}
+          isSupported={isSupported}
+          keyConfigured={keyConfigured}
+          audioDevices={audioDevices}
+        />
       )}
 
       {isActive && (
@@ -412,6 +626,8 @@ export default function InterviewPage() {
           transcript={transcript}
           ttsAnalyserRef={ttsAnalyserRef}
           hasOpenAIKey={hasOpenAIKey}
+          prefs={prefs}
+          audioDevices={audioDevices}
           onEnd={endInterview}
           onStopRecording={stopRecording}
           onInterrupt={interrupt}

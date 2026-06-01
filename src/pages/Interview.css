@@ -496,18 +496,6 @@
   overflow: hidden;
   background: var(--card-bg);
 }
-.interview-summary__transcript-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-3);
-  background: var(--surface-alt);
-}
 .interview-summary__transcript-toggle {
   background: none;
   border: none;
@@ -584,6 +572,242 @@
   transition: color 0.15s;
 }
 .interview-summary__home:hover { color: var(--text-2); }
+
+/* Copy button */
+.interview-summary__transcript-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  background: var(--surface-alt);
+}
+.interview-summary__transcript-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.interview-summary__copy {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 11px;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.interview-summary__copy:hover {
+  color: var(--text-1);
+  border-color: var(--border-hover);
+}
+
+/* ── Settings panel ──────────────────────────────────────────── */
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+.settings-panel__group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.settings-panel__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.settings-panel__toggles {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: left;
+}
+.settings-toggle:hover {
+  border-color: var(--border-hover);
+  background: var(--card-hover);
+}
+.settings-toggle--active {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.06);
+}
+.settings-toggle__name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-1);
+}
+.settings-toggle__tag {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 20px;
+}
+.settings-toggle__tag--free {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+.settings-toggle__tag--paid {
+  background: rgba(251, 191, 36, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+/* ── Audio panel ─────────────────────────────────────────────── */
+.audio-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-top: 8px;
+}
+.audio-panel__permit {
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  text-align: center;
+  width: 100%;
+}
+.audio-panel__permit:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.audio-panel__row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.audio-panel__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.audio-panel__controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.audio-panel__select {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-1);
+  cursor: pointer;
+}
+.audio-panel__select:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+.audio-panel__test {
+  padding: 6px 14px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+.audio-panel__test:hover {
+  color: var(--text-1);
+  border-color: var(--border-hover);
+}
+.audio-panel__test--stop {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.audio-panel__level-wrap {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.audio-panel__level-bar {
+  height: 100%;
+  background: #22c55e;
+  border-radius: 2px;
+  transition: width 0.05s linear;
+}
+
+/* ── Setup audio toggle ──────────────────────────────────────── */
+.interview-setup__audio-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.interview-setup__audio-toggle:hover {
+  color: var(--text-1);
+  border-color: var(--border-hover);
+}
+.interview-setup__audio-toggle-arrow {
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+/* ── Active interview audio footer ───────────────────────────── */
+.interview-active__audio-footer {
+  width: 100%;
+  margin-top: 8px;
+}
+.interview-active__audio-toggle {
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 6px 0;
+  transition: color 0.15s;
+}
+.interview-active__audio-toggle:hover { color: var(--text-2); }
 
 /* ── Interview avatar — slow, elegant overrides ──────────────── */
 .interview-avatar {

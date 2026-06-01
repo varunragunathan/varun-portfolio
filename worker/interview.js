@@ -9,7 +9,8 @@
 
 import { getSession } from './auth/session.js';
 
-const INTERVIEW_MODEL = 'claude-haiku-4-5-20251001';
+const INTERVIEW_MODEL   = 'claude-haiku-4-5-20251001';
+const WORKERS_AI_MODEL  = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
 // Haiku pricing (per million tokens)
 const PRICE_INPUT  = 0.80;
@@ -71,29 +72,38 @@ export async function createInterviewSession(request, env) {
   if (session instanceof Response) return session;
 
   const body = await request.json().catch(() => ({}));
-  const theme    = THEMES[body.theme] ? body.theme : 'frontend';
-  const duration = Math.min(Math.max(Number(body.duration) || 1800, 300), 3600);
+  const theme       = THEMES[body.theme] ? body.theme : 'frontend';
+  const duration    = Math.min(Math.max(Number(body.duration) || 1800, 300), 3600);
+  const useWorkersAI = body.model === 'workers-ai';
+  const modelId     = useWorkersAI ? WORKERS_AI_MODEL : INTERVIEW_MODEL;
 
   const id = uid();
   const now = Math.floor(Date.now() / 1000);
 
   await env.varun_portfolio_auth
     .prepare('INSERT INTO interview_sessions (id, user_id, theme, duration_target, model, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .bind(id, session.userId, theme, duration, INTERVIEW_MODEL, now)
+    .bind(id, session.userId, theme, duration, modelId, now)
     .run();
 
-  // Stream the opening from Claude
-  const upstream = await callClaude(env.ANTHROPIC_API_KEY, systemPrompt(theme), []);
   const msgId = uid();
 
+  if (useWorkersAI) {
+    const upstream = await callWorkersAI(env.AI, systemPrompt(theme), []);
+    return sse(transformStreamWorkersAI(upstream, async (fullText) => {
+      const ts = Math.floor(Date.now() / 1000);
+      await env.varun_portfolio_auth
+        .prepare('INSERT INTO interview_messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)')
+        .bind(msgId, id, 'assistant', fullText, ts).run();
+    }, { sessionId: id }));
+  }
+
+  const upstream = await callClaude(env.ANTHROPIC_API_KEY, systemPrompt(theme), []);
   return sse(transformStream(upstream, async (fullText, usage) => {
     const ts = Math.floor(Date.now() / 1000);
     await env.varun_portfolio_auth
       .prepare('INSERT INTO interview_messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)')
-      .bind(msgId, id, 'assistant', fullText, ts)
-      .run();
+      .bind(msgId, id, 'assistant', fullText, ts).run();
     await accumulateUsage(env, id, usage);
-    // Prepend session id so the client knows it
   }, { sessionId: id }));
 }
 
@@ -103,7 +113,7 @@ export async function sendInterviewMessage(request, env, sessionId) {
   if (session instanceof Response) return session;
 
   const row = await env.varun_portfolio_auth
-    .prepare('SELECT user_id, theme, ended_at FROM interview_sessions WHERE id = ?')
+    .prepare('SELECT user_id, theme, model, ended_at FROM interview_sessions WHERE id = ?')
     .bind(sessionId).first();
 
   if (!row) return json({ error: 'Not found' }, 404);
@@ -119,24 +129,33 @@ export async function sendInterviewMessage(request, env, sessionId) {
   const ts = Math.floor(Date.now() / 1000);
   await env.varun_portfolio_auth
     .prepare('INSERT INTO interview_messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)')
-    .bind(userMsgId, sessionId, 'user', userContent, ts)
-    .run();
+    .bind(userMsgId, sessionId, 'user', userContent, ts).run();
 
   // Load full history for context
   const { results } = await env.varun_portfolio_auth
     .prepare('SELECT role, content FROM interview_messages WHERE session_id = ? ORDER BY created_at ASC')
     .bind(sessionId).all();
 
-  const messages = results.map(r => ({ role: r.role, content: r.content }));
-  const upstream = await callClaude(env.ANTHROPIC_API_KEY, systemPrompt(row.theme), messages);
-  const asstMsgId = uid();
+  const messages    = results.map(r => ({ role: r.role, content: r.content }));
+  const asstMsgId   = uid();
+  const useWorkersAI = row.model?.startsWith('@cf/');
 
+  if (useWorkersAI) {
+    const upstream = await callWorkersAI(env.AI, systemPrompt(row.theme), messages);
+    return sse(transformStreamWorkersAI(upstream, async (fullText) => {
+      const now = Math.floor(Date.now() / 1000);
+      await env.varun_portfolio_auth
+        .prepare('INSERT INTO interview_messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)')
+        .bind(asstMsgId, sessionId, 'assistant', fullText, now).run();
+    }));
+  }
+
+  const upstream = await callClaude(env.ANTHROPIC_API_KEY, systemPrompt(row.theme), messages);
   return sse(transformStream(upstream, async (fullText, usage) => {
     const now = Math.floor(Date.now() / 1000);
     await env.varun_portfolio_auth
       .prepare('INSERT INTO interview_messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)')
-      .bind(asstMsgId, sessionId, 'assistant', fullText, now)
-      .run();
+      .bind(asstMsgId, sessionId, 'assistant', fullText, now).run();
     await accumulateUsage(env, sessionId, usage);
   }));
 }
@@ -199,6 +218,62 @@ export async function getInterviewSession(request, env, sessionId) {
     .bind(sessionId).all();
 
   return json({ session: row, messages });
+}
+
+// ── Cloudflare Workers AI call ────────────────────────────────────
+async function callWorkersAI(ai, system, messages) {
+  const allMessages = [
+    ...(system ? [{ role: 'system', content: system }] : []),
+    ...(messages.length ? messages : [{ role: 'user', content: 'Begin.' }]),
+  ];
+  return ai.run(WORKERS_AI_MODEL, { messages: allMessages, stream: true, max_tokens: 512 });
+}
+
+// ── SSE transform: Workers AI format → client delta stream ────────
+function transformStreamWorkersAI(upstream, onDone, meta = {}) {
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let buffer   = '';
+  let fullText = '';
+
+  return new ReadableStream({
+    async start(controller) {
+      if (meta.sessionId) {
+        controller.enqueue(encoder.encode(
+          `data: ${JSON.stringify({ type: 'session', id: meta.sessionId })}\n\n`
+        ));
+      }
+      const reader = upstream.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const raw = line.slice(6).trim();
+            if (raw === '[DONE]') {
+              await onDone(fullText, { input_tokens: 0, output_tokens: 0 });
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
+              continue;
+            }
+            let ev;
+            try { ev = JSON.parse(raw); } catch { continue; }
+            if (ev.response) {
+              fullText += ev.response;
+              controller.enqueue(encoder.encode(
+                `data: ${JSON.stringify({ type: 'delta', text: ev.response })}\n\n`
+              ));
+            }
+          }
+        }
+      } finally {
+        controller.close();
+      }
+    },
+  });
 }
 
 // ── Anthropic streaming call ──────────────────────────────────────
