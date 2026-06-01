@@ -30,14 +30,15 @@ export function owlState(iState) {
 }
 
 export function useVoiceInterview() {
-  const [state,      setState]      = useState(INTERVIEW_STATES.IDLE);
-  const [sessionId,  setSessionId]  = useState(null);
-  const [transcript, setTranscript] = useState([]);
-  const [lastText,   setLastText]   = useState('');
-  const [error,      setError]      = useState(null);
-  const [elapsed,    setElapsed]    = useState(0);
-  const [cost,       setCost]       = useState(0);
-  const [duration,   setDuration]   = useState(1800);
+  const [state,        setState]        = useState(INTERVIEW_STATES.IDLE);
+  const [sessionId,    setSessionId]    = useState(null);
+  const [transcript,   setTranscript]   = useState([]);
+  const [lastText,     setLastText]     = useState('');
+  const [error,        setError]        = useState(null);
+  const [elapsed,      setElapsed]      = useState(0);
+  const [cost,         setCost]         = useState(0);
+  const [duration,     setDuration]     = useState(1800);
+  const [hasOpenAIKey, setHasOpenAIKey] = useState(false);
 
   const sessionRef     = useRef(null);
   const timerRef       = useRef(null);
@@ -52,6 +53,8 @@ export function useVoiceInterview() {
   const manualStopRef  = useRef(false);
   // Accumulates interim speech text so Stop can submit whatever was said
   const partialRef     = useRef('');
+  // Set when the timer expires — lets the current turn finish before ending
+  const windingDownRef = useRef(false);
 
   // OpenAI TTS — set on start() if user has a stored key
   const hasOpenAIKeyRef  = useRef(false);
@@ -66,6 +69,7 @@ export function useVoiceInterview() {
   const handleUserTurnRef  = useRef(null);
   const endInterviewRef    = useRef(null);
   const startListeningRef  = useRef(null);
+  const windDownRef        = useRef(null);
 
   const setStateSynced = useCallback((s) => {
     stateRef.current = s;
@@ -215,7 +219,7 @@ export function useVoiceInterview() {
     };
 
     recog.start();
-  }, [setStateSynced]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [setStateSynced]);
 
   // ── Stop recording — submits whatever was said, or leaves mic dead
   //    so the user can type. Renamed "Done" in the UI to signal intent.
@@ -230,7 +234,7 @@ export function useVoiceInterview() {
     manualStopRef.current = true;
     recogRef.current?.stop();
     // If nothing was captured, state stays LISTENING — user sees text input
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Interrupt Hooty mid-speech ───────────────────────────────────
   const interrupt = useCallback(() => {
@@ -299,7 +303,11 @@ export function useVoiceInterview() {
     await speak(fullText);
 
     if (stateRef.current !== INTERVIEW_STATES.ENDED) {
-      startListening();
+      if (windingDownRef.current) {
+        endInterviewRef.current?.();
+      } else {
+        startListening();
+      }
     }
   }, [readStream, speak, startListening, setStateSynced]);
 
@@ -326,8 +334,18 @@ export function useVoiceInterview() {
     }
   }, [handleAIResponse, setStateSynced, startListening]);
 
+  // ── Wind-down: speak a closing statement then end gracefully ─────
+  const windDownInterview = useCallback(async () => {
+    const closing = "That's all the time we have for today. You did great — thanks so much for your time, and good luck with your upcoming interviews!";
+    setStateSynced(INTERVIEW_STATES.RESPONDING);
+    setLastText(closing);
+    await speak(closing);
+    endInterviewRef.current?.();
+  }, [speak, setStateSynced]);
+
   useEffect(() => { handleUserTurnRef.current = handleUserTurn; }, [handleUserTurn]);
   useEffect(() => { startListeningRef.current = startListening; }, [startListening]);
+  useEffect(() => { windDownRef.current = windDownInterview; }, [windDownInterview]);
 
   // ── End interview ────────────────────────────────────────────────
   const endInterview = useCallback(async () => {
@@ -371,6 +389,8 @@ export function useVoiceInterview() {
     setLastText('');
     setElapsed(0);
     setCost(0);
+    setHasOpenAIKey(false);
+    windingDownRef.current = false;
     durationRef.current = duration;
     setDuration(duration);
 
@@ -378,6 +398,7 @@ export function useVoiceInterview() {
     try {
       const ks = await fetch('/api/user/key/status').then(r => r.json());
       hasOpenAIKeyRef.current = ks?.configured === true;
+      setHasOpenAIKey(ks?.configured === true);
     } catch {
       hasOpenAIKeyRef.current = false;
     }
@@ -388,7 +409,17 @@ export function useVoiceInterview() {
     timerRef.current = setInterval(() => {
       const secs = Math.floor((Date.now() - startTimeRef.current) / 1000);
       setElapsed(secs);
-      if (secs >= durationRef.current) endInterviewRef.current?.();
+      if (secs >= durationRef.current && !windingDownRef.current) {
+        windingDownRef.current = true;
+        clearInterval(timerRef.current);
+        // If currently listening: stop mic and trigger closing statement
+        if (stateRef.current === INTERVIEW_STATES.LISTENING) {
+          manualStopRef.current = true;
+          recogRef.current?.stop();
+          windDownRef.current?.();
+        }
+        // If responding/processing: handleAIResponse checks windingDownRef after speak()
+      }
     }, 1000);
 
     try {
@@ -435,6 +466,7 @@ export function useVoiceInterview() {
     elapsed,
     remaining,
     cost,
+    hasOpenAIKey,
     ttsAnalyserRef,
     start,
     endInterview,

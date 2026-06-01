@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import PixelOwl from '../components/PixelOwl';
 import SpeechWaveform from '../components/SpeechWaveform';
 import { useVoiceInterview, INTERVIEW_STATES, owlState } from '../hooks/useVoiceInterview';
@@ -118,7 +118,7 @@ function SetupView({ onStart, isSupported }) {
 }
 
 // ── Active interview ──────────────────────────────────────────────
-function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, onEnd, onStopRecording, onInterrupt, onSendText }) {
+function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, hasOpenAIKey, onEnd, onStopRecording, onInterrupt, onSendText }) {
   const [showText, setShowText] = useState(false);
   const [typed,    setTyped]    = useState('');
   const inputRef = useRef(null);
@@ -147,6 +147,7 @@ function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, on
       <div className="interview-active__timer">
         <span className={`interview-active__timer-dot${isListening ? ' interview-active__timer-dot--live' : ''}`} />
         {fmtTime(remaining)} remaining
+        {hasOpenAIKey && <span className="interview-active__tts-badge">OpenAI voice</span>}
       </div>
 
       {/* ── Main visual area ──────────────────────────────────── */}
@@ -261,19 +262,52 @@ function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, on
         End Interview
       </button>
 
-      <div className="interview-active__footer">
-        <a href="/account/settings#api-key" className="interview-active__api-link">
-          💡 Better voice? Setup OpenAI API Key
-        </a>
-      </div>
+      {!hasOpenAIKey && (
+        <div className="interview-active__footer">
+          <a href="/account/settings#api-key" className="interview-active__api-link">
+            💡 Better voice? Setup OpenAI API Key
+          </a>
+        </div>
+      )}
     </div>
   );
 }
 
 // ── Summary screen ────────────────────────────────────────────────
-function SummaryView({ transcript, elapsed, cost, onRestart }) {
-  const [showFull, setShowFull] = useState(false);
-  const turns = Math.floor(transcript.filter(t => t.role === 'user').length);
+function SummaryView({ transcript, elapsed, cost, sessionId, onRestart }) {
+  const [showFull,          setShowFull]          = useState(false);
+  const [assessment,        setAssessment]        = useState('');
+  const [assessmentLoading, setAssessmentLoading] = useState(true);
+  const turns = transcript.filter(t => t.role === 'user').length;
+
+  useEffect(() => {
+    if (!sessionId) { setAssessmentLoading(false); return; }
+    async function fetchAssessment() {
+      try {
+        const res = await fetch(`/api/interview/sessions/${sessionId}/assessment`);
+        if (!res.ok) { setAssessmentLoading(false); return; }
+        const reader = res.body.getReader();
+        const dec    = new TextDecoder();
+        let buf      = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop();
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const raw = line.slice(6).trim();
+            let ev;
+            try { ev = JSON.parse(raw); } catch { continue; }
+            if (ev.type === 'delta' && ev.text) setAssessment(t => t + ev.text);
+          }
+        }
+      } catch { /* best-effort */ }
+      setAssessmentLoading(false);
+    }
+    fetchAssessment();
+  }, [sessionId]);
 
   return (
     <div className="interview-summary">
@@ -281,7 +315,6 @@ function SummaryView({ transcript, elapsed, cost, onRestart }) {
         <InterviewerAvatar interviewState={INTERVIEW_STATES.ENDED} size={14} />
       </div>
       <h2 className="interview-summary__title">Interview Complete</h2>
-      <p className="interview-summary__sub">Great session — here's how it went.</p>
 
       <div className="interview-summary__stats">
         <div className="interview-summary__stat">
@@ -296,6 +329,20 @@ function SummaryView({ transcript, elapsed, cost, onRestart }) {
           <span className="interview-summary__stat-value">{fmtCost(cost)}</span>
           <span className="interview-summary__stat-label">cost</span>
         </div>
+      </div>
+
+      {/* Assessment */}
+      <div className="interview-summary__assessment">
+        <h3 className="interview-summary__assessment-title">Hooty&apos;s Feedback</h3>
+        {assessmentLoading ? (
+          <p className="interview-summary__assessment-loading">Generating feedback…</p>
+        ) : assessment ? (
+          <p className="interview-summary__assessment-text">{assessment}</p>
+        ) : (
+          <p className="interview-summary__assessment-text interview-summary__assessment-text--empty">
+            Not enough data to generate feedback for this session.
+          </p>
+        )}
       </div>
 
       <div className="interview-summary__transcript">
@@ -327,8 +374,8 @@ function SummaryView({ transcript, elapsed, cost, onRestart }) {
 export default function InterviewPage() {
   const { user } = useAuth();
   const {
-    state, transcript, lastText, error,
-    elapsed, remaining, cost, ttsAnalyserRef,
+    state, sessionId, transcript, lastText, error,
+    elapsed, remaining, cost, hasOpenAIKey, ttsAnalyserRef,
     start, endInterview, stopRecording, interrupt, sendText, clearError, isSupported,
   } = useVoiceInterview();
 
@@ -364,6 +411,7 @@ export default function InterviewPage() {
           lastText={lastText}
           transcript={transcript}
           ttsAnalyserRef={ttsAnalyserRef}
+          hasOpenAIKey={hasOpenAIKey}
           onEnd={endInterview}
           onStopRecording={stopRecording}
           onInterrupt={interrupt}
@@ -376,6 +424,7 @@ export default function InterviewPage() {
           transcript={transcript}
           elapsed={elapsed}
           cost={cost}
+          sessionId={sessionId}
           onRestart={() => window.location.reload()}
         />
       )}

@@ -35,7 +35,7 @@ import {
 } from './pages.js';
 import {
   createInterviewSession, sendInterviewMessage, endInterviewSession,
-  listInterviewSessions, getInterviewSession,
+  listInterviewSessions, getInterviewSession, getInterviewAssessment,
 } from './interview.js';
 import {
   listTopics, createTopic, getTopic, addComment, deleteComment,
@@ -371,9 +371,10 @@ async function handleRequest(request, env) {
     try {
       const path   = url.pathname;
       const method = request.method;
-      const sessionMatch  = path.match(/^\/api\/interview\/sessions\/([^/]+)$/);
-      const messageMatch  = path.match(/^\/api\/interview\/sessions\/([^/]+)\/message$/);
-      const endMatch      = path.match(/^\/api\/interview\/sessions\/([^/]+)\/end$/);
+      const sessionMatch    = path.match(/^\/api\/interview\/sessions\/([^/]+)$/);
+      const messageMatch    = path.match(/^\/api\/interview\/sessions\/([^/]+)\/message$/);
+      const endMatch        = path.match(/^\/api\/interview\/sessions\/([^/]+)\/end$/);
+      const assessmentMatch = path.match(/^\/api\/interview\/sessions\/([^/]+)\/assessment$/);
 
       let response;
       if (path === '/api/interview/sessions' && method === 'POST') {
@@ -384,6 +385,8 @@ async function handleRequest(request, env) {
         response = await sendInterviewMessage(request, env, messageMatch[1]);
       } else if (endMatch && method === 'PATCH') {
         response = await endInterviewSession(request, env, endMatch[1]);
+      } else if (assessmentMatch && method === 'GET') {
+        response = await getInterviewAssessment(request, env, assessmentMatch[1]);
       } else if (sessionMatch && method === 'GET') {
         response = await getInterviewSession(request, env, sessionMatch[1]);
       } else {

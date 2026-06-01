@@ -265,6 +265,18 @@
   font-family: var(--font-mono, monospace);
   color: var(--text-3);
 }
+.interview-active__tts-badge {
+  font-family: var(--font-sans, sans-serif);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: 20px;
+  padding: 2px 8px;
+  margin-left: 4px;
+}
 .interview-active__timer-dot {
   width: 8px;
   height: 8px;
@@ -435,6 +447,45 @@
   color: var(--text-3);
   text-transform: uppercase;
   letter-spacing: 0.07em;
+}
+
+/* Assessment */
+.interview-summary__assessment {
+  width: 100%;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 20px 18px;
+}
+.interview-summary__assessment-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #818cf8;
+  margin: 0 0 12px;
+}
+.interview-summary__assessment-text {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text-2);
+  margin: 0;
+  white-space: pre-wrap;
+}
+.interview-summary__assessment-text--empty {
+  color: var(--text-3);
+  font-style: italic;
+}
+.interview-summary__assessment-loading {
+  font-size: 13px;
+  color: var(--text-3);
+  font-style: italic;
+  margin: 0;
+  animation: fade-pulse 1.4s ease-in-out infinite;
+}
+@keyframes fade-pulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1;   }
 }
 
 /* Transcript accordion */

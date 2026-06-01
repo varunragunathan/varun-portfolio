@@ -280,6 +280,50 @@ function transformStream(upstream, onDone, meta = {}) {
   });
 }
 
+// ── Interview assessment (post-session) ──────────────────────────
+export async function getInterviewAssessment(request, env, sessionId) {
+  const session = await guardAuth(request, env);
+  if (session instanceof Response) return session;
+
+  const row = await env.varun_portfolio_auth
+    .prepare('SELECT user_id, theme, ended_at FROM interview_sessions WHERE id = ?')
+    .bind(sessionId).first();
+
+  if (!row) return json({ error: 'Not found' }, 404);
+  if (row.user_id !== session.userId) return json({ error: 'Forbidden' }, 403);
+  if (!row.ended_at) return json({ error: 'Session not ended' }, 400);
+
+  const { results: messages } = await env.varun_portfolio_auth
+    .prepare('SELECT role, content FROM interview_messages WHERE session_id = ? ORDER BY created_at ASC LIMIT 40')
+    .bind(sessionId).all();
+
+  if (messages.length < 2) return json({ error: 'Not enough data' }, 400);
+
+  const themeLabel = THEMES[row.theme] || row.theme;
+  const transcript = messages
+    .map(m => `${m.role === 'assistant' ? 'Interviewer' : 'Candidate'}: ${m.content}`)
+    .join('\n\n');
+
+  const assessmentPrompt = `You are reviewing a ${themeLabel} technical interview. Provide a concise, honest, and encouraging performance assessment.
+
+Here is the full interview transcript:
+
+${transcript}
+
+Write an assessment in three flowing paragraphs (no headers or bullets):
+1. What the candidate did well — 2-3 specific strengths with examples from the transcript
+2. Areas to improve — 2-3 specific, actionable suggestions
+3. One encouraging closing sentence with an overall impression
+
+Keep it under 200 words. Be specific and reference actual answers where possible. Tone: warm coach, not harsh critic.`;
+
+  const upstream = await callClaude(env.ANTHROPIC_API_KEY, '', [
+    { role: 'user', content: assessmentPrompt }
+  ]);
+
+  return sse(transformStream(upstream, async () => {}, {}));
+}
+
 // ── Accumulate token usage + cost after each turn ────────────────
 async function accumulateUsage(env, sessionId, usage) {
   const costDelta = (usage.input_tokens / 1_000_000) * PRICE_INPUT
