@@ -120,7 +120,15 @@ export function useVoiceInterview() {
       const utt = new SpeechSynthesisUtterance(text);
       utt.rate  = 0.92;
       utt.pitch = 1.0;
-      const voices = synthRef.current.getVoices();
+      // On iOS, voices may not be loaded immediately — wait if needed
+      let voices = synthRef.current.getVoices();
+      if (voices.length === 0) {
+        // iOS workaround: voices load asynchronously
+        synthRef.current.onvoiceschanged = () => {
+          voices = synthRef.current.getVoices();
+          if (voices.length > 0) synthRef.current.onvoiceschanged = null;
+        };
+      }
       const preferred = voices.find(v =>
         /en[-_]US/i.test(v.lang) && /natural|premium|enhanced/i.test(v.name)
       ) || voices.find(v => /en[-_]US/i.test(v.lang));
