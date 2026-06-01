@@ -60,6 +60,8 @@ export function useVoiceInterview() {
   const hasOpenAIKeyRef    = useRef(false);
   // Explicit TTS mode: 'browser' | 'openai' — set on start()
   const ttsModeRef         = useRef('browser');
+  // OpenAI voice name — set on start()
+  const ttsVoiceRef        = useRef('nova');
   // Output device ID for AudioContext.setSinkId (Chrome)
   const outputDeviceIdRef  = useRef(null);
   // Persisted AudioContext (one per session)
@@ -85,7 +87,7 @@ export function useVoiceInterview() {
     const res = await fetch('/api/proxy/tts', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ text, voice: 'nova' }),
+      body:    JSON.stringify({ text, voice: ttsVoiceRef.current }),
     });
     if (!res.ok) throw new Error(`TTS ${res.status}`);
 
@@ -438,7 +440,7 @@ export function useVoiceInterview() {
   useEffect(() => { endInterviewRef.current = endInterview; }, [endInterview]);
 
   // ── Start interview ───────────────────────────────────────────────
-  const start = useCallback(async ({ theme, duration, model = 'workers-ai', ttsMode = 'browser', outputDeviceId = null }) => {
+  const start = useCallback(async ({ theme, duration, model = 'workers-ai', ttsMode = 'browser', voice = 'nova', outputDeviceId = null }) => {
     setError(null);
     setTranscript([]);
     setLastText('');
@@ -447,6 +449,7 @@ export function useVoiceInterview() {
     setHasOpenAIKey(false);
     windingDownRef.current     = false;
     ttsModeRef.current         = ttsMode;
+    ttsVoiceRef.current        = voice;
     outputDeviceIdRef.current  = outputDeviceId;
     durationRef.current        = duration;
     setDuration(duration);

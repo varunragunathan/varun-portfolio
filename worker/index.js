@@ -44,7 +44,7 @@ import {
   getDiscussionMetrics, getDiscussionTriage,
 } from './discussionMetrics.js';
 import {
-  handleGetKeyStatus, handleSaveKey, handleDeleteKey, handleProxyTTS,
+  handleGetKeyStatus, handleSaveKey, handleDeleteKey, handleProxyTTS, handleVoiceSample,
 } from './keys.js';
 import { checkIpRateLimit } from './rateLimit.js';
 import { getMetrics } from './metrics.js';
@@ -297,8 +297,11 @@ async function handleRequest(request, env) {
     try {
       const path = url.pathname;
       let response;
+      const voiceSampleMatch = path.match(/^\/api\/proxy\/voice-sample\/([a-z]+)$/);
       if (path === '/api/proxy/tts' && request.method === 'POST') {
         response = await handleProxyTTS(request, env);
+      } else if (voiceSampleMatch && request.method === 'GET') {
+        response = await handleVoiceSample(request, env, voiceSampleMatch[1]);
       } else {
         response = new Response(JSON.stringify({ error: 'Not found' }), {
           status: 404, headers: { 'Content-Type': 'application/json' },

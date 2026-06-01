@@ -12,6 +12,93 @@ const PREFS_KEY = 'iv_prefs_v1';
 const loadPrefs = () => { try { return JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; } catch { return {}; } };
 const savePrefs = (p) => { localStorage.setItem(PREFS_KEY, JSON.stringify(p)); };
 
+// ── Voice options (OpenAI TTS voices) ────────────────────────────
+const TTS_VOICES = [
+  { id: 'nova',    label: 'Nova',    desc: 'Warm & natural'       },
+  { id: 'alloy',   label: 'Alloy',   desc: 'Neutral & balanced'   },
+  { id: 'onyx',    label: 'Onyx',    desc: 'Deep & authoritative' },
+  { id: 'echo',    label: 'Echo',    desc: 'Warm, conversational' },
+  { id: 'shimmer', label: 'Shimmer', desc: 'Soft & clear'         },
+  { id: 'fable',   label: 'Fable',   desc: 'British & expressive' },
+];
+
+// ── Voice sample picker ───────────────────────────────────────────
+function VoicePicker({ selectedVoice, onSelect, keyConfigured }) {
+  const [playing,  setPlaying]  = useState(null);
+  const [loading,  setLoading]  = useState(null);
+  const audioRef = useRef(null);
+
+  const stopCurrent = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      URL.revokeObjectURL(audioRef.current.src);
+      audioRef.current = null;
+    }
+    setPlaying(null);
+    setLoading(null);
+  };
+
+  const previewVoice = async (e, voiceId) => {
+    e.stopPropagation();
+    if (loading === voiceId || playing === voiceId) { stopCurrent(); return; }
+    stopCurrent();
+    if (!keyConfigured) return;
+    setLoading(voiceId);
+    try {
+      const res = await fetch(`/api/proxy/voice-sample/${voiceId}`);
+      if (!res.ok) throw new Error('preview failed');
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => { URL.revokeObjectURL(url); audioRef.current = null; setPlaying(null); };
+      audio.onerror = () => { URL.revokeObjectURL(url); audioRef.current = null; setPlaying(null); };
+      setLoading(null);
+      setPlaying(voiceId);
+      audio.play().catch(() => { setPlaying(null); });
+    } catch {
+      setLoading(null);
+    }
+  };
+
+  useEffect(() => () => stopCurrent(), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="voice-picker">
+      {TTS_VOICES.map(v => (
+        <div
+          key={v.id}
+          className={`voice-card${selectedVoice === v.id ? ' voice-card--selected' : ''}`}
+          onClick={() => onSelect(v.id)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={e => e.key === 'Enter' && onSelect(v.id)}
+        >
+          <button
+            className={`voice-card__play${loading === v.id ? ' voice-card__play--loading' : playing === v.id ? ' voice-card__play--playing' : ''}`}
+            onClick={e => previewVoice(e, v.id)}
+            aria-label={`Preview ${v.label} voice`}
+            title={keyConfigured ? 'Preview' : 'Add an OpenAI key to preview voices'}
+            disabled={!keyConfigured}
+          >
+            {loading === v.id ? '…' : playing === v.id ? '■' : '▶'}
+          </button>
+          <div className="voice-card__info">
+            <span className="voice-card__name">{v.label}</span>
+            <span className="voice-card__desc">{v.desc}</span>
+          </div>
+          {selectedVoice === v.id && <span className="voice-card__check">✓</span>}
+        </div>
+      ))}
+      {!keyConfigured && (
+        <p className="voice-picker__hint">
+          <a href="/account/settings#api-key">Add an OpenAI key</a> to preview voices.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ── Avatar wrapper ────────────────────────────────────────────────
 function InterviewerAvatar({ interviewState, size = 14 }) {
   return (
@@ -128,8 +215,9 @@ function AudioPanel({ audioDevices }) {
 
 // ── Model + TTS settings panel ────────────────────────────────────
 function SettingsPanel({ prefs, onPrefChange, keyConfigured }) {
-  const model  = prefs.model || 'workers-ai';
-  const tts    = prefs.tts   || 'browser';
+  const model = prefs.model || 'workers-ai';
+  const tts   = prefs.tts   || 'browser';
+  const voice = prefs.voice || 'nova';
 
   return (
     <div className="settings-panel">
@@ -154,10 +242,10 @@ function SettingsPanel({ prefs, onPrefChange, keyConfigured }) {
         </div>
       </div>
 
-      {/* TTS — only shown if OpenAI key is configured */}
+      {/* TTS engine — only shown if key is configured */}
       {keyConfigured && (
         <div className="settings-panel__group">
-          <div className="settings-panel__label">Voice</div>
+          <div className="settings-panel__label">Voice Engine</div>
           <div className="settings-panel__toggles">
             <button
               className={`settings-toggle${tts === 'browser' ? ' settings-toggle--active' : ''}`}
@@ -176,6 +264,16 @@ function SettingsPanel({ prefs, onPrefChange, keyConfigured }) {
           </div>
         </div>
       )}
+
+      {/* Voice picker — always visible; previews require key */}
+      <div className="settings-panel__group">
+        <div className="settings-panel__label">Voice</div>
+        <VoicePicker
+          selectedVoice={voice}
+          onSelect={v => onPrefChange('voice', v)}
+          keyConfigured={keyConfigured}
+        />
+      </div>
     </div>
   );
 }
@@ -582,6 +680,7 @@ export default function InterviewPage() {
       duration,
       model:          prefs.model     || 'workers-ai',
       ttsMode:        prefs.tts       || 'browser',
+      voice:          prefs.voice     || 'nova',
       outputDeviceId: audioDevices.speakerId || null,
     });
   };

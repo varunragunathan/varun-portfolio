@@ -128,6 +128,56 @@ export async function handleDeleteKey(request, env) {
   return json({ ok: true });
 }
 
+// GET /api/voice-samples/:voiceId
+// First request: generates via OpenAI and caches in KV for 30 days.
+// Subsequent requests: served from KV instantly (no API cost).
+export async function handleVoiceSample(request, env, voiceId) {
+  const session = await guardAuth(request, env);
+  if (session instanceof Response) return session;
+
+  const ALLOWED = ['nova','alloy','echo','onyx','shimmer','fable'];
+  if (!ALLOWED.includes(voiceId)) return json({ error: 'Unknown voice' }, 400);
+
+  const cacheKey = `voice_sample_v1_${voiceId}`;
+
+  // Serve from KV if already generated
+  const cached = await env.KV.get(cacheKey, 'arrayBuffer');
+  if (cached) {
+    return new Response(cached, {
+      headers: { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'public, max-age=2592000' },
+    });
+  }
+
+  // Generate once using the requesting user's stored key
+  const apiKey = await loadUserKey(env, session.userId);
+  if (!apiKey) return json({ error: 'No API key configured — set one up to preview voices' }, 402);
+
+  const upstream = await fetch('https://api.openai.com/v1/audio/speech', {
+    method:  'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model:           'tts-1-hd',
+      input:           "Hi, I'm Hooty. Ready to help you practice your interview skills today!",
+      voice:           voiceId,
+      response_format: 'mp3',
+    }),
+  });
+
+  if (!upstream.ok) {
+    const msg = await upstream.text().catch(() => upstream.statusText);
+    return json({ error: msg }, upstream.status);
+  }
+
+  const audioBuffer = await upstream.arrayBuffer();
+
+  // Cache for 30 days — same sample text, same voice = same audio forever
+  await env.KV.put(cacheKey, audioBuffer, { expirationTtl: 60 * 60 * 24 * 30 });
+
+  return new Response(audioBuffer, {
+    headers: { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'public, max-age=2592000' },
+  });
+}
+
 // POST /api/proxy/tts   { text, voice? }
 // Worker decrypts the stored key, calls OpenAI TTS, streams audio back.
 // The raw API key never leaves the Worker process.
