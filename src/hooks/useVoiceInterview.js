@@ -91,7 +91,8 @@ export function useVoiceInterview() {
 
     const arrayBuffer = await res.arrayBuffer();
 
-    // Lazily create one AudioContext per session
+    // AudioContext should already exist (created in start() during user gesture).
+    // Re-create only if it was closed (e.g. endInterview was called).
     if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
       audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
       if (outputDeviceIdRef.current && audioCtxRef.current.setSinkId) {
@@ -99,6 +100,7 @@ export function useVoiceInterview() {
       }
     }
     const audioCtx = audioCtxRef.current;
+    // Resume handles the case where the context was suspended (e.g. app backgrounded)
     await audioCtx.resume();
 
     const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
@@ -128,31 +130,55 @@ export function useVoiceInterview() {
   const speakSynthesis = useCallback((text) => {
     return new Promise((resolve) => {
       synthRef.current.cancel();
-      const utt = new SpeechSynthesisUtterance(text);
-      utt.rate  = 0.92;
-      utt.pitch = 1.0;
-      // On iOS, voices may not be loaded immediately — wait if needed
-      let voices = synthRef.current.getVoices();
-      if (voices.length === 0) {
-        // iOS workaround: voices load asynchronously
-        synthRef.current.onvoiceschanged = () => {
-          voices = synthRef.current.getVoices();
-          if (voices.length > 0) synthRef.current.onvoiceschanged = null;
-        };
-      }
-      const preferred = voices.find(v =>
-        /en[-_]US/i.test(v.lang) && /natural|premium|enhanced/i.test(v.name)
-      ) || voices.find(v => /en[-_]US/i.test(v.lang));
-      if (preferred) utt.voice = preferred;
+      const utt  = new SpeechSynthesisUtterance(text);
+      utt.rate   = 0.92;
+      utt.pitch  = 1.0;
+
+      let stallTimer;
       utt.onboundary = (e) => {
         if (e.name !== 'word') return;
         const word = text.slice(e.charIndex, e.charIndex + (e.charLength ?? 4));
         const amp  = Math.min(0.92, 0.42 + Math.min(word.replace(/\W/g, '').length, 9) * 0.057);
         window.dispatchEvent(new CustomEvent('iv-voice-pulse', { detail: { amp } }));
       };
-      utt.onend   = resolve;
-      utt.onerror = resolve;
-      synthRef.current.speak(utt);
+      // iOS Safari stalls speech synthesis after ~15 s of speaking.
+      // Periodic pause+resume keeps it running on long responses.
+      utt.onstart = () => {
+        stallTimer = setInterval(() => {
+          if (synthRef.current.speaking) {
+            synthRef.current.pause();
+            synthRef.current.resume();
+          }
+        }, 12000);
+      };
+      utt.onend   = () => { clearInterval(stallTimer); resolve(); };
+      utt.onerror = () => { clearInterval(stallTimer); resolve(); };
+
+      const assignVoiceAndSpeak = () => {
+        const voices = synthRef.current.getVoices();
+        const preferred = voices.find(v =>
+          /en[-_]US/i.test(v.lang) && /natural|premium|enhanced/i.test(v.name)
+        ) || voices.find(v => /en[-_]US/i.test(v.lang));
+        if (preferred) utt.voice = preferred;
+        synthRef.current.speak(utt);
+      };
+
+      // iOS loads voices asynchronously — must wait before calling speak(),
+      // otherwise the utterance plays silently with no voice assigned.
+      const voices = synthRef.current.getVoices();
+      if (voices.length > 0) {
+        assignVoiceAndSpeak();
+      } else {
+        let spoken = false;
+        synthRef.current.onvoiceschanged = () => {
+          synthRef.current.onvoiceschanged = null;
+          if (!spoken) { spoken = true; assignVoiceAndSpeak(); }
+        };
+        // Fallback: if onvoiceschanged never fires (some iOS versions), speak anyway
+        setTimeout(() => {
+          if (!spoken) { spoken = true; assignVoiceAndSpeak(); }
+        }, 500);
+      }
     });
   }, []);
 
@@ -398,6 +424,19 @@ export function useVoiceInterview() {
     outputDeviceIdRef.current  = outputDeviceId;
     durationRef.current        = duration;
     setDuration(duration);
+
+    // ── iOS Safari: create and unlock AudioContext NOW, while still in the
+    //    synchronous user-gesture call chain. Any await after this point
+    //    breaks the gesture context and iOS will block audio playback.
+    if (ttsMode === 'openai') {
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        if (outputDeviceId && audioCtxRef.current.setSinkId) {
+          audioCtxRef.current.setSinkId(outputDeviceId).catch(() => {});
+        }
+      }
+      audioCtxRef.current.resume().catch(() => {});
+    }
 
     // Check whether user has an OpenAI key (needed for TTS even if ttsMode=openai)
     try {
