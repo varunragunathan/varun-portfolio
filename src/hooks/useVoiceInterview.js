@@ -152,21 +152,23 @@ export function useVoiceInterview() {
   // ── STT ──────────────────────────────────────────────────────────
   const startListening = useCallback(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
-      setError('Voice input requires Chrome or Edge. Use the text input below instead.');
-      return;
-    }
 
     gotResultRef.current  = false;
     manualStopRef.current = false;
     partialRef.current    = '';
+
+    setStateSynced(INTERVIEW_STATES.LISTENING);
+
+    if (!SR) {
+      // Voice not available (e.g., iPhone Safari) — user will type instead
+      return;
+    }
 
     const recog = new SR();
     recog.lang           = 'en-US';
     recog.continuous     = false;
     recog.interimResults = true;  // track partial so Stop can submit them
     recogRef.current     = recog;
-    setStateSynced(INTERVIEW_STATES.LISTENING);
 
     recog.onresult = (e) => {
       if (gotResultRef.current) return; // already submitted (e.g. via Stop)
