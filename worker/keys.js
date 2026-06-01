@@ -150,7 +150,7 @@ export async function handleProxyTTS(request, env) {
       'Content-Type':  'application/json',
     },
     body: JSON.stringify({
-      model:           'tts-1',
+      model:           'tts-1-hd',
       input:           text,
       voice,
       response_format: 'mp3',

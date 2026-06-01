@@ -85,7 +85,7 @@ export function useVoiceInterview() {
     const res = await fetch('/api/proxy/tts', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ text, voice: 'fable' }),
+      body:    JSON.stringify({ text, voice: 'nova' }),
     });
     if (!res.ok) throw new Error(`TTS ${res.status}`);
 
@@ -207,37 +207,63 @@ export function useVoiceInterview() {
 
     const recog = new SR();
     recog.lang           = 'en-US';
-    recog.continuous     = false;
-    recog.interimResults = true;  // track partial so Stop can submit them
+    recog.continuous     = true;  // Don't cut off on brief mid-sentence pauses
+    recog.interimResults = true;
     recogRef.current     = recog;
 
+    let accumulated  = '';  // confirmed final text across multiple utterances
+    let silenceTimer;       // auto-submit after 3 s of silence
+
+    const submit = (text) => {
+      if (gotResultRef.current) return;
+      clearTimeout(silenceTimer);
+      gotResultRef.current = true;
+      partialRef.current   = '';
+      handleUserTurnRef.current?.(text);
+      manualStopRef.current = true;
+      recog.stop();
+    };
+
     recog.onresult = (e) => {
-      if (gotResultRef.current) return; // already submitted (e.g. via Stop)
-      const result = e.results[e.results.length - 1];
-      const text   = result[0].transcript.trim();
-      partialRef.current = text;
-      if (result.isFinal && text) {
-        gotResultRef.current = true;
-        partialRef.current   = '';
-        handleUserTurnRef.current?.(text);
+      if (gotResultRef.current) return;
+      clearTimeout(silenceTimer);
+
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          accumulated += e.results[i][0].transcript + ' ';
+        }
+      }
+      const lastResult = e.results[e.results.length - 1];
+      const interim    = lastResult.isFinal ? '' : lastResult[0].transcript;
+      partialRef.current = (accumulated + interim).trim();
+
+      // Auto-submit after 3 s of silence once there's confirmed speech
+      if (accumulated.trim()) {
+        silenceTimer = setTimeout(() => submit(accumulated.trim()), 3000);
       }
     };
 
     recog.onend = () => {
-      // Don't restart if: we already got a result, user manually stopped, or session ended
+      clearTimeout(silenceTimer);
       if (gotResultRef.current) return;
       if (manualStopRef.current) return;
       if (stateRef.current !== INTERVIEW_STATES.LISTENING) return;
+      // If we accumulated anything before an unexpected stop, submit it
+      if (accumulated.trim()) {
+        gotResultRef.current = true;
+        handleUserTurnRef.current?.(accumulated.trim());
+        return;
+      }
       startListeningRef.current?.();
     };
 
     recog.onerror = (e) => {
+      clearTimeout(silenceTimer);
       if (e.error === 'no-speech') {
         if (stateRef.current === INTERVIEW_STATES.LISTENING && !manualStopRef.current) {
           startListeningRef.current?.();
         }
       } else if (e.error !== 'aborted') {
-        // Mark as manual stop so onend doesn't restart into another error loop
         manualStopRef.current = true;
         setError(
           e.error === 'not-allowed'
