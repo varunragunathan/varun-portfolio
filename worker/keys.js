@@ -59,7 +59,7 @@ async function saveUserKey(env, userId, apiKey) {
   const aesKey = await deriveUserKey(env.ENCRYPTION_SECRET, userId);
   const blob   = await encryptBlob(aesKey, apiKey);
   const hint   = 'OpenAI •••• ' + apiKey.slice(-4);
-  await env.DB.prepare(`
+  await env.varun_portfolio_auth.prepare(`
     INSERT INTO user_encrypted_keys (user_id, encrypted_blob, key_hint, updated_at)
     VALUES (?, ?, ?, unixepoch())
     ON CONFLICT(user_id) DO UPDATE
@@ -71,7 +71,7 @@ async function saveUserKey(env, userId, apiKey) {
 
 async function loadUserKey(env, userId) {
   if (!env.ENCRYPTION_SECRET) return null;
-  const row = await env.DB.prepare(
+  const row = await env.varun_portfolio_auth.prepare(
     'SELECT encrypted_blob FROM user_encrypted_keys WHERE user_id = ?'
   ).bind(userId).first();
   if (!row) return null;
@@ -80,13 +80,13 @@ async function loadUserKey(env, userId) {
 }
 
 async function deleteUserKey(env, userId) {
-  await env.DB.prepare(
+  await env.varun_portfolio_auth.prepare(
     'DELETE FROM user_encrypted_keys WHERE user_id = ?'
   ).bind(userId).run();
 }
 
 async function getKeyHint(env, userId) {
-  const row = await env.DB.prepare(
+  const row = await env.varun_portfolio_auth.prepare(
     'SELECT key_hint FROM user_encrypted_keys WHERE user_id = ?'
   ).bind(userId).first();
   return row?.key_hint ?? null;
