@@ -24,15 +24,18 @@ const TTS_VOICES = [
 
 // ── Voice sample picker ───────────────────────────────────────────
 function VoicePicker({ selectedVoice, onSelect, keyConfigured }) {
-  const [playing,  setPlaying]  = useState(null);
-  const [loading,  setLoading]  = useState(null);
-  const audioRef = useRef(null);
+  const [playing,   setPlaying]   = useState(null);
+  const [loading,   setLoading]   = useState(null);
+  const [previewErr,setPreviewErr]= useState(null);
+  const ctxRef    = useRef(null); // shared AudioContext for previews
+  const sourceRef = useRef(null); // current playing BufferSourceNode
+  const cacheRef  = useRef({});   // session-level ArrayBuffer cache keyed by voiceId
 
   const stopCurrent = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      URL.revokeObjectURL(audioRef.current.src);
-      audioRef.current = null;
+    if (sourceRef.current) {
+      sourceRef.current.onended = null;
+      try { sourceRef.current.stop(); } catch { /* already stopped */ }
+      sourceRef.current = null;
     }
     setPlaying(null);
     setLoading(null);
@@ -40,28 +43,52 @@ function VoicePicker({ selectedVoice, onSelect, keyConfigured }) {
 
   const previewVoice = async (e, voiceId) => {
     e.stopPropagation();
+    setPreviewErr(null);
     if (loading === voiceId || playing === voiceId) { stopCurrent(); return; }
     stopCurrent();
-    if (!keyConfigured) return;
+
+    // ── Create/unlock AudioContext SYNCHRONOUSLY here, while still in the
+    //    user-gesture call chain. iOS Safari blocks audio from async callbacks.
+    if (!ctxRef.current || ctxRef.current.state === 'closed') {
+      ctxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    ctxRef.current.resume().catch(() => {});
+    const ctx = ctxRef.current;
+
     setLoading(voiceId);
     try {
-      const res = await fetch(`/api/proxy/voice-sample/${voiceId}`);
-      if (!res.ok) throw new Error('preview failed');
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onended = () => { URL.revokeObjectURL(url); audioRef.current = null; setPlaying(null); };
-      audio.onerror = () => { URL.revokeObjectURL(url); audioRef.current = null; setPlaying(null); };
+      // Fetch once, cache ArrayBuffer for the session
+      if (!cacheRef.current[voiceId]) {
+        const res = await fetch(`/api/proxy/voice-sample/${voiceId}`);
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `HTTP ${res.status}`);
+        }
+        cacheRef.current[voiceId] = await res.arrayBuffer();
+      }
+
+      // decodeAudioData transfers the buffer, so pass a copy from cache
+      const audioBuffer = await ctx.decodeAudioData(cacheRef.current[voiceId].slice(0));
+
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(ctx.destination);
+      sourceRef.current = source;
+
       setLoading(null);
       setPlaying(voiceId);
-      audio.play().catch(() => { setPlaying(null); });
-    } catch {
+      source.onended = () => { sourceRef.current = null; setPlaying(null); };
+      source.start();
+    } catch (err) {
       setLoading(null);
+      setPreviewErr(err.message || 'Preview failed');
     }
   };
 
-  useEffect(() => () => stopCurrent(), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => {
+    stopCurrent();
+    ctxRef.current?.close().catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="voice-picker">
@@ -78,8 +105,7 @@ function VoicePicker({ selectedVoice, onSelect, keyConfigured }) {
             className={`voice-card__play${loading === v.id ? ' voice-card__play--loading' : playing === v.id ? ' voice-card__play--playing' : ''}`}
             onClick={e => previewVoice(e, v.id)}
             aria-label={`Preview ${v.label} voice`}
-            title={keyConfigured ? 'Preview' : 'Add an OpenAI key to preview voices'}
-            disabled={!keyConfigured}
+            title="Preview voice"
           >
             {loading === v.id ? '…' : playing === v.id ? '■' : '▶'}
           </button>
@@ -90,6 +116,7 @@ function VoicePicker({ selectedVoice, onSelect, keyConfigured }) {
           {selectedVoice === v.id && <span className="voice-card__check">✓</span>}
         </div>
       ))}
+      {previewErr && <p className="voice-picker__error">{previewErr}</p>}
       {!keyConfigured && (
         <p className="voice-picker__hint">
           <a href="/account/settings#api-key">Add an OpenAI key</a> to preview voices.
