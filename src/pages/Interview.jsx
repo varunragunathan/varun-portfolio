@@ -107,6 +107,12 @@ function SetupView({ onStart, isSupported }) {
       <button className="interview-setup__start" onClick={() => onStart({ theme, duration })}>
         Start Interview
       </button>
+
+      <div className="interview-setup__footer">
+        <a href="/account/settings#api-key" className="interview-setup__api-link">
+          🔑 Setup OpenAI API Key for better voice
+        </a>
+      </div>
     </div>
   );
 }
@@ -254,6 +260,12 @@ function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, on
       <button className="interview-active__end" onClick={onEnd}>
         End Interview
       </button>
+
+      <div className="interview-active__footer">
+        <a href="/account/settings#api-key" className="interview-active__api-link">
+          💡 Better voice? Setup OpenAI API Key
+        </a>
+      </div>
     </div>
   );
 }

@@ -231,6 +231,22 @@
   transform: scale(0.98);
 }
 
+.interview-setup__footer {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.interview-setup__api-link {
+  font-size: 12px;
+  color: var(--text-3);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.interview-setup__api-link:hover {
+  color: var(--accent);
+}
+
 /* ── Active interview ─────────────────────────────────────────── */
 .interview-active {
   display: flex;
@@ -354,6 +370,22 @@
 .interview-active__end:hover {
   border-color: #ef4444;
   color: #ef4444;
+}
+
+.interview-active__footer {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.interview-active__api-link {
+  font-size: 12px;
+  color: var(--text-3);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.interview-active__api-link:hover {
+  color: var(--accent);
 }
 
 /* ── Summary screen ──────────────────────────────────────────── */
