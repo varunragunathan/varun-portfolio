@@ -37,6 +37,7 @@ export function useVoiceInterview() {
   const [error,        setError]        = useState(null);
   const [elapsed,      setElapsed]      = useState(0);
   const [cost,         setCost]         = useState(0);
+  const [ttsCost,      setTtsCost]      = useState(0);  // OpenAI TTS cost this session
   const [duration,     setDuration]     = useState(1800);
   const [hasOpenAIKey, setHasOpenAIKey] = useState(false);
 
@@ -62,6 +63,8 @@ export function useVoiceInterview() {
   const ttsModeRef         = useRef('browser');
   // OpenAI voice name — set on start()
   const ttsVoiceRef        = useRef('nova');
+  // Cumulative character count sent to OpenAI TTS this session
+  const ttsCharsRef        = useRef(0);
   // Output device ID for AudioContext.setSinkId (Chrome)
   const outputDeviceIdRef  = useRef(null);
   // Persisted AudioContext (one per session)
@@ -84,6 +87,10 @@ export function useVoiceInterview() {
 
   // ── TTS — OpenAI proxy (real audio) ──────────────────────────────
   const speakOpenAI = useCallback(async (text) => {
+    // Track chars for cost display — OpenAI TTS-1-HD: $0.030 / 1000 chars
+    ttsCharsRef.current += text.length;
+    setTtsCost(ttsCharsRef.current / 1000 * 0.030);
+
     const res = await fetch('/api/proxy/tts', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -500,9 +507,11 @@ export function useVoiceInterview() {
     setElapsed(0);
     setCost(0);
     setHasOpenAIKey(false);
+    setTtsCost(0);
     windingDownRef.current     = false;
     ttsModeRef.current         = ttsMode;
     ttsVoiceRef.current        = voice;
+    ttsCharsRef.current        = 0;
     outputDeviceIdRef.current  = outputDeviceId;
     durationRef.current        = duration;
     setDuration(duration);
@@ -592,6 +601,7 @@ export function useVoiceInterview() {
     elapsed,
     remaining,
     cost,
+    ttsCost,
     hasOpenAIKey,
     ttsAnalyserRef,
     start,

@@ -559,12 +559,17 @@ function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, ha
 }
 
 // ── Summary screen ────────────────────────────────────────────────
-function SummaryView({ transcript, elapsed, cost, sessionId, onRestart }) {
+function SummaryView({ transcript, elapsed, cost, ttsCost, modelChoice, sessionId, onRestart }) {
   const [showFull,          setShowFull]          = useState(false);
+  const [showCostBreakdown, setShowCostBreakdown] = useState(false);
   const [assessment,        setAssessment]        = useState('');
   const [assessmentLoading, setAssessmentLoading] = useState(true);
   const [copied,            setCopied]            = useState(false);
-  const turns = transcript.filter(t => t.role === 'user').length;
+  const turns      = transcript.filter(t => t.role === 'user').length;
+  const totalCost  = (cost || 0) + (ttsCost || 0);
+  const hasTTS     = ttsCost > 0;
+  const hasModel   = cost > 0;
+  const modelLabel = modelChoice === 'workers-ai' ? 'Llama 3.3 (free)' : 'Claude Haiku';
 
   useEffect(() => {
     if (!sessionId) { setAssessmentLoading(false); return; }
@@ -621,9 +626,30 @@ function SummaryView({ transcript, elapsed, cost, sessionId, onRestart }) {
           <span className="interview-summary__stat-value">{turns}</span>
           <span className="interview-summary__stat-label">answers</span>
         </div>
-        <div className="interview-summary__stat">
-          <span className="interview-summary__stat-value">{fmtCost(cost)}</span>
+        <div className="interview-summary__stat interview-summary__stat--cost">
+          <button
+            className="interview-summary__cost-btn"
+            onClick={() => (hasTTS || hasModel) && setShowCostBreakdown(v => !v)}
+            style={{ cursor: (hasTTS || hasModel) ? 'pointer' : 'default' }}
+          >
+            <span className="interview-summary__stat-value">{fmtCost(totalCost)}</span>
+            {(hasTTS || hasModel) && (
+              <span className="interview-summary__cost-arrow">{showCostBreakdown ? '▲' : '▼'}</span>
+            )}
+          </button>
           <span className="interview-summary__stat-label">cost</span>
+          {showCostBreakdown && (
+            <div className="interview-summary__cost-breakdown">
+              <div className="interview-summary__cost-row">
+                <span>{modelLabel}</span>
+                <span>{fmtCost(cost || 0)}</span>
+              </div>
+              <div className="interview-summary__cost-row">
+                <span>OpenAI TTS</span>
+                <span>{fmtCost(ttsCost || 0)}</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -681,7 +707,7 @@ export default function InterviewPage() {
 
   const {
     state, sessionId, transcript, lastText, error,
-    elapsed, remaining, cost, hasOpenAIKey, ttsAnalyserRef,
+    elapsed, remaining, cost, ttsCost, hasOpenAIKey, ttsAnalyserRef,
     start, endInterview, stopRecording, interrupt, sendText, clearError, isSupported,
   } = useVoiceInterview();
 
@@ -766,6 +792,8 @@ export default function InterviewPage() {
           transcript={transcript}
           elapsed={elapsed}
           cost={cost}
+          ttsCost={ttsCost}
+          modelChoice={prefs.model || 'workers-ai'}
           sessionId={sessionId}
           onRestart={() => window.location.reload()}
         />

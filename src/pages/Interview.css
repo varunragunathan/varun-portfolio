@@ -449,6 +449,49 @@
   letter-spacing: 0.07em;
 }
 
+/* Cost breakdown */
+.interview-summary__stat--cost {
+  position: relative;
+}
+.interview-summary__cost-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.interview-summary__cost-arrow {
+  font-size: 9px;
+  color: var(--text-3);
+  line-height: 1;
+}
+.interview-summary__cost-breakdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 200px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  z-index: 10;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+.interview-summary__cost-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-2);
+  padding: 4px 0;
+  gap: 16px;
+}
+.interview-summary__cost-row + .interview-summary__cost-row {
+  border-top: 1px solid var(--border);
+}
+
 /* Assessment */
 .interview-summary__assessment {
   width: 100%;
