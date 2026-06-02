@@ -248,9 +248,10 @@ export function useVoiceInterview() {
       const interim    = lastResult.isFinal ? '' : lastResult[0].transcript;
       partialRef.current = (accumulated + interim).trim();
 
-      // Auto-submit after 3 s of silence once there's confirmed speech
+      // Auto-submit after 5 s of silence — longer than default so thoughtful
+      // pauses mid-answer don't cut the user off prematurely.
       if (accumulated.trim()) {
-        silenceTimer = setTimeout(() => submit(accumulated.trim()), 3000);
+        silenceTimer = setTimeout(() => submit(accumulated.trim()), 5000);
       }
     };
 
@@ -375,12 +376,27 @@ export function useVoiceInterview() {
           textBuf  += ev.text;
           setLastText(fullText);
 
-          // Flush completed sentences to TTS as they arrive in the stream
+          // Flush sentence endings immediately (.!?) — these are hard breaks.
           let breakIdx = textBuf.search(/[.!?]\s/);
           while (breakIdx !== -1) {
             speakChunk(textBuf.slice(0, breakIdx + 1).trim());
             textBuf  = textBuf.slice(breakIdx + 2);
             breakIdx = textBuf.search(/[.!?]\s/);
+          }
+
+          // Flush on commas too, but only when the chunk is long enough (≥ 25 chars).
+          // Short comma-separated phrases ("Hello, I'd like to") stay buffered until
+          // the comma is far enough in — clubbing adjacent short fragments together.
+          const COMMA_MIN = 25;
+          const commaRe   = /,\s/g;
+          let cm;
+          while ((cm = commaRe.exec(textBuf)) !== null) {
+            if (cm.index >= COMMA_MIN) {
+              speakChunk(textBuf.slice(0, cm.index + 1).trim());
+              textBuf = textBuf.slice(cm.index + 2);
+              commaRe.lastIndex = 0; // restart search on updated buffer
+              break;
+            }
           }
         }
       }
