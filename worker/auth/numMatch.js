@@ -9,6 +9,7 @@
 // only validates identity before forwarding the WebSocket upgrade to the DO.
 
 import { getSession } from './session.js';
+import { sha256Hex } from '../utils.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -28,11 +29,13 @@ export async function numMatchSubscribe(request, env) {
   const session = await getSession(env.KV, request);
   if (!session) return json({ error: 'Unauthorized' }, 401);
 
-  // Only trusted sessions can approve sign-ins
+  // Verify this specific session is trusted — use token_hash (same as /me)
+  // so the check matches exactly what the UI read when deciding to connect.
   const db = env.varun_portfolio_auth;
+  const tokenHash = await sha256Hex(session.token);
   const sessionRecord = await db
-    .prepare('SELECT trusted FROM sessions WHERE user_id = ? AND trusted = 1 AND expires_at > ? LIMIT 1')
-    .bind(session.userId, Date.now())
+    .prepare('SELECT trusted FROM sessions WHERE token_hash = ? AND trusted = 1 LIMIT 1')
+    .bind(tokenHash)
     .first();
   if (!sessionRecord) return json({ error: 'Requires a trusted session' }, 403);
 

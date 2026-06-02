@@ -16,7 +16,9 @@ export function useNumMatchApproval(user) {
 
     let ws;
     let reconnectTimer;
-    let destroyed = false;
+    let destroyed  = false;
+    let delay      = 3_000;   // start at 3s, doubles on each failed connection
+    const MAX_DELAY = 5 * 60_000; // cap at 5 minutes
 
     function connect() {
       if (destroyed) return;
@@ -25,6 +27,13 @@ export function useNumMatchApproval(user) {
       const host = window.location.host;
       ws = new WebSocket(`${protocol}//${host}/api/auth/num-match/subscribe`);
       wsRef.current = ws;
+
+      let openedCleanly = false;
+
+      ws.addEventListener('open', () => {
+        openedCleanly = true;
+        delay = 3_000;  // reset backoff on successful connection
+      });
 
       ws.addEventListener('message', event => {
         try {
@@ -47,8 +56,8 @@ export function useNumMatchApproval(user) {
 
       ws.addEventListener('close', () => {
         if (!destroyed) {
-          // Reconnect after 3s — server may have restarted
-          reconnectTimer = setTimeout(connect, 3000);
+          if (!openedCleanly) delay = Math.min(delay * 2, MAX_DELAY);
+          reconnectTimer = setTimeout(connect, delay);
         }
       });
 
