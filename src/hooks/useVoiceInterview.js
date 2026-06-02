@@ -90,6 +90,8 @@ export function useVoiceInterview() {
   const ttsCharsRef        = useRef(0);
   // Timer that fires a filler phrase while AI is thinking
   const fillerTimerRef     = useRef(null);
+  // Promise from the currently-playing filler so we can await it before real speech
+  const fillerPromiseRef   = useRef(null);
   // Output device ID for AudioContext.setSinkId (Chrome)
   const outputDeviceIdRef  = useRef(null);
   // Persisted AudioContext (one per session)
@@ -395,13 +397,29 @@ export function useVoiceInterview() {
       speakChain = speakChain.then(async () => {
         if (stateRef.current === INTERVIEW_STATES.ENDED   ||
             stateRef.current === INTERVIEW_STATES.LISTENING) return;
-        // Cancel any filler the moment we start real speech
+
+        // Cancel the pending filler timer (hasn't fired yet — good, skip it)
         clearTimeout(fillerTimerRef.current);
-        synthRef.current.cancel();
+
+        // If a filler IS currently playing, wait for it to finish naturally
+        // rather than cutting it off mid-word. The real audio is pre-fetched
+        // so waiting here adds no perceived delay — it just feels smoother.
+        if (fillerPromiseRef.current) {
+          await Promise.race([
+            fillerPromiseRef.current.catch(() => {}),
+            new Promise(r => setTimeout(r, 3000)), // safety cap
+          ]);
+          fillerPromiseRef.current = null;
+          synthRef.current.cancel(); // ensure synthesis is stopped after filler
+        }
+
+        if (stateRef.current === INTERVIEW_STATES.ENDED   ||
+            stateRef.current === INTERVIEW_STATES.LISTENING) return;
+
         if (stateRef.current !== INTERVIEW_STATES.RESPONDING) {
           setStateSynced(INTERVIEW_STATES.RESPONDING);
         }
-        const buf = await bufferPromise;  // likely already resolved
+        const buf = await bufferPromise;  // likely already resolved (pre-fetched)
         if (buf) {
           await playTTSBuffer(buf);
         } else {
@@ -480,14 +498,15 @@ export function useVoiceInterview() {
     setStateSynced(INTERVIEW_STATES.PROCESSING);
     setTranscript(t => [...t, { role: 'user', text }]);
 
-    // After 800 ms of silence, play a short filler via browser synthesis so
-    // there's no dead air while the AI model generates its response.
-    // The filler is cancelled the moment the first real TTS chunk starts.
+    // After 800 ms of silence, play a short filler via browser synthesis.
+    // We store the promise so speakChunk can await it and let the filler finish
+    // naturally before the real response starts — no more mid-word cut-offs.
     clearTimeout(fillerTimerRef.current);
+    fillerPromiseRef.current = null;
     fillerTimerRef.current = setTimeout(() => {
       if (stateRef.current === INTERVIEW_STATES.PROCESSING) {
         const filler = FILLERS[Math.floor(Math.random() * FILLERS.length)];
-        speakSynthesis(filler); // fire-and-forget; cancelled when real speech starts
+        fillerPromiseRef.current = speakSynthesis(filler);
       }
     }, 800);
 
@@ -566,6 +585,7 @@ export function useVoiceInterview() {
     setHasOpenAIKey(false);
     setTtsCost(0);
     clearTimeout(fillerTimerRef.current);
+    fillerPromiseRef.current   = null;
     windingDownRef.current     = false;
     ttsModeRef.current         = ttsMode;
     ttsVoiceRef.current        = voice;
