@@ -16,6 +16,20 @@ const FILLERS = [
   'Right, let me think...',
   'Mm-hmm...',
   'Got it...',
+  'Hmm, thanks for that...',
+  "I'm taking notes...",
+  'That is helpful, let me note that down...',
+  'Good point...',
+  'I see, interesting...',
+  'Let me jot that down...',
+  'Right, noted...',
+  'Appreciate that...',
+  'Thanks for sharing that...',
+  'Noted, give me a moment...',
+  'That is great context...',
+  'Mm, let me process that...',
+  'Very good...',
+  'I see what you mean...',
 ];
 
 export const INTERVIEW_STATES = {
