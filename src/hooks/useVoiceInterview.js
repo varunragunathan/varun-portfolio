@@ -9,6 +9,15 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+const FILLERS = [
+  'Hmm, let me think about that...',
+  'Interesting...',
+  'Okay...',
+  'Right, let me think...',
+  'Mm-hmm...',
+  'Got it...',
+];
+
 export const INTERVIEW_STATES = {
   IDLE:        'idle',
   OPENING:     'opening',
@@ -65,6 +74,8 @@ export function useVoiceInterview() {
   const ttsVoiceRef        = useRef('nova');
   // Cumulative character count sent to OpenAI TTS this session
   const ttsCharsRef        = useRef(0);
+  // Timer that fires a filler phrase while AI is thinking
+  const fillerTimerRef     = useRef(null);
   // Output device ID for AudioContext.setSinkId (Chrome)
   const outputDeviceIdRef  = useRef(null);
   // Persisted AudioContext (one per session)
@@ -85,23 +96,26 @@ export function useVoiceInterview() {
     setState(s);
   }, []);
 
-  // ── TTS — OpenAI proxy (real audio) ──────────────────────────────
-  const speakOpenAI = useCallback(async (text) => {
-    // Track chars for cost display — OpenAI TTS-1-HD: $0.030 / 1000 chars
+  // ── TTS step 1: fetch audio bytes from the proxy ─────────────────
+  // Called immediately when a chunk is enqueued so the download overlaps
+  // with playback of the previous chunk (zero inter-chunk gap).
+  const fetchTTSBuffer = useCallback(async (text) => {
     ttsCharsRef.current += text.length;
     setTtsCost(ttsCharsRef.current / 1000 * 0.030);
-
     const res = await fetch('/api/proxy/tts', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ text, voice: ttsVoiceRef.current }),
     });
     if (!res.ok) throw new Error(`TTS ${res.status}`);
+    return res.arrayBuffer();
+  }, []);
 
-    const arrayBuffer = await res.arrayBuffer();
+  // ── TTS step 2: decode a pre-fetched ArrayBuffer and play it ──────
+  const playTTSBuffer = useCallback(async (arrayBuffer) => {
+    // Cancel any browser-synthesis filler that may be running
+    synthRef.current.cancel();
 
-    // AudioContext should already exist (created in start() during user gesture).
-    // Re-create only if it was closed (e.g. endInterview was called).
     if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
       audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
       if (outputDeviceIdRef.current && audioCtxRef.current.setSinkId) {
@@ -109,12 +123,10 @@ export function useVoiceInterview() {
       }
     }
     const audioCtx = audioCtxRef.current;
-    // Resume handles the case where the context was suspended (e.g. app backgrounded)
     await audioCtx.resume();
 
     const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
-    // Wire up analyser so SpeechWaveform gets real FFT data
     const analyser = audioCtx.createAnalyser();
     analyser.fftSize               = 128;
     analyser.smoothingTimeConstant = 0.78;
@@ -194,10 +206,13 @@ export function useVoiceInterview() {
   // ── TTS — dispatch based on explicit ttsMode setting ─────────────
   const speak = useCallback(async (text) => {
     if (ttsModeRef.current === 'openai' && hasOpenAIKeyRef.current) {
-      try { return await speakOpenAI(text); } catch { /* fall through to browser TTS */ }
+      try {
+        const buf = await fetchTTSBuffer(text);
+        return await playTTSBuffer(buf);
+      } catch { /* fall through to browser TTS */ }
     }
     return speakSynthesis(text);
-  }, [speakOpenAI, speakSynthesis]);
+  }, [fetchTTSBuffer, playTTSBuffer, speakSynthesis]);
 
   // ── STT ──────────────────────────────────────────────────────────
   const startListening = useCallback(() => {
@@ -350,17 +365,34 @@ export function useVoiceInterview() {
     let textBuf    = '';   // incomplete sentence waiting for more tokens
     let speakChain = Promise.resolve();
 
-    // Enqueue a sentence chunk: chains onto the existing TTS promise
-    // so chunks play in order without overlap.
+    // Enqueue a sentence chunk: chains onto the existing TTS promise so chunks
+    // play in order. For OpenAI TTS the fetch starts IMMEDIATELY on enqueue
+    // (while the previous chunk is still playing) so audio is buffered by the
+    // time it's this chunk's turn — eliminating inter-chunk silence gaps.
     const speakChunk = (text) => {
       if (!text.trim()) return;
+
+      // Kick off the network fetch right now, don't wait for the chain
+      const useOpenAI = ttsModeRef.current === 'openai' && hasOpenAIKeyRef.current;
+      const bufferPromise = useOpenAI
+        ? fetchTTSBuffer(text).catch(() => null)  // null → fallback to browser
+        : Promise.resolve(null);
+
       speakChain = speakChain.then(async () => {
         if (stateRef.current === INTERVIEW_STATES.ENDED   ||
             stateRef.current === INTERVIEW_STATES.LISTENING) return;
+        // Cancel any filler the moment we start real speech
+        clearTimeout(fillerTimerRef.current);
+        synthRef.current.cancel();
         if (stateRef.current !== INTERVIEW_STATES.RESPONDING) {
           setStateSynced(INTERVIEW_STATES.RESPONDING);
         }
-        await speak(text);
+        const buf = await bufferPromise;  // likely already resolved
+        if (buf) {
+          await playTTSBuffer(buf);
+        } else {
+          await speakSynthesis(text);
+        }
       });
     };
 
@@ -426,13 +458,24 @@ export function useVoiceInterview() {
         startListening();
       }
     }
-  }, [speak, startListening, setStateSynced]);
+  }, [fetchTTSBuffer, playTTSBuffer, speakSynthesis, startListening, setStateSynced]);
 
   // ── User turn ────────────────────────────────────────────────────
   const handleUserTurn = useCallback(async (text) => {
     if (!sessionRef.current) return;
     setStateSynced(INTERVIEW_STATES.PROCESSING);
     setTranscript(t => [...t, { role: 'user', text }]);
+
+    // After 800 ms of silence, play a short filler via browser synthesis so
+    // there's no dead air while the AI model generates its response.
+    // The filler is cancelled the moment the first real TTS chunk starts.
+    clearTimeout(fillerTimerRef.current);
+    fillerTimerRef.current = setTimeout(() => {
+      if (stateRef.current === INTERVIEW_STATES.PROCESSING) {
+        const filler = FILLERS[Math.floor(Math.random() * FILLERS.length)];
+        speakSynthesis(filler); // fire-and-forget; cancelled when real speech starts
+      }
+    }, 800);
 
     try {
       await handleAIResponse(
@@ -443,13 +486,13 @@ export function useVoiceInterview() {
         })
       );
     } catch (err) {
+      clearTimeout(fillerTimerRef.current);
       setError(`Something went wrong: ${err.message}`);
-      // Return to listening so user can try again
       if (stateRef.current !== INTERVIEW_STATES.ENDED) {
         startListening();
       }
     }
-  }, [handleAIResponse, setStateSynced, startListening]);
+  }, [handleAIResponse, setStateSynced, startListening, speakSynthesis]);
 
   // ── Wind-down: speak a closing statement then end gracefully ─────
   const windDownInterview = useCallback(async () => {
@@ -508,6 +551,7 @@ export function useVoiceInterview() {
     setCost(0);
     setHasOpenAIKey(false);
     setTtsCost(0);
+    clearTimeout(fillerTimerRef.current);
     windingDownRef.current     = false;
     ttsModeRef.current         = ttsMode;
     ttsVoiceRef.current        = voice;
@@ -577,6 +621,7 @@ export function useVoiceInterview() {
     const synth = synthRef.current;
     return () => {
       clearInterval(timerRef.current);
+      clearTimeout(fillerTimerRef.current);
       synth?.cancel();
       if (ttsSourceRef.current) {
         ttsSourceRef.current.onended = null;
