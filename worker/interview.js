@@ -17,13 +17,15 @@ const PRICE_INPUT  = 0.80;
 const PRICE_OUTPUT = 4.00;
 
 export const THEMES = {
-  'frontend':      'Frontend Engineering',
-  'backend':       'Backend & Systems Engineering',
-  'system-design': 'System Design',
-  'behavioral':    'Behavioral & Leadership',
-  'dsa':           'Data Structures & Algorithms',
-  'fullstack':     'Full Stack Engineering',
-  'product':       'Product Management',
+  'frontend':         'Frontend Engineering',
+  'backend':          'Backend & Systems Engineering',
+  'system-design':    'System Design',
+  'behavioral':       'Behavioral & Leadership',
+  'dsa':              'Data Structures & Algorithms',
+  'fullstack':        'Full Stack Engineering',
+  'product':          'Product Management',
+  'data-engineering': 'Data Engineering',
+  'data-fullstack':   'Data & Full Stack Development',
 };
 
 function json(data, status = 200) {

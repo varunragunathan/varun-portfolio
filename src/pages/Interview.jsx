@@ -137,13 +137,15 @@ function InterviewerAvatar({ interviewState, size = 14 }) {
 
 // ── Theme cards ───────────────────────────────────────────────────
 const THEMES = [
-  { id: 'frontend',      label: 'Frontend Eng',   icon: '⚛️',  desc: 'React, JS, CSS, perf' },
-  { id: 'backend',       label: 'Backend & Sys',  icon: '⚙️',  desc: 'APIs, databases, infra' },
-  { id: 'system-design', label: 'System Design',  icon: '🏗️',  desc: 'Scale, architecture' },
-  { id: 'behavioral',    label: 'Behavioral',      icon: '🧠',  desc: 'Leadership, STAR method' },
-  { id: 'dsa',           label: 'DSA',             icon: '📊',  desc: 'Algorithms, complexity' },
-  { id: 'fullstack',     label: 'Full Stack',      icon: '🔧',  desc: 'End-to-end engineering' },
-  { id: 'product',       label: 'Product Mgmt',   icon: '📋',  desc: 'Strategy, metrics, users' },
+  { id: 'frontend',         label: 'Frontend Eng',    icon: '⚛️',  desc: 'React, JS, CSS, perf' },
+  { id: 'backend',          label: 'Backend & Sys',   icon: '⚙️',  desc: 'APIs, databases, infra' },
+  { id: 'system-design',    label: 'System Design',   icon: '🏗️',  desc: 'Scale, architecture' },
+  { id: 'behavioral',       label: 'Behavioral',       icon: '🧠',  desc: 'Leadership, STAR method' },
+  { id: 'dsa',              label: 'DSA',              icon: '📊',  desc: 'Algorithms, complexity' },
+  { id: 'fullstack',        label: 'Full Stack',       icon: '🔧',  desc: 'End-to-end engineering' },
+  { id: 'product',          label: 'Product Mgmt',    icon: '📋',  desc: 'Strategy, metrics, users' },
+  { id: 'data-engineering', label: 'Data Engineering', icon: '🗄️',  desc: 'Pipelines, ETL, Spark, dbt' },
+  { id: 'data-fullstack',   label: 'Data Full Stack',  icon: '📈',  desc: 'SQL, analytics, APIs, viz' },
 ];
 
 const DURATIONS = [
