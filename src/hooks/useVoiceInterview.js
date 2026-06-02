@@ -213,17 +213,26 @@ export function useVoiceInterview() {
     recog.interimResults = true;
     recogRef.current     = recog;
 
-    let accumulated  = '';  // confirmed final text across multiple utterances
-    let silenceTimer;       // auto-submit after 3 s of silence
+    let accumulated = '';  // confirmed final text across multiple utterances
+    let silenceTimer;      // auto-submit after 3 s of silence
+    // Chrome fires BOTH onerror AND onend for the same event (e.g. no-speech).
+    // Without this flag, both handlers call restart() → two instances fight → mic appears dead.
+    let didRestart = false;
 
     const submit = (text) => {
       if (gotResultRef.current) return;
       clearTimeout(silenceTimer);
-      gotResultRef.current = true;
-      partialRef.current   = '';
+      gotResultRef.current  = true;
+      partialRef.current    = '';
       handleUserTurnRef.current?.(text);
       manualStopRef.current = true;
       recog.stop();
+    };
+
+    const restart = () => {
+      if (didRestart) return;
+      didRestart = true;
+      startListeningRef.current?.();
     };
 
     recog.onresult = (e) => {
@@ -250,22 +259,23 @@ export function useVoiceInterview() {
       if (gotResultRef.current) return;
       if (manualStopRef.current) return;
       if (stateRef.current !== INTERVIEW_STATES.LISTENING) return;
-      // If we accumulated anything before an unexpected stop, submit it
+      // If we accumulated anything before the unexpected stop, submit it
       if (accumulated.trim()) {
         gotResultRef.current = true;
         handleUserTurnRef.current?.(accumulated.trim());
         return;
       }
-      startListeningRef.current?.();
+      restart();
     };
 
     recog.onerror = (e) => {
       clearTimeout(silenceTimer);
       if (e.error === 'no-speech') {
         if (stateRef.current === INTERVIEW_STATES.LISTENING && !manualStopRef.current) {
-          startListeningRef.current?.();
+          restart();
         }
       } else if (e.error !== 'aborted') {
+        didRestart = true;  // block onend from restarting after a real error
         manualStopRef.current = true;
         setError(
           e.error === 'not-allowed'
@@ -314,19 +324,44 @@ export function useVoiceInterview() {
     handleUserTurnRef.current?.(trimmed);
   }, []);
 
-  // ── Read SSE stream ──────────────────────────────────────────────
-  const readStream = useCallback(async (response, onText) => {
-    const reader = response.body.getReader();
-    const dec    = new TextDecoder();
-    let buf  = '';
-    let full = '';
+  // ── AI response: stream text + pipeline TTS sentence-by-sentence ─
+  // Sentences are spoken as soon as they complete in the stream, so
+  // audio starts ~1 sentence after generation begins instead of waiting
+  // for the full response. Chunks are chained so they play in order.
+  const handleAIResponse = useCallback(async (fetchPromise) => {
+    const response = await fetchPromise;
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || `HTTP ${response.status}`);
+    }
+
+    const reader   = response.body.getReader();
+    const dec      = new TextDecoder();
+    let sseBuf     = '';
+    let fullText   = '';
+    let textBuf    = '';   // incomplete sentence waiting for more tokens
+    let speakChain = Promise.resolve();
+
+    // Enqueue a sentence chunk: chains onto the existing TTS promise
+    // so chunks play in order without overlap.
+    const speakChunk = (text) => {
+      if (!text.trim()) return;
+      speakChain = speakChain.then(async () => {
+        if (stateRef.current === INTERVIEW_STATES.ENDED   ||
+            stateRef.current === INTERVIEW_STATES.LISTENING) return;
+        if (stateRef.current !== INTERVIEW_STATES.RESPONDING) {
+          setStateSynced(INTERVIEW_STATES.RESPONDING);
+        }
+        await speak(text);
+      });
+    };
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split('\n');
-      buf = lines.pop();
+      sseBuf += dec.decode(value, { stream: true });
+      const lines = sseBuf.split('\n');
+      sseBuf = lines.pop();
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
         const raw = line.slice(6).trim();
@@ -336,37 +371,39 @@ export function useVoiceInterview() {
           setSessionId(ev.id);
           sessionRef.current = ev.id;
         } else if (ev.type === 'delta' && ev.text) {
-          full += ev.text;
-          onText?.(full);
+          fullText += ev.text;
+          textBuf  += ev.text;
+          setLastText(fullText);
+
+          // Flush completed sentences to TTS as they arrive in the stream
+          let breakIdx = textBuf.search(/[.!?]\s/);
+          while (breakIdx !== -1) {
+            speakChunk(textBuf.slice(0, breakIdx + 1).trim());
+            textBuf  = textBuf.slice(breakIdx + 2);
+            breakIdx = textBuf.search(/[.!?]\s/);
+          }
         }
       }
     }
-    return full;
-  }, []);
 
-  // ── AI response: stream → accumulate → TTS → listen ─────────────
-  const handleAIResponse = useCallback(async (fetchPromise) => {
-    const response = await fetchPromise;
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      throw new Error(body.error || `HTTP ${response.status}`);
-    }
-
-    const fullText = await readStream(response, (partial) => setLastText(partial));
-    if (!fullText) return;
+    // Speak any remaining text (last sentence may not have trailing punctuation)
+    speakChunk(textBuf.trim());
 
     setTranscript(t => [...t, { role: 'assistant', text: fullText }]);
-    setStateSynced(INTERVIEW_STATES.RESPONDING);
-    await speak(fullText);
 
-    if (stateRef.current !== INTERVIEW_STATES.ENDED) {
+    // Wait for all enqueued chunks to finish speaking
+    await speakChain;
+
+    // Only transition state if not already interrupted or ended
+    if (stateRef.current !== INTERVIEW_STATES.ENDED &&
+        stateRef.current !== INTERVIEW_STATES.LISTENING) {
       if (windingDownRef.current) {
         endInterviewRef.current?.();
       } else {
         startListening();
       }
     }
-  }, [readStream, speak, startListening, setStateSynced]);
+  }, [speak, startListening, setStateSynced]);
 
   // ── User turn ────────────────────────────────────────────────────
   const handleUserTurn = useCallback(async (text) => {
