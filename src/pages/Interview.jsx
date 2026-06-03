@@ -328,24 +328,24 @@ function SetupView({ prefs, onPrefChange, onStart, isSupported, keyConfigured, a
   return (
     <motion.div
       className="interview-setup"
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, ease: [0.25, 0.4, 0.45, 0.95] }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.35 }}
     >
       <motion.div
         className="interview-setup__owl"
-        initial={{ scale: 0.85, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ ...SPRING_SOFT, delay: 0.05 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, delay: 0.05 }}
       >
         <InterviewerAvatar interviewState={INTERVIEW_STATES.IDLE} size={16} />
       </motion.div>
 
       <motion.div
         style={{ textAlign: 'center' }}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.1 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, delay: 0.15 }}
       >
         <h1 className="interview-setup__title">Ready to interview you</h1>
         <p className="interview-setup__sub">
