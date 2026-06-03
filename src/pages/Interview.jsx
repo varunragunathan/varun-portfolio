@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import PixelOwl from '../components/PixelOwl';
 import SpeechWaveform from '../components/SpeechWaveform';
 import { useVoiceInterview, INTERVIEW_STATES, owlState } from '../hooks/useVoiceInterview';
@@ -6,6 +7,9 @@ import { useAudioDevices } from '../hooks/useAudioDevices';
 import { useAuth } from '../hooks/useAuth';
 import { Link } from 'react-router-dom';
 import './Interview.css';
+
+const SPRING      = { type: 'spring', stiffness: 320, damping: 24 };
+const SPRING_SOFT = { type: 'spring', stiffness: 240, damping: 22 };
 
 // ── Prefs persistence (localStorage) ─────────────────────────────
 const PREFS_KEY = 'iv_prefs_v1';
@@ -322,15 +326,32 @@ function SetupView({ prefs, onPrefChange, onStart, isSupported, keyConfigured, a
   };
 
   return (
-    <div className="interview-setup">
-      <div className="interview-setup__owl">
+    <motion.div
+      className="interview-setup"
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: [0.25, 0.4, 0.45, 0.95] }}
+    >
+      <motion.div
+        className="interview-setup__owl"
+        initial={{ scale: 0.85, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ ...SPRING_SOFT, delay: 0.05 }}
+      >
         <InterviewerAvatar interviewState={INTERVIEW_STATES.IDLE} size={16} />
-      </div>
+      </motion.div>
 
-      <h1 className="interview-setup__title">Ready to interview you</h1>
-      <p className="interview-setup__sub">
-        Hooty will ask questions and listen over voice — just like a phone screen.
-      </p>
+      <motion.div
+        style={{ textAlign: 'center' }}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.1 }}
+      >
+        <h1 className="interview-setup__title">Ready to interview you</h1>
+        <p className="interview-setup__sub">
+          Hooty will ask questions and listen over voice — just like a phone screen.
+        </p>
+      </motion.div>
 
       {!isSupported && (
         <div className="interview-setup__warn">
@@ -339,77 +360,139 @@ function SetupView({ prefs, onPrefChange, onStart, isSupported, keyConfigured, a
       )}
 
       {/* Theme */}
-      <section className="interview-setup__section">
+      <motion.section
+        className="interview-setup__section"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.15 }}
+      >
         <div className="interview-setup__section-header">
           <span className="interview-setup__label">Theme</span>
-          <button className="interview-setup__random" onClick={randomize}>🎲 random</button>
+          <motion.button
+            className="interview-setup__random"
+            onClick={randomize}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            transition={SPRING}
+          >
+            🎲 random
+          </motion.button>
         </div>
         <div className="interview-setup__themes">
           {THEMES.map(t => (
-            <button
+            <motion.button
               key={t.id}
               className={`interview-theme-card${theme === t.id ? ' interview-theme-card--active' : ''}`}
               onClick={() => handleTheme(t.id)}
+              whileHover={{ y: -3, scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              transition={SPRING}
             >
               <span className="interview-theme-card__icon">{t.icon}</span>
               <span className="interview-theme-card__label">{t.label}</span>
               <span className="interview-theme-card__desc">{t.desc}</span>
-            </button>
+            </motion.button>
           ))}
         </div>
-      </section>
+      </motion.section>
 
       {/* Duration */}
-      <section className="interview-setup__section">
+      <motion.section
+        className="interview-setup__section"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.2 }}
+      >
         <div className="interview-setup__label">Duration</div>
         <div className="interview-setup__durations">
           {DURATIONS.map(d => (
-            <button
+            <motion.button
               key={d.value}
               className={`interview-duration-chip${duration === d.value ? ' interview-duration-chip--active' : ''}`}
               onClick={() => handleDuration(d.value)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              transition={SPRING}
             >
               {d.label}
-            </button>
+            </motion.button>
           ))}
         </div>
-      </section>
+      </motion.section>
 
       {/* Model + TTS settings */}
-      <section className="interview-setup__section">
+      <motion.section
+        className="interview-setup__section"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.25 }}
+      >
         <div className="interview-setup__label">Settings</div>
         <SettingsPanel prefs={prefs} onPrefChange={onPrefChange} keyConfigured={keyConfigured} />
-      </section>
+      </motion.section>
 
       {/* Audio devices */}
-      <section className="interview-setup__section">
-        <button
+      <motion.section
+        className="interview-setup__section"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.3 }}
+      >
+        <motion.button
           className="interview-setup__audio-toggle"
           onClick={() => setShowAudio(v => !v)}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
+          transition={SPRING}
         >
           🎙 Audio Settings
           <span className="interview-setup__audio-toggle-arrow">{showAudio ? '▲' : '▼'}</span>
-        </button>
-        {showAudio && <AudioPanel audioDevices={audioDevices} />}
-      </section>
+        </motion.button>
+        <AnimatePresence>
+          {showAudio && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              style={{ overflow: 'hidden' }}
+            >
+              <AudioPanel audioDevices={audioDevices} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.section>
 
-      <button className="interview-setup__start" onClick={() => onStart({ theme, duration })}>
-        Start Interview
-      </button>
+      <motion.button
+        className="interview-setup__start"
+        onClick={() => onStart({ theme, duration })}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.35 }}
+        whileHover={{ scale: 1.04, boxShadow: '0 8px 32px rgba(99,102,241,0.5)' }}
+        whileTap={{ scale: 0.97 }}
+      >
+        Start Interview →
+      </motion.button>
 
       {!keyConfigured && (
-        <div className="interview-setup__footer">
+        <motion.div
+          className="interview-setup__footer"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.45 }}
+        >
           <a href="/account/settings#api-key" className="interview-setup__api-link">
             🔑 Setup OpenAI API Key for better voice
           </a>
-        </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 }
 
 // ── Active interview ──────────────────────────────────────────────
-function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, hasOpenAIKey, prefs, audioDevices, onEnd, onStopRecording, onInterrupt, onSendText }) {
+function ActiveView({ state, remaining, elapsed, lastText, transcript, ttsAnalyserRef, hasOpenAIKey, prefs, audioDevices, onEnd, onStopRecording, onInterrupt, onSendText }) {
   const [showText,  setShowText]  = useState(false);
   const [typed,     setTyped]     = useState('');
   const [showAudio, setShowAudio] = useState(false);
@@ -418,6 +501,10 @@ function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, ha
   const isSpeaking  = state === INTERVIEW_STATES.OPENING || state === INTERVIEW_STATES.RESPONDING;
   const isListening = state === INTERVIEW_STATES.LISTENING;
   const isThinking  = state === INTERVIEW_STATES.PROCESSING;
+
+  const total    = (elapsed || 0) + (remaining || 0);
+  const progress = total > 0 ? Math.min(1, (elapsed || 0) / total) : 0;
+  const isLow    = remaining < 120;
 
   const handleTextSubmit = (e) => {
     e.preventDefault();
@@ -435,66 +522,148 @@ function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, ha
   const ttsLabel = prefs?.tts === 'openai' && hasOpenAIKey ? 'OpenAI voice' : null;
 
   return (
-    <div className="interview-active">
+    <motion.div
+      className="interview-active"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: [0.25, 0.4, 0.45, 0.95] }}
+    >
+      {/* Progress bar */}
+      <div className="interview-active__progress-bar">
+        <motion.div
+          className={`interview-active__progress-fill${isLow ? ' interview-active__progress-fill--low' : ''}`}
+          style={{ scaleX: progress, transformOrigin: 'left' }}
+          transition={{ duration: 0.8, ease: 'linear' }}
+        />
+      </div>
 
       {/* Timer */}
       <div className="interview-active__timer">
         <span className={`interview-active__timer-dot${isListening ? ' interview-active__timer-dot--live' : ''}`} />
-        {fmtTime(remaining)} remaining
+        <span className={isLow ? 'interview-active__timer-low' : ''}>{fmtTime(remaining)} remaining</span>
         {ttsLabel && <span className="interview-active__tts-badge">{ttsLabel}</span>}
       </div>
 
-      {/* ── Main visual area ──────────────────────────────────── */}
+      {/* ── Main stage — AnimatePresence for smooth state transitions ─ */}
       <div className="interview-active__stage">
-        {isSpeaking && (
-          <div className="interview-active__waveform-wrap">
-            <SpeechWaveform mode="speaking" externalAnalyserRef={ttsAnalyserRef} />
-            <p className="interview-active__stage-label">Hooty is speaking…</p>
-          </div>
-        )}
-        {!isSpeaking && (
-          <div className="interview-active__avatar-wrap">
-            <InterviewerAvatar interviewState={state} size={16} />
-            <p className="interview-active__stage-label">
-              {isListening ? 'Listening — speak now' : isThinking ? 'Thinking…' : ''}
-            </p>
-          </div>
-        )}
+        <AnimatePresence mode="wait">
+          {isSpeaking ? (
+            <motion.div
+              key="speaking"
+              className="interview-active__waveform-wrap"
+              initial={{ opacity: 0, scale: 0.93 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.93 }}
+              transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+            >
+              <SpeechWaveform mode="speaking" externalAnalyserRef={ttsAnalyserRef} />
+              <p className="interview-active__stage-label">Hooty is speaking…</p>
+            </motion.div>
+          ) : (
+            <motion.div
+              key={`avatar-${state}`}
+              className="interview-active__avatar-wrap"
+              initial={{ opacity: 0, scale: 0.93 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.93 }}
+              transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+            >
+              <InterviewerAvatar interviewState={state} size={16} />
+              <p className="interview-active__stage-label">
+                {isListening ? 'Listening — speak now' : isThinking ? 'Thinking…' : ''}
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Last AI text */}
-      {lastText && (
-        <div className="interview-active__last-text">
-          <p>{lastText}</p>
-        </div>
-      )}
+      {/* Last AI text — speech bubble */}
+      <AnimatePresence>
+        {lastText && (
+          <motion.div
+            className="interview-active__last-text"
+            initial={{ opacity: 0, y: 8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+          >
+            <p>{lastText}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Mic waveform when listening */}
-      {isListening && (
-        <div className="interview-active__mic-wave">
-          <SpeechWaveform mode="listening" />
-        </div>
-      )}
+      <AnimatePresence>
+        {isListening && (
+          <motion.div
+            className="interview-active__mic-wave"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            transition={{ duration: 0.25 }}
+          >
+            <SpeechWaveform mode="listening" />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Controls ──────────────────────────────────────────── */}
       <div className="interview-active__controls">
-        {isSpeaking && (
-          <button className="interview-ctrl interview-ctrl--interrupt" onClick={onInterrupt}>
-            <span className="interview-ctrl__icon">🎙</span> Speak now
-          </button>
-        )}
-        {isListening && !showText && (
-          <>
-            <button className="interview-ctrl interview-ctrl--stop" onClick={onStopRecording}>
-              ✓ Done
-            </button>
-            <button className="interview-ctrl interview-ctrl--text" onClick={handleShowText}>
-              ⌨️ Type instead
-            </button>
-          </>
-        )}
+        <AnimatePresence mode="wait">
+          {isSpeaking && (
+            <motion.button
+              key="interrupt"
+              className="interview-ctrl interview-ctrl--interrupt"
+              onClick={onInterrupt}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.96 }}
+              transition={SPRING}
+            >
+              <span className="interview-ctrl__icon">🎙</span> Speak now
+            </motion.button>
+          )}
+          {isListening && !showText && (
+            <motion.div
+              key="listening"
+              className="interview-active__controls-row"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.22 }}
+            >
+              <motion.button
+                className="interview-ctrl interview-ctrl--stop"
+                onClick={onStopRecording}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                transition={SPRING}
+              >
+                ✓ Done
+              </motion.button>
+              <motion.button
+                className="interview-ctrl interview-ctrl--text"
+                onClick={handleShowText}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                transition={SPRING}
+              >
+                ⌨️ Type instead
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {showText && (
-          <form className="interview-active__text-form" onSubmit={handleTextSubmit}>
+          <motion.form
+            className="interview-active__text-form"
+            onSubmit={handleTextSubmit}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.22 }}
+          >
             <textarea
               ref={inputRef}
               className="interview-active__text-input"
@@ -511,13 +680,16 @@ function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, ha
               rows={3}
             />
             <div className="interview-active__text-actions">
-              <button
+              <motion.button
                 type="submit"
                 className="interview-ctrl interview-ctrl--send"
                 disabled={!typed.trim()}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                transition={SPRING}
               >
                 Send
-              </button>
+              </motion.button>
               <button
                 type="button"
                 className="interview-ctrl interview-ctrl--text"
@@ -526,7 +698,7 @@ function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, ha
                 Use mic
               </button>
             </div>
-          </form>
+          </motion.form>
         )}
       </div>
 
@@ -542,21 +714,41 @@ function ActiveView({ state, remaining, lastText, transcript, ttsAnalyserRef, ha
         </div>
       )}
 
-      <button className="interview-active__end" onClick={onEnd}>
+      <motion.button
+        className="interview-active__end"
+        onClick={onEnd}
+        whileHover={{ scale: 1.03, borderColor: '#ef4444', color: '#ef4444' }}
+        whileTap={{ scale: 0.97 }}
+        transition={SPRING}
+      >
         End Interview
-      </button>
+      </motion.button>
 
       {/* Audio settings footer */}
       <div className="interview-active__audio-footer">
-        <button
+        <motion.button
           className="interview-active__audio-toggle"
           onClick={() => setShowAudio(v => !v)}
+          whileHover={{ scale: 1.02 }}
+          transition={SPRING}
         >
           🎙 Audio Settings {showAudio ? '▲' : '▼'}
-        </button>
-        {showAudio && <AudioPanel audioDevices={audioDevices} />}
+        </motion.button>
+        <AnimatePresence>
+          {showAudio && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25 }}
+              style={{ overflow: 'hidden' }}
+            >
+              <AudioPanel audioDevices={audioDevices} />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -613,21 +805,51 @@ function SummaryView({ transcript, elapsed, cost, ttsCost, modelChoice, sessionI
   };
 
   return (
-    <div className="interview-summary">
-      <div className="interview-summary__owl">
+    <motion.div
+      className="interview-summary"
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: [0.25, 0.4, 0.45, 0.95] }}
+    >
+      <motion.div
+        className="interview-summary__owl"
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ ...SPRING_SOFT, delay: 0.05 }}
+      >
         <InterviewerAvatar interviewState={INTERVIEW_STATES.ENDED} size={14} />
-      </div>
-      <h2 className="interview-summary__title">Interview Complete</h2>
+      </motion.div>
+      <motion.h2
+        className="interview-summary__title"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, delay: 0.1 }}
+      >
+        Interview Complete
+      </motion.h2>
 
       <div className="interview-summary__stats">
-        <div className="interview-summary__stat">
-          <span className="interview-summary__stat-value">{fmtTime(elapsed)}</span>
-          <span className="interview-summary__stat-label">duration</span>
-        </div>
-        <div className="interview-summary__stat">
-          <span className="interview-summary__stat-value">{turns}</span>
-          <span className="interview-summary__stat-label">answers</span>
-        </div>
+        {[
+          { value: fmtTime(elapsed), label: 'duration' },
+          { value: turns,            label: 'answers'  },
+        ].map(({ value, label }, i) => (
+          <motion.div
+            key={label}
+            className="interview-summary__stat"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.15 + i * 0.08 }}
+          >
+            <span className="interview-summary__stat-value">{value}</span>
+            <span className="interview-summary__stat-label">{label}</span>
+          </motion.div>
+        ))}
+        {/* cost stat — keep original markup for the breakdown logic */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: 0.31 }}
+        >
         <div className="interview-summary__stat interview-summary__stat--cost">
           <button
             className="interview-summary__cost-btn"
@@ -653,6 +875,7 @@ function SummaryView({ transcript, elapsed, cost, ttsCost, modelChoice, sessionI
             </div>
           )}
         </div>
+        </motion.div>
       </div>
 
       {/* Assessment */}
@@ -692,11 +915,24 @@ function SummaryView({ transcript, elapsed, cost, ttsCost, modelChoice, sessionI
         </div>
       </div>
 
-      <div className="interview-summary__actions">
-        <button className="interview-summary__restart" onClick={onRestart}>New Interview</button>
+      <motion.div
+        className="interview-summary__actions"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, delay: 0.4 }}
+      >
+        <motion.button
+          className="interview-summary__restart"
+          onClick={onRestart}
+          whileHover={{ scale: 1.04, boxShadow: '0 8px 28px rgba(99,102,241,0.4)' }}
+          whileTap={{ scale: 0.97 }}
+          transition={SPRING}
+        >
+          New Interview
+        </motion.button>
         <Link to="/" className="interview-summary__home">← Home</Link>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -776,6 +1012,7 @@ export default function InterviewPage() {
         <ActiveView
           state={state}
           remaining={remaining}
+          elapsed={elapsed}
           lastText={lastText}
           transcript={transcript}
           ttsAnalyserRef={ttsAnalyserRef}
