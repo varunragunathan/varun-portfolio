@@ -1,19 +1,26 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { useTheme } from '../hooks/useTheme';
-import { useFadeIn } from '../hooks/useAnimations';
+import { usePrefersReducedMotion } from '../hooks/useAnimations';
 import './UI.css';
 
-/** Scroll-triggered fade-in wrapper */
+// Spring config reused across hover interactions
+const HOVER_SPRING = { type: 'spring', stiffness: 320, damping: 22 };
+
+/** Scroll-triggered fade-in using motion whileInView with spring physics */
 export function Fade({ children, delay = 0, style = {} }) {
-  const [ref, visible, reduced] = useFadeIn();
+  const reduced = usePrefersReducedMotion();
+  if (reduced) return <div style={style}>{children}</div>;
   return (
-    <div
-      ref={ref}
-      className={`fade${visible ? ' fade--visible' : ''}${reduced ? ' fade--reduced' : ''}`}
-      style={{ '--fade-delay': `${delay}ms`, ...style }}
+    <motion.div
+      initial={{ opacity: 0, y: 18 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-50px' }}
+      transition={{ duration: 0.45, delay: delay / 1000, ease: [0.25, 0.4, 0.45, 0.95] }}
+      style={style}
     >
       {children}
-    </div>
+    </motion.div>
   );
 }
 
@@ -30,16 +37,19 @@ export function SectionHeader({ label, title, subtitle }) {
   );
 }
 
-/** Link-styled button */
+/** Link-styled button with spring press/hover feedback */
 export function Btn({ href, primary, children, external }) {
   return (
-    <a
+    <motion.a
       href={href}
       className={`btn${primary ? ' btn--primary' : ''}`}
+      whileHover={{ scale: 1.04, y: -2 }}
+      whileTap={{ scale: 0.96 }}
+      transition={HOVER_SPRING}
       {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
     >
       {children}
-    </a>
+    </motion.a>
   );
 }
 

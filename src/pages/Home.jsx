@@ -1,5 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
+import { motion } from 'motion/react';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { useTypewriter, useCounter } from '../hooks/useAnimations';
 import { Fade, SectionHeader, Btn } from '../components/UI';
@@ -7,6 +8,8 @@ import ParticleField from '../components/ParticleField';
 import { PERSONAL, STATS, PROJECTS, SKILLS, PRINCIPLES, TIMELINE, EDUCATION } from '../data/portfolio';
 import FrozenChat from '../components/FrozenChat';
 import './Home.css';
+
+const CARD_SPRING = { type: 'spring', stiffness: 280, damping: 20 };
 
 const TOUR_KEY = 'hasSeenWelcomeTour';
 const WelcomeTour = lazy(() => import('../components/WelcomeTour'));
@@ -43,26 +46,39 @@ function GuestView() {
         </div>
 
         {/* Sign-in card */}
-        <div className="guest-card">
+        <motion.div
+          className="guest-card"
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.15, ease: [0.25, 0.4, 0.45, 0.95] }}
+          whileHover={{ y: -4, boxShadow: '0 24px 56px rgba(99,102,241,0.14)' }}
+          style={{ transition: 'box-shadow 0.2s' }}
+        >
           <div className="guest-card__gradient" aria-hidden="true" />
           <div className="guest-card__inner">
             <p className="guest-card__headline">This site is the product.</p>
             <p className="guest-card__subtext">Explore the work, then ask the AI how it was built.</p>
 
-            {/* Feature bullets */}
+            {/* Feature bullets — stagger in */}
             <div className="guest-card__features">
-              {GUEST_FEATURES.map(({ tag, text }) => (
-                <div key={tag} className="guest-card__feature">
+              {GUEST_FEATURES.map(({ tag, text }, i) => (
+                <motion.div
+                  key={tag}
+                  className="guest-card__feature"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.35 + i * 0.1, duration: 0.35 }}
+                >
                   <span className="guest-card__feature-tag">{tag}</span>
                   <span className="guest-card__feature-text">{text}</span>
-                </div>
+                </motion.div>
               ))}
             </div>
 
             <Link to="/auth" className="guest-card__sign-in">Sign in →</Link>
             <p className="guest-card__passkey-note">No password · passkey required</p>
           </div>
-        </div>
+        </motion.div>
 
         {/* Live demo chat */}
         <FrozenChat />
@@ -179,9 +195,12 @@ function LearningPromo() {
 function ProjectCard({ role, title, description, metrics, tags, delay }) {
   return (
     <Fade delay={delay}>
-      <article
+      <motion.article
         className="project-card"
         aria-label={`Project: ${title}`}
+        whileHover={{ y: -6, boxShadow: '0 20px 48px rgba(99,102,241,0.16)' }}
+        whileTap={{ scale: 0.98 }}
+        transition={CARD_SPRING}
       >
         <div className="project-card__accent-line" aria-hidden="true" />
         <div className="project-card__role">{role}</div>
@@ -193,7 +212,7 @@ function ProjectCard({ role, title, description, metrics, tags, delay }) {
         <div className="project-card__tags">
           {tags.map((tg, i) => <span key={i} className="project-card__tag">{tg}</span>)}
         </div>
-      </article>
+      </motion.article>
     </Fade>
   );
 }
