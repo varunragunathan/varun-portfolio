@@ -146,12 +146,20 @@ export async function sendInterviewMessage(request, env, sessionId) {
     .prepare('SELECT role, content FROM interview_messages WHERE session_id = ? ORDER BY created_at ASC')
     .bind(sessionId).all();
 
-  const messages    = results.map(r => ({ role: r.role, content: r.content }));
-  const asstMsgId   = uid();
+  const messages = results.map(r => ({ role: r.role, content: r.content }));
+  const asstMsgId = uid();
   const useWorkersAI = row.model?.startsWith('@cf/');
 
+  // When the timer has expired, tell Hooty to react to this final answer and close
+  // warmly rather than asking another question.
+  const sysPrompt = body.isLastTurn
+    ? systemPrompt(row.theme) + '\n\nTIME IS UP — this is the candidate\'s final answer. ' +
+      'Respond with exactly two spoken sentences: first, a genuine one-sentence reaction to their answer; ' +
+      'second, a warm closing that thanks them and wishes them luck. Do not ask another question.'
+    : systemPrompt(row.theme);
+
   if (useWorkersAI) {
-    const upstream = await callWorkersAI(env.AI, systemPrompt(row.theme), messages);
+    const upstream = await callWorkersAI(env.AI, sysPrompt, messages);
     return sse(transformStreamWorkersAI(upstream, async (fullText) => {
       const now = Math.floor(Date.now() / 1000);
       await env.varun_portfolio_auth
@@ -160,7 +168,7 @@ export async function sendInterviewMessage(request, env, sessionId) {
     }));
   }
 
-  const upstream = await callClaude(env.ANTHROPIC_API_KEY, systemPrompt(row.theme), messages);
+  const upstream = await callClaude(env.ANTHROPIC_API_KEY, sysPrompt, messages);
   return sse(transformStream(upstream, async (fullText, usage) => {
     const now = Math.floor(Date.now() / 1000);
     await env.varun_portfolio_auth

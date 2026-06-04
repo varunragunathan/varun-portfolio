@@ -538,7 +538,7 @@ export function useVoiceInterview() {
         fetch(`/api/interview/sessions/${sessionRef.current}/message`, {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ content: text }),
+          body:    JSON.stringify({ content: text, isLastTurn: windingDownRef.current }),
         })
       );
     } catch (err) {
@@ -648,11 +648,17 @@ export function useVoiceInterview() {
       if (secs >= durationRef.current && !windingDownRef.current) {
         windingDownRef.current = true;
         clearInterval(timerRef.current);
-        // If currently listening: stop mic and trigger closing statement
         if (stateRef.current === INTERVIEW_STATES.LISTENING) {
-          manualStopRef.current = true;
-          recogRef.current?.stop();
-          windDownRef.current?.();
+          if (partialRef.current.trim()) {
+            // User is mid-answer — let them finish. STT will auto-submit their text;
+            // handleUserTurn sees windingDownRef=true and sends isLastTurn:true so
+            // Hooty reacts to the answer and closes rather than asking another question.
+          } else {
+            // Nothing said yet — close immediately with a graceful monologue.
+            manualStopRef.current = true;
+            recogRef.current?.stop();
+            windDownRef.current?.();
+          }
         }
         // If responding/processing: handleAIResponse checks windingDownRef after speak()
       }
