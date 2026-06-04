@@ -151,6 +151,7 @@ const THEMES = [
   { id: 'data-engineering', label: 'Data Engineering', icon: '🗄️',  desc: 'Pipelines, ETL, Spark, dbt' },
   { id: 'data-fullstack',   label: 'Data Full Stack',  icon: '📈',  desc: 'SQL, analytics, APIs, viz' },
   { id: 'business-finance', label: 'Business Finance', icon: '💼',  desc: 'Valuation, accounting, markets' },
+  { id: 'custom',           label: 'Custom',           icon: '✏️',  desc: 'Your own topic' },
 ];
 
 const DURATIONS = [
@@ -314,17 +315,21 @@ function SettingsPanel({ prefs, onPrefChange, keyConfigured }) {
 
 // ── Setup screen ──────────────────────────────────────────────────
 function SetupView({ prefs, onPrefChange, onStart, isSupported, keyConfigured, audioDevices }) {
-  const [theme,     setTheme]     = useState(prefs.theme    || 'frontend');
-  const [duration,  setDuration]  = useState(prefs.duration || 1800);
-  const [showAudio, setShowAudio] = useState(false);
+  const [theme,       setTheme]       = useState(prefs.theme    || 'frontend');
+  const [duration,    setDuration]    = useState(prefs.duration || 1800);
+  const [showAudio,   setShowAudio]   = useState(false);
+  const [customTopic, setCustomTopic] = useState('');
 
   const handleTheme = (t) => { setTheme(t); onPrefChange('theme', t); };
   const handleDuration = (d) => { setDuration(d); onPrefChange('duration', d); };
 
+  const PRESET_THEMES = THEMES.filter(t => t.id !== 'custom');
   const randomize = () => {
-    const t = THEMES[Math.floor(Math.random() * THEMES.length)].id;
+    const t = PRESET_THEMES[Math.floor(Math.random() * PRESET_THEMES.length)].id;
     handleTheme(t);
   };
+
+  const canStart = theme !== 'custom' || customTopic.trim().length > 0;
 
   return (
     <motion.div
@@ -395,6 +400,26 @@ function SetupView({ prefs, onPrefChange, onStart, isSupported, keyConfigured, a
             </motion.button>
           ))}
         </div>
+
+        <AnimatePresence>
+          {theme === 'custom' && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, marginTop: 0 }}
+              animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
+              exit={{ opacity: 0, height: 0, marginTop: 0 }}
+              transition={{ duration: 0.22, ease: 'easeInOut' }}
+              style={{ overflow: 'hidden' }}
+            >
+              <textarea
+                className="interview-setup__custom-input"
+                placeholder="Describe the topic, role, or focus area — e.g. &quot;ML engineer at a startup, focus on model deployment&quot;"
+                value={customTopic}
+                onChange={e => setCustomTopic(e.target.value)}
+                rows={3}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.section>
 
       {/* Duration */}
@@ -466,12 +491,13 @@ function SetupView({ prefs, onPrefChange, onStart, isSupported, keyConfigured, a
 
       <motion.button
         className="interview-setup__start"
-        onClick={() => onStart({ theme, duration })}
+        onClick={() => canStart && onStart({ theme, duration, customTopic: customTopic.trim() })}
+        disabled={!canStart}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.35 }}
-        whileHover={{ scale: 1.04, boxShadow: '0 8px 32px rgba(99,102,241,0.5)' }}
-        whileTap={{ scale: 0.97 }}
+        whileHover={canStart ? { scale: 1.04, boxShadow: '0 8px 32px rgba(99,102,241,0.5)' } : {}}
+        whileTap={canStart ? { scale: 0.97 } : {}}
       >
         Start Interview →
       </motion.button>
@@ -966,10 +992,11 @@ export default function InterviewPage() {
     });
   }, []);
 
-  const handleStart = ({ theme, duration }) => {
+  const handleStart = ({ theme, duration, customTopic }) => {
     start({
       theme,
       duration,
+      customTopic,
       model:          prefs.model     || 'workers-ai',
       ttsMode:        prefs.tts       || 'browser',
       voice:          prefs.voice     || 'nova',

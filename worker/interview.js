@@ -75,7 +75,14 @@ export async function createInterviewSession(request, env) {
   if (session instanceof Response) return session;
 
   const body = await request.json().catch(() => ({}));
-  const theme       = THEMES[body.theme] ? body.theme : 'frontend';
+  // Custom theme: store the user's topic text directly so subsequent turns
+  // and the assessment use it. THEMES[theme] || theme already handles arbitrary text.
+  let theme;
+  if (body.theme === 'custom' && body.customTopic?.trim()) {
+    theme = body.customTopic.trim().slice(0, 200);
+  } else {
+    theme = THEMES[body.theme] ? body.theme : 'frontend';
+  }
   const duration    = Math.min(Math.max(Number(body.duration) || 1800, 300), 3600);
   const useWorkersAI = body.model === 'workers-ai';
   const modelId     = useWorkersAI ? WORKERS_AI_MODEL : INTERVIEW_MODEL;

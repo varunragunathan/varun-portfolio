@@ -599,7 +599,7 @@ export function useVoiceInterview() {
   useEffect(() => { endInterviewRef.current = endInterview; }, [endInterview]);
 
   // ── Start interview ───────────────────────────────────────────────
-  const start = useCallback(async ({ theme, duration, model = 'workers-ai', ttsMode = 'browser', voice = 'nova', outputDeviceId = null }) => {
+  const start = useCallback(async ({ theme, duration, customTopic, model = 'workers-ai', ttsMode = 'browser', voice = 'nova', outputDeviceId = null }) => {
     setError(null);
     setTranscript([]);
     setLastText('');
@@ -663,7 +663,7 @@ export function useVoiceInterview() {
         fetch('/api/interview/sessions', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ theme, duration, model }),
+          body:    JSON.stringify({ theme, duration, model, customTopic }),
         })
       );
     } catch (err) {
