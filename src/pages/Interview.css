@@ -92,7 +92,7 @@
   text-align: center;
   max-width: 460px;
   line-height: 1.65;
-  margin: -20px 0 0;
+  margin: 6px 0 0;
 }
 .interview-setup__warn {
   font-size: 12px;
@@ -180,6 +180,29 @@
   font-size: 11px;
   color: var(--text-3);
   line-height: 1.3;
+}
+
+/* ── Custom topic input ───────────────────────────────────────── */
+.interview-setup__custom-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1.5px solid #6366f1;
+  background: var(--card-bg);
+  color: var(--text-1);
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+.interview-setup__custom-input::placeholder { color: var(--text-3); }
+.interview-setup__custom-input:focus {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
 }
 
 /* ── Duration chips ───────────────────────────────────────────── */
@@ -1172,7 +1195,7 @@
   justify-content: flex-end;
 }
 
-/* ── Light mode: card icon filter to prevent emoji darkness ──── */
+/* ── Light mode overrides ─────────────────────────────────────── */
 [data-theme="light"] .interview-theme-card--active {
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
 }
@@ -1186,4 +1209,53 @@
 [data-theme="light"] .interview-active__ring--speaking {
   box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.5),
               0 0 32px 6px rgba(79, 70, 229, 0.1);
+}
+
+/* --border in light mode is rgba(0,0,0,0.09) — nearly invisible on white.
+   Bump interview-specific borders to a legible gray. */
+[data-theme="light"] .interview-theme-card {
+  border-color: rgba(0, 0, 0, 0.15);
+}
+[data-theme="light"] .interview-theme-card:hover {
+  border-color: rgba(0, 0, 0, 0.25);
+}
+[data-theme="light"] .interview-duration-chip {
+  border-color: rgba(0, 0, 0, 0.18);
+}
+[data-theme="light"] .interview-duration-chip:hover {
+  border-color: rgba(0, 0, 0, 0.3);
+}
+[data-theme="light"] .interview-duration-chip--active {
+  border-color: #6366f1;
+  color: #4f46e5;
+}
+[data-theme="light"] .interview-setup__random {
+  border-color: rgba(0, 0, 0, 0.18);
+}
+[data-theme="light"] .interview-setup__random:hover {
+  border-color: rgba(0, 0, 0, 0.3);
+}
+[data-theme="light"] .interview-ctrl--text {
+  border-color: rgba(0, 0, 0, 0.2);
+  color: var(--text-2);
+}
+[data-theme="light"] .interview-ctrl--text:hover {
+  border-color: rgba(0, 0, 0, 0.32);
+  color: var(--text-1);
+}
+[data-theme="light"] .interview-ctrl--stop {
+  border-color: rgba(239, 68, 68, 0.5);
+}
+[data-theme="light"] .interview-active__text-input {
+  border-color: rgba(0, 0, 0, 0.18);
+}
+[data-theme="light"] .interview-setup__custom-input {
+  background: #f8f8fc;
+}
+
+/* Disabled start button when custom topic is empty */
+.interview-setup__start:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
 }
