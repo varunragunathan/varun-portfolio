@@ -92,6 +92,8 @@ export function useVoiceInterview() {
   const fillerTimerRef     = useRef(null);
   // Promise from the currently-playing filler so we can await it before real speech
   const fillerPromiseRef   = useRef(null);
+  // Set to true to abort an in-flight OpenAI filler fetch before it plays
+  const fillerCancelledRef = useRef(false);
   // Output device ID for AudioContext.setSinkId (Chrome)
   const outputDeviceIdRef  = useRef(null);
   // Persisted AudioContext (one per session)
@@ -401,16 +403,26 @@ export function useVoiceInterview() {
         // Cancel the pending filler timer (hasn't fired yet — good, skip it)
         clearTimeout(fillerTimerRef.current);
 
-        // If a filler IS currently playing, wait for it to finish naturally
-        // rather than cutting it off mid-word. The real audio is pre-fetched
-        // so waiting here adds no perceived delay — it just feels smoother.
         if (fillerPromiseRef.current) {
-          await Promise.race([
-            fillerPromiseRef.current.catch(() => {}),
-            new Promise(r => setTimeout(r, 3000)), // safety cap
-          ]);
+          if (ttsModeRef.current === 'openai' && hasOpenAIKeyRef.current) {
+            // OpenAI mode: real audio is pre-fetched and ready — stop the filler
+            // immediately so there's no gap between text appearing and audio starting.
+            fillerCancelledRef.current = true;
+            if (ttsSourceRef.current) {
+              ttsSourceRef.current.onended = null;
+              ttsSourceRef.current.stop();
+              ttsSourceRef.current   = null;
+              ttsAnalyserRef.current = null;
+            }
+          } else {
+            // Browser TTS: let the filler finish naturally before real speech starts.
+            await Promise.race([
+              fillerPromiseRef.current.catch(() => {}),
+              new Promise(r => setTimeout(r, 3000)), // safety cap
+            ]);
+            synthRef.current.cancel();
+          }
           fillerPromiseRef.current = null;
-          synthRef.current.cancel(); // ensure synthesis is stopped after filler
         }
 
         if (stateRef.current === INTERVIEW_STATES.ENDED   ||
@@ -498,14 +510,25 @@ export function useVoiceInterview() {
     setStateSynced(INTERVIEW_STATES.PROCESSING);
     setTranscript(t => [...t, { role: 'user', text }]);
 
-    // After 800 ms of silence, play a short filler via browser synthesis.
-    // We store the promise so speakChunk can await it and let the filler finish
-    // naturally before the real response starts — no more mid-word cut-offs.
+    // After 800 ms of silence, play a short filler to fill dead air.
+    // In OpenAI mode, use the same TTS voice for consistency. A cancel flag
+    // lets speakChunk abort the filler immediately once real audio is ready.
     clearTimeout(fillerTimerRef.current);
-    fillerPromiseRef.current = null;
+    fillerPromiseRef.current  = null;
+    fillerCancelledRef.current = false;
     fillerTimerRef.current = setTimeout(() => {
-      if (stateRef.current === INTERVIEW_STATES.PROCESSING) {
-        const filler = FILLERS[Math.floor(Math.random() * FILLERS.length)];
+      if (stateRef.current !== INTERVIEW_STATES.PROCESSING) return;
+      const filler    = FILLERS[Math.floor(Math.random() * FILLERS.length)];
+      const useOpenAI = ttsModeRef.current === 'openai' && hasOpenAIKeyRef.current;
+      if (useOpenAI) {
+        fillerPromiseRef.current = fetchTTSBuffer(filler)
+          .then(buf => {
+            if (fillerCancelledRef.current) return;
+            if (stateRef.current !== INTERVIEW_STATES.PROCESSING) return;
+            return playTTSBuffer(buf);
+          })
+          .catch(() => {});
+      } else {
         fillerPromiseRef.current = speakSynthesis(filler);
       }
     }, 800);
@@ -525,7 +548,7 @@ export function useVoiceInterview() {
         startListening();
       }
     }
-  }, [handleAIResponse, setStateSynced, startListening, speakSynthesis]);
+  }, [handleAIResponse, setStateSynced, startListening, speakSynthesis, fetchTTSBuffer, playTTSBuffer]);
 
   // ── Wind-down: speak a closing statement then end gracefully ─────
   const windDownInterview = useCallback(async () => {
