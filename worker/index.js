@@ -605,8 +605,18 @@ async function handleRequest(request, env) {
   }
 
   // All non-API requests → serve the React static build
-  // Inject security headers on HTML responses
-  const asset = await env.ASSETS.fetch(request);
+  // Inject security headers on HTML responses.
+  // SPA routes (e.g. /interview) have no matching file in dist/ — fall back
+  // to index.html so React Router handles the path on the client.
+  let asset;
+  try {
+    asset = await env.ASSETS.fetch(request);
+    if (asset.status === 404 && !url.pathname.includes('.')) {
+      asset = await env.ASSETS.fetch(new Request(new URL('/', url.origin)));
+    }
+  } catch {
+    asset = await env.ASSETS.fetch(new Request(new URL('/', url.origin)));
+  }
   const ct    = asset.headers.get('Content-Type') || '';
   if (!ct.includes('text/html')) return asset;
 
