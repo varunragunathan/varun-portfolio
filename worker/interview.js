@@ -25,7 +25,8 @@ export const THEMES = {
   'fullstack':        'Full Stack Engineering',
   'product':          'Product Management',
   'data-engineering': 'Data Engineering',
-  'data-fullstack':   'Data & Full Stack Development',
+  'data-fullstack':    'Data & Full Stack Development',
+  'business-finance':  'Business Finance',
 };
 
 function json(data, status = 200) {

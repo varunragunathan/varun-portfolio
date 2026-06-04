@@ -150,6 +150,7 @@ const THEMES = [
   { id: 'product',          label: 'Product Mgmt',    icon: '📋',  desc: 'Strategy, metrics, users' },
   { id: 'data-engineering', label: 'Data Engineering', icon: '🗄️',  desc: 'Pipelines, ETL, Spark, dbt' },
   { id: 'data-fullstack',   label: 'Data Full Stack',  icon: '📈',  desc: 'SQL, analytics, APIs, viz' },
+  { id: 'business-finance', label: 'Business Finance', icon: '💼',  desc: 'Valuation, accounting, markets' },
 ];
 
 const DURATIONS = [
