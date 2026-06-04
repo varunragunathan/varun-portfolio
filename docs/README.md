@@ -42,6 +42,7 @@ The documentation is written for a competent developer who may not yet know WebA
 | [26](./chapters/26-llm-eval-pipeline.md) | LLM Eval Pipeline | Two-phase generate-then-judge pipeline, financial Q&A dataset, scoring dimensions, baseline/comparison workflow, secret management |
 | [27](./chapters/27-agent-fix.md) | Agent Fix Workflow | Automated bug-fixing pipeline: issue label trigger, Gemini-powered file discovery and code generation, safety guards, full test gate, PR creation |
 | [28](./chapters/28-agentic-surveys.md) | Agentic Surveys (Hooty) | Conversational owl-guided survey system: SSE streaming, delimiter protocol, multi-model routing (Anthropic / Workers AI / OpenRouter), short URL slugs, session lifecycle, admin builder |
+| [29](./chapters/29-voice-interview.md) | Voice Interview | End-to-end voice mock interview: sentence-level TTS pipelining, filler phrase cancellation, SpeechRecognition quirks, AudioContext lifecycle, OpenAI key encryption, graceful wind-down, post-session assessment |
 
 ### Ops Notes
 
