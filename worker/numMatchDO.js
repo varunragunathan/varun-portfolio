@@ -41,6 +41,13 @@ export class NumMatchDO {
     const uid = url.searchParams.get('userId');
     if (uid) this.userId = uid;
 
+    // ── Internal: trusted device responds via HTTP (no WebSocket needed) ─
+    if (request.method === 'POST' && url.pathname.endsWith('/respond')) {
+      const { approvalToken, approved } = await request.json();
+      await this.handleResponse(approvalToken, approved);
+      return new Response('ok');
+    }
+
     // ── Internal: worker broadcasts new approval ──────────────────
     if (request.method === 'POST' && url.pathname.endsWith('/broadcast')) {
       const { approvalToken, code, userAgent, userId, deviceNames } = await request.json();
@@ -77,27 +84,28 @@ export class NumMatchDO {
       this.clients.set(server, { type: 'trusted' });
 
       // Send any pending approval immediately (covers DO restart / late connect)
-      let toSend = this.pending;
-      if (!toSend && this.userId) {
-        const raw = await this.env.KV.get(`num_match_for_user:${this.userId}`);
-        if (raw) {
-          const { approvalToken: at, code, userAgent, deviceNames } = JSON.parse(raw);
-          const still = await this.env.KV.get(`num_match:${at}`);
-          if (still) {
-            // Reconstruct expiresAt from the alarm (best-effort: fall back to now+2min)
-            const alarm = await this.state.storage.getAlarm();
-            const expiresAt = alarm ?? (Date.now() + TIMEOUT_MS);
-            toSend = { approvalToken: at, code, userAgent, deviceNames, expiresAt };
-            this.pending = toSend;
+      try {
+        let toSend = this.pending;
+        if (!toSend && this.userId) {
+          const raw = await this.env.KV.get(`num_match_for_user:${this.userId}`);
+          if (raw) {
+            const { approvalToken: at, code, userAgent, deviceNames } = JSON.parse(raw);
+            const still = await this.env.KV.get(`num_match:${at}`);
+            if (still) {
+              const alarm = await this.state.storage.getAlarm();
+              const expiresAt = alarm ?? (Date.now() + TIMEOUT_MS);
+              toSend = { approvalToken: at, code, userAgent, deviceNames, expiresAt };
+              this.pending = toSend;
+            }
           }
         }
-      }
-      if (toSend) {
-        server.send(JSON.stringify({
-          type: 'approval_request', ...toSend,
-          expires_at: toSend.expiresAt,
-        }));
-      }
+        if (toSend) {
+          server.send(JSON.stringify({
+            type: 'approval_request', ...toSend,
+            expires_at: toSend.expiresAt,
+          }));
+        }
+      } catch { /* non-fatal — client will re-read from KV via pending endpoint */ }
 
       server.addEventListener('message', async event => {
         try {
@@ -108,6 +116,16 @@ export class NumMatchDO {
 
     } else if (type === 'waiting') {
       this.clients.set(server, { type: 'waiting', approvalToken });
+      // Check if the result was already processed (trusted device responded before we connected)
+      try {
+        const resultRaw = await this.env.KV.get(`num_match_result:${approvalToken}`);
+        if (resultRaw) {
+          const result = JSON.parse(resultRaw);
+          server.send(JSON.stringify({ type: 'result', approved: result.approved, pendingToken: result.pendingToken ?? null }));
+          this.clients.delete(server);
+          server.close(1000, 'Done');
+        }
+      } catch {}
     }
 
     server.addEventListener('close', () => {
@@ -142,6 +160,13 @@ export class NumMatchDO {
       pendingToken = await createPendingSession(this.env.KV, { userId, email, method: 'passkey+number_match' });
     }
     this.pending = null;
+
+    // Cache result briefly so a new device that connects after the response still gets it
+    await this.env.KV.put(
+      `num_match_result:${approvalToken}`,
+      JSON.stringify({ approved, pendingToken }),
+      { expirationTtl: 60 },
+    ).catch(() => {});
 
     const resultMsg   = JSON.stringify({ type: 'result', approved, pendingToken });
     const resolvedMsg = JSON.stringify({ type: 'resolved', approvalToken });

@@ -1,7 +1,7 @@
 import { sendOTP, verifyOTP } from './otp.js';
 import { getRegisterOptions, verifyRegistration, getAuthOptions, verifyAuth, addPasskeyOptions, addPasskeyVerify } from './passkey.js';
 import { getMe, logout, finaliseSession } from './session.js';
-import { numMatchSubscribe, numMatchWait } from './numMatch.js';
+import { numMatchSubscribe, numMatchWait, numMatchPending, numMatchRespond } from './numMatch.js';
 import { stepUpOptions, stepUpVerify } from './stepUp.js';
 import { recoveryStart, recoveryVerify, recoveryVerifyTOTP, recoverySignIn } from './recovery.js';
 import { totpStatus, totpSetup, totpEnable, totpDisable, totpSignin } from './totp.js';
@@ -102,11 +102,15 @@ export async function handleAuth(request, env, url) {
   if (method === 'GET'  && path === '/recovery-codes/status')       return recoveryCodesStatus(request, env);
   if (method === 'POST' && path === '/recovery-codes/regenerate')   return regenerateRecoveryCodes(request, env);
 
-  // ── Number matching (WebSocket) ─────────────────────────────────
-  // GET (WS upgrade) — trusted session subscribes for approval requests
-  if (method === 'GET'  && path === '/num-match/subscribe')         return numMatchSubscribe(request, env);
-  // GET (WS upgrade) — new device waits for approval result
+  // ── Number matching ─────────────────────────────────────────────
+  // Polling — trusted device checks for pending approvals (KV read, no DO)
+  if (method === 'GET'  && path === '/num-match/pending')           return numMatchPending(request, env);
+  // HTTP respond — trusted device approves/denies (delegates to DO via HTTP)
+  if (method === 'POST' && path === '/num-match/respond')           return numMatchRespond(request, env);
+  // WebSocket — new device waits for approval result
   if (method === 'GET'  && path === '/num-match/wait')              return numMatchWait(request, env);
+  // Legacy WebSocket subscribe — kept for backward compatibility but no longer used
+  if (method === 'GET'  && path === '/num-match/subscribe')         return numMatchSubscribe(request, env);
 
   // ── Profile ─────────────────────────────────────────────────────
   if (method === 'PATCH' && path === '/account/nickname')           return updateNickname(request, env);

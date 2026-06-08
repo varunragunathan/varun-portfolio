@@ -47,6 +47,67 @@ export async function numMatchSubscribe(request, env) {
   return stub.fetch(new Request(url.toString(), request));
 }
 
+// GET /api/auth/num-match/pending
+// Trusted sessions poll this instead of holding a persistent WebSocket.
+// Reads directly from KV — no DO activation, no duration charge.
+export async function numMatchPending(request, env) {
+  const session = await getSession(env.KV, request);
+  if (!session) return json({ error: 'Unauthorized' }, 401);
+
+  const db = env.varun_portfolio_auth;
+  const tokenHash = await sha256Hex(session.token);
+  const sessionRecord = await db
+    .prepare('SELECT trusted FROM sessions WHERE token_hash = ? AND trusted = 1 LIMIT 1')
+    .bind(tokenHash).first();
+  if (!sessionRecord) return json({ pending: false });
+
+  const raw = await env.KV.get(`num_match_for_user:${session.userId}`);
+  if (!raw) return json({ pending: false });
+
+  const { approvalToken, code, userAgent, deviceNames } = JSON.parse(raw);
+
+  // Verify token is still live (not already processed)
+  const still = await env.KV.get(`num_match:${approvalToken}`);
+  if (!still) {
+    await env.KV.delete(`num_match_for_user:${session.userId}`).catch(() => {});
+    return json({ pending: false });
+  }
+
+  return json({ pending: true, approvalToken, code, userAgent, deviceNames });
+}
+
+// POST /api/auth/num-match/respond   { approvalToken, approved }
+// Trusted sessions respond here. Delegates to the DO via HTTP so the
+// waiting new device's WebSocket gets notified. No persistent connection needed.
+export async function numMatchRespond(request, env) {
+  const session = await getSession(env.KV, request);
+  if (!session) return json({ error: 'Unauthorized' }, 401);
+
+  const db = env.varun_portfolio_auth;
+  const tokenHash = await sha256Hex(session.token);
+  const sessionRecord = await db
+    .prepare('SELECT trusted FROM sessions WHERE token_hash = ? AND trusted = 1 LIMIT 1')
+    .bind(tokenHash).first();
+  if (!sessionRecord) return json({ error: 'Requires a trusted session' }, 403);
+
+  const { approvalToken, approved } = await request.json().catch(() => ({}));
+  if (!approvalToken) return json({ error: 'Missing approvalToken' }, 400);
+
+  const raw = await env.KV.get(`num_match:${approvalToken}`);
+  if (!raw) return json({ error: 'Approval not found or already processed' }, 404);
+
+  const { userId } = JSON.parse(raw);
+  const doId = env.NUM_MATCH_DO.idFromName(userId);
+  const stub = env.NUM_MATCH_DO.get(doId);
+  await stub.fetch(new Request('http://do-internal/respond', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ approvalToken, approved }),
+  }));
+
+  return json({ ok: true });
+}
+
 // GET /api/auth/num-match/wait?token={tempToken}
 // New device connects here after verifyAuth returns pendingNumberMatch.
 // Worker validates the tempToken from KV before forwarding to the DO.
