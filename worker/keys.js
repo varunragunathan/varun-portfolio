@@ -74,14 +74,14 @@ async function loadUserKey(env, userId) {
   const row = await env.varun_portfolio_auth.prepare(
     'SELECT encrypted_blob FROM user_encrypted_keys WHERE user_id = ?'
   ).bind(userId).first();
-  if (!row) return null;
+  if (!row?.encrypted_blob) return null;
   const aesKey = await deriveUserKey(env.ENCRYPTION_SECRET, userId);
   return decryptBlob(aesKey, row.encrypted_blob);
 }
 
 async function deleteUserKey(env, userId) {
   await env.varun_portfolio_auth.prepare(
-    'DELETE FROM user_encrypted_keys WHERE user_id = ?'
+    'UPDATE user_encrypted_keys SET encrypted_blob = NULL, key_hint = NULL WHERE user_id = ?'
   ).bind(userId).run();
 }
 
@@ -92,14 +92,61 @@ async function getKeyHint(env, userId) {
   return row?.key_hint ?? null;
 }
 
+// ── Gemini key helpers ────────────────────────────────────────────
+
+async function saveGeminiKey(env, userId, apiKey) {
+  if (!env.ENCRYPTION_SECRET) throw new Error('ENCRYPTION_SECRET not configured');
+  const aesKey = await deriveUserKey(env.ENCRYPTION_SECRET, userId + ':gemini');
+  const blob   = await encryptBlob(aesKey, apiKey);
+  const hint   = 'Gemini •••• ' + apiKey.slice(-4);
+  await env.varun_portfolio_auth.prepare(`
+    INSERT INTO user_encrypted_keys (user_id, gemini_blob, gemini_hint, updated_at)
+    VALUES (?, ?, ?, unixepoch())
+    ON CONFLICT(user_id) DO UPDATE
+      SET gemini_blob = excluded.gemini_blob,
+          gemini_hint = excluded.gemini_hint,
+          updated_at  = excluded.updated_at
+  `).bind(userId, blob, hint).run();
+}
+
+async function loadGeminiKey(env, userId) {
+  if (!env.ENCRYPTION_SECRET) return null;
+  const row = await env.varun_portfolio_auth.prepare(
+    'SELECT gemini_blob FROM user_encrypted_keys WHERE user_id = ?'
+  ).bind(userId).first();
+  if (!row?.gemini_blob) return null;
+  const aesKey = await deriveUserKey(env.ENCRYPTION_SECRET, userId + ':gemini');
+  return decryptBlob(aesKey, row.gemini_blob);
+}
+
+async function deleteGeminiKey(env, userId) {
+  await env.varun_portfolio_auth.prepare(
+    'UPDATE user_encrypted_keys SET gemini_blob = NULL, gemini_hint = NULL WHERE user_id = ?'
+  ).bind(userId).run();
+}
+
+async function getGeminiKeyHint(env, userId) {
+  const row = await env.varun_portfolio_auth.prepare(
+    'SELECT gemini_hint FROM user_encrypted_keys WHERE user_id = ?'
+  ).bind(userId).first();
+  return row?.gemini_hint ?? null;
+}
+
 // ── Route handlers ────────────────────────────────────────────────
 
 // GET /api/user/key/status
 export async function handleGetKeyStatus(request, env) {
   const session = await guardAuth(request, env);
   if (session instanceof Response) return session;
-  const hint = await getKeyHint(env, session.userId);
-  return json({ configured: hint !== null, hint });
+  const [hint, geminiHint] = await Promise.all([
+    getKeyHint(env, session.userId),
+    getGeminiKeyHint(env, session.userId),
+  ]);
+  return json({
+    configured: hint !== null,
+    hint,
+    gemini: { configured: geminiHint !== null, hint: geminiHint },
+  });
 }
 
 // POST /api/user/key   { key: "sk-..." }
@@ -125,6 +172,32 @@ export async function handleDeleteKey(request, env) {
   const session = await guardAuth(request, env);
   if (session instanceof Response) return session;
   await deleteUserKey(env, session.userId);
+  return json({ ok: true });
+}
+
+// POST /api/user/key/gemini   { key: "AIza..." }
+export async function handleSaveGeminiKey(request, env) {
+  const session = await guardAuth(request, env);
+  if (session instanceof Response) return session;
+  const { key } = await request.json().catch(() => ({}));
+  if (!key || typeof key !== 'string' || !key.startsWith('AIza')) {
+    return json({ error: 'Invalid key — Gemini keys start with AIza' }, 400);
+  }
+  try {
+    await saveGeminiKey(env, session.userId, key);
+    const hint = await getGeminiKeyHint(env, session.userId);
+    return json({ ok: true, hint });
+  } catch (err) {
+    console.error('Gemini key save error:', err);
+    return json({ error: 'Failed to save key' }, 500);
+  }
+}
+
+// DELETE /api/user/key/gemini
+export async function handleDeleteGeminiKey(request, env) {
+  const session = await guardAuth(request, env);
+  if (session instanceof Response) return session;
+  await deleteGeminiKey(env, session.userId);
   return json({ ok: true });
 }
 
@@ -175,6 +248,110 @@ export async function handleVoiceSample(request, env, voiceId) {
 
   return new Response(audioBuffer, {
     headers: { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'public, max-age=2592000' },
+  });
+}
+
+const GEMINI_ALLOWED_VOICES = ['Kore','Puck','Charon','Zephyr','Aoede','Leda','Orus','Fenrir'];
+const GEMINI_TTS_MODEL = 'gemini-2.5-flash-preview-tts';
+
+// POST /api/proxy/tts/gemini   { text, voice? }
+export async function handleProxyTTSGemini(request, env) {
+  const session = await guardAuth(request, env);
+  if (session instanceof Response) return session;
+
+  const { text, voice = 'Kore' } = await request.json().catch(() => ({}));
+  if (!text || typeof text !== 'string') return json({ error: 'text is required' }, 400);
+
+  const apiKey = await loadGeminiKey(env, session.userId);
+  if (!apiKey) return json({ error: 'No Gemini API key configured' }, 402);
+
+  const safeVoice = GEMINI_ALLOWED_VOICES.includes(voice) ? voice : 'Kore';
+
+  const upstream = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_TTS_MODEL}:generateContent?key=${apiKey}`,
+    {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text }] }],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: safeVoice } },
+          },
+        },
+      }),
+    }
+  );
+
+  if (!upstream.ok) {
+    const msg = await upstream.text().catch(() => upstream.statusText);
+    return json({ error: `Gemini TTS: ${msg}` }, upstream.status);
+  }
+
+  const data = await upstream.json();
+  const part = data?.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+  if (!part?.data) return json({ error: 'No audio in Gemini response' }, 500);
+
+  const bytes = Uint8Array.from(atob(part.data), c => c.charCodeAt(0));
+  return new Response(bytes.buffer, {
+    headers: {
+      'Content-Type':  part.mimeType || 'audio/wav',
+      'Cache-Control': 'no-store',
+    },
+  });
+}
+
+// GET /api/proxy/voice-sample-gemini/:voiceId
+// KV-cached sample clips so the UI can preview each voice without a per-click API call.
+export async function handleGeminiVoiceSample(request, env, voiceId) {
+  const session = await guardAuth(request, env);
+  if (session instanceof Response) return session;
+
+  if (!GEMINI_ALLOWED_VOICES.includes(voiceId)) return json({ error: 'Unknown voice' }, 400);
+
+  const cacheKey = `gemini_voice_sample_v1_${voiceId}`;
+  const cached = await env.KV.get(cacheKey, 'arrayBuffer');
+  if (cached) {
+    return new Response(cached, {
+      headers: { 'Content-Type': 'audio/wav', 'Cache-Control': 'public, max-age=2592000' },
+    });
+  }
+
+  const apiKey = await loadGeminiKey(env, session.userId);
+  if (!apiKey) return json({ error: 'No Gemini API key configured — add one to preview voices' }, 402);
+
+  const upstream = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_TTS_MODEL}:generateContent?key=${apiKey}`,
+    {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: "Hi, I'm Hooty. Ready to help you practice your interview skills today!" }] }],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceId } },
+          },
+        },
+      }),
+    }
+  );
+
+  if (!upstream.ok) {
+    const msg = await upstream.text().catch(() => upstream.statusText);
+    return json({ error: msg }, upstream.status);
+  }
+
+  const data = await upstream.json();
+  const part = data?.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+  if (!part?.data) return json({ error: 'No audio in Gemini response' }, 500);
+
+  const bytes = Uint8Array.from(atob(part.data), c => c.charCodeAt(0));
+  await env.KV.put(cacheKey, bytes.buffer, { expirationTtl: 60 * 60 * 24 * 30 });
+
+  return new Response(bytes.buffer, {
+    headers: { 'Content-Type': 'audio/wav', 'Cache-Control': 'public, max-age=2592000' },
   });
 }
 

@@ -44,7 +44,11 @@ import {
   getDiscussionMetrics, getDiscussionTriage,
 } from './discussionMetrics.js';
 import {
-  handleGetKeyStatus, handleSaveKey, handleDeleteKey, handleProxyTTS, handleVoiceSample,
+  handleGetKeyStatus,
+  handleSaveKey, handleDeleteKey,
+  handleSaveGeminiKey, handleDeleteGeminiKey,
+  handleProxyTTS, handleProxyTTSGemini,
+  handleVoiceSample, handleGeminiVoiceSample,
 } from './keys.js';
 import { checkIpRateLimit } from './rateLimit.js';
 import { getMetrics } from './metrics.js';
@@ -275,6 +279,10 @@ async function handleRequest(request, env) {
         response = await handleSaveKey(request, env);
       } else if (path === '/api/user/key' && method === 'DELETE') {
         response = await handleDeleteKey(request, env);
+      } else if (path === '/api/user/key/gemini' && method === 'POST') {
+        response = await handleSaveGeminiKey(request, env);
+      } else if (path === '/api/user/key/gemini' && method === 'DELETE') {
+        response = await handleDeleteGeminiKey(request, env);
       } else {
         response = new Response(JSON.stringify({ error: 'Not found' }), {
           status: 404,
@@ -297,11 +305,16 @@ async function handleRequest(request, env) {
     try {
       const path = url.pathname;
       let response;
-      const voiceSampleMatch = path.match(/^\/api\/proxy\/voice-sample\/([a-z]+)$/);
+      const voiceSampleMatch       = path.match(/^\/api\/proxy\/voice-sample\/([a-z]+)$/);
+      const geminiVoiceSampleMatch = path.match(/^\/api\/proxy\/voice-sample-gemini\/([A-Za-z]+)$/);
       if (path === '/api/proxy/tts' && request.method === 'POST') {
         response = await handleProxyTTS(request, env);
+      } else if (path === '/api/proxy/tts/gemini' && request.method === 'POST') {
+        response = await handleProxyTTSGemini(request, env);
       } else if (voiceSampleMatch && request.method === 'GET') {
         response = await handleVoiceSample(request, env, voiceSampleMatch[1]);
+      } else if (geminiVoiceSampleMatch && request.method === 'GET') {
+        response = await handleGeminiVoiceSample(request, env, geminiVoiceSampleMatch[1]);
       } else {
         response = new Response(JSON.stringify({ error: 'Not found' }), {
           status: 404, headers: { 'Content-Type': 'application/json' },

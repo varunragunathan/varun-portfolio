@@ -62,7 +62,8 @@ export function useVoiceInterview() {
   const [cost,         setCost]         = useState(0);
   const [ttsCost,      setTtsCost]      = useState(0);  // OpenAI TTS cost this session
   const [duration,     setDuration]     = useState(1800);
-  const [hasOpenAIKey, setHasOpenAIKey] = useState(false);
+  const [hasOpenAIKey,  setHasOpenAIKey]  = useState(false);
+  const [hasGeminiKey,  setHasGeminiKey]  = useState(false);
 
   const sessionRef     = useRef(null);
   const timerRef       = useRef(null);
@@ -82,6 +83,8 @@ export function useVoiceInterview() {
 
   // OpenAI TTS — set on start() if user has a stored key
   const hasOpenAIKeyRef    = useRef(false);
+  // Gemini TTS — set on start() if user has a stored Gemini key
+  const hasGeminiKeyRef    = useRef(false);
   // Explicit TTS mode: 'browser' | 'openai' — set on start()
   const ttsModeRef         = useRef('browser');
   // OpenAI voice name — set on start()
@@ -126,6 +129,17 @@ export function useVoiceInterview() {
       body:    JSON.stringify({ text, voice: ttsVoiceRef.current }),
     });
     if (!res.ok) throw new Error(`TTS ${res.status}`);
+    return res.arrayBuffer();
+  }, []);
+
+  // ── TTS step 1b: Gemini TTS (returns WAV, no streaming) ──────────
+  const fetchTTSBufferGemini = useCallback(async (text) => {
+    const res = await fetch('/api/proxy/tts/gemini', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ text, voice: ttsVoiceRef.current }),
+    });
+    if (!res.ok) throw new Error(`Gemini TTS ${res.status}`);
     return res.arrayBuffer();
   }, []);
 
@@ -227,10 +241,16 @@ export function useVoiceInterview() {
       try {
         const buf = await fetchTTSBuffer(text);
         return await playTTSBuffer(buf);
-      } catch { /* fall through to browser TTS */ }
+      } catch { /* fall through */ }
+    }
+    if (ttsModeRef.current === 'gemini' && hasGeminiKeyRef.current) {
+      try {
+        const buf = await fetchTTSBufferGemini(text);
+        return await playTTSBuffer(buf);
+      } catch { /* fall through */ }
     }
     return speakSynthesis(text);
-  }, [fetchTTSBuffer, playTTSBuffer, speakSynthesis]);
+  }, [fetchTTSBuffer, fetchTTSBufferGemini, playTTSBuffer, speakSynthesis]);
 
   // ── STT ──────────────────────────────────────────────────────────
   const startListening = useCallback(() => {
@@ -392,9 +412,12 @@ export function useVoiceInterview() {
 
       // Kick off the network fetch right now, don't wait for the chain
       const useOpenAI = ttsModeRef.current === 'openai' && hasOpenAIKeyRef.current;
+      const useGemini = ttsModeRef.current === 'gemini' && hasGeminiKeyRef.current;
       const bufferPromise = useOpenAI
-        ? fetchTTSBuffer(text).catch(() => null)  // null → fallback to browser
-        : Promise.resolve(null);
+        ? fetchTTSBuffer(text).catch(() => null)
+        : useGemini
+          ? fetchTTSBufferGemini(text).catch(() => null)
+          : Promise.resolve(null);
 
       speakChain = speakChain.then(async () => {
         if (stateRef.current === INTERVIEW_STATES.ENDED   ||
@@ -404,9 +427,10 @@ export function useVoiceInterview() {
         clearTimeout(fillerTimerRef.current);
 
         if (fillerPromiseRef.current) {
-          if (ttsModeRef.current === 'openai' && hasOpenAIKeyRef.current) {
-            // OpenAI mode: real audio is pre-fetched and ready — stop the filler
-            // immediately so there's no gap between text appearing and audio starting.
+          const isAPITTS = (ttsModeRef.current === 'openai' && hasOpenAIKeyRef.current) ||
+                           (ttsModeRef.current === 'gemini' && hasGeminiKeyRef.current);
+          if (isAPITTS) {
+            // API TTS: real audio is pre-fetched — cancel filler immediately.
             fillerCancelledRef.current = true;
             if (ttsSourceRef.current) {
               ttsSourceRef.current.onended = null;
@@ -520,8 +544,10 @@ export function useVoiceInterview() {
       if (stateRef.current !== INTERVIEW_STATES.PROCESSING) return;
       const filler    = FILLERS[Math.floor(Math.random() * FILLERS.length)];
       const useOpenAI = ttsModeRef.current === 'openai' && hasOpenAIKeyRef.current;
-      if (useOpenAI) {
-        fillerPromiseRef.current = fetchTTSBuffer(filler)
+      const useGemini = ttsModeRef.current === 'gemini' && hasGeminiKeyRef.current;
+      const fetchFn   = useOpenAI ? fetchTTSBuffer : useGemini ? fetchTTSBufferGemini : null;
+      if (fetchFn) {
+        fillerPromiseRef.current = fetchFn(filler)
           .then(buf => {
             if (fillerCancelledRef.current) return;
             if (stateRef.current !== INTERVIEW_STATES.PROCESSING) return;
@@ -548,7 +574,7 @@ export function useVoiceInterview() {
         startListening();
       }
     }
-  }, [handleAIResponse, setStateSynced, startListening, speakSynthesis, fetchTTSBuffer, playTTSBuffer]);
+  }, [handleAIResponse, setStateSynced, startListening, speakSynthesis, fetchTTSBuffer, fetchTTSBufferGemini, playTTSBuffer]);
 
   // ── Wind-down: speak a closing statement then end gracefully ─────
   const windDownInterview = useCallback(async () => {
@@ -599,19 +625,20 @@ export function useVoiceInterview() {
   useEffect(() => { endInterviewRef.current = endInterview; }, [endInterview]);
 
   // ── Start interview ───────────────────────────────────────────────
-  const start = useCallback(async ({ theme, duration, customTopic, model = 'workers-ai', ttsMode = 'browser', voice = 'nova', outputDeviceId = null }) => {
+  const start = useCallback(async ({ theme, duration, customTopic, model = 'workers-ai', ttsMode = 'browser', voice = 'nova', geminiVoice = 'Kore', outputDeviceId = null }) => {
     setError(null);
     setTranscript([]);
     setLastText('');
     setElapsed(0);
     setCost(0);
     setHasOpenAIKey(false);
+    setHasGeminiKey(false);
     setTtsCost(0);
     clearTimeout(fillerTimerRef.current);
     fillerPromiseRef.current   = null;
     windingDownRef.current     = false;
     ttsModeRef.current         = ttsMode;
-    ttsVoiceRef.current        = voice;
+    ttsVoiceRef.current        = ttsMode === 'gemini' ? geminiVoice : voice;
     ttsCharsRef.current        = 0;
     outputDeviceIdRef.current  = outputDeviceId;
     durationRef.current        = duration;
@@ -620,7 +647,7 @@ export function useVoiceInterview() {
     // ── iOS Safari: create and unlock AudioContext NOW, while still in the
     //    synchronous user-gesture call chain. Any await after this point
     //    breaks the gesture context and iOS will block audio playback.
-    if (ttsMode === 'openai') {
+    if (ttsMode === 'openai' || ttsMode === 'gemini') {
       if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
         audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
         if (outputDeviceId && audioCtxRef.current.setSinkId) {
@@ -630,13 +657,16 @@ export function useVoiceInterview() {
       audioCtxRef.current.resume().catch(() => {});
     }
 
-    // Check whether user has an OpenAI key (needed for TTS even if ttsMode=openai)
+    // Check stored API keys for both TTS providers
     try {
       const ks = await fetch('/api/user/key/status').then(r => r.json());
       hasOpenAIKeyRef.current = ks?.configured === true;
       setHasOpenAIKey(ks?.configured === true);
+      hasGeminiKeyRef.current = ks?.gemini?.configured === true;
+      setHasGeminiKey(ks?.gemini?.configured === true);
     } catch {
       hasOpenAIKeyRef.current = false;
+      hasGeminiKeyRef.current = false;
     }
 
     setStateSynced(INTERVIEW_STATES.OPENING);
@@ -711,6 +741,7 @@ export function useVoiceInterview() {
     cost,
     ttsCost,
     hasOpenAIKey,
+    hasGeminiKey,
     ttsAnalyserRef,
     start,
     endInterview,

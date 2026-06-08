@@ -16,8 +16,8 @@ const PREFS_KEY = 'iv_prefs_v1';
 const loadPrefs = () => { try { return JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; } catch { return {}; } };
 const savePrefs = (p) => { localStorage.setItem(PREFS_KEY, JSON.stringify(p)); };
 
-// ── Voice options (OpenAI TTS voices) ────────────────────────────
-const TTS_VOICES = [
+// ── Voice options ─────────────────────────────────────────────────
+const OPENAI_VOICES = [
   { id: 'nova',    label: 'Nova',    desc: 'Warm & natural'       },
   { id: 'alloy',   label: 'Alloy',   desc: 'Neutral & balanced'   },
   { id: 'onyx',    label: 'Onyx',    desc: 'Deep & authoritative' },
@@ -26,8 +26,16 @@ const TTS_VOICES = [
   { id: 'fable',   label: 'Fable',   desc: 'British & expressive' },
 ];
 
+const GEMINI_VOICES = [
+  { id: 'Kore',   label: 'Kore',   desc: 'Warm & expressive'     },
+  { id: 'Puck',   label: 'Puck',   desc: 'Upbeat & clear'        },
+  { id: 'Charon', label: 'Charon', desc: 'Measured & informative' },
+  { id: 'Zephyr', label: 'Zephyr', desc: 'Bright & engaging'     },
+  { id: 'Aoede',  label: 'Aoede',  desc: 'Natural & breezy'      },
+];
+
 // ── Voice sample picker ───────────────────────────────────────────
-function VoicePicker({ selectedVoice, onSelect, keyConfigured }) {
+function VoicePicker({ voices, selectedVoice, onSelect, keyConfigured, sampleEndpointBase, keyHint }) {
   const [playing,   setPlaying]   = useState(null);
   const [loading,   setLoading]   = useState(null);
   const [previewErr,setPreviewErr]= useState(null);
@@ -63,7 +71,7 @@ function VoicePicker({ selectedVoice, onSelect, keyConfigured }) {
     try {
       // Fetch once, cache ArrayBuffer for the session
       if (!cacheRef.current[voiceId]) {
-        const res = await fetch(`/api/proxy/voice-sample/${voiceId}`);
+        const res = await fetch(`${sampleEndpointBase}/${voiceId}`);
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error || `HTTP ${res.status}`);
@@ -96,7 +104,7 @@ function VoicePicker({ selectedVoice, onSelect, keyConfigured }) {
 
   return (
     <div className="voice-picker">
-      {TTS_VOICES.map(v => (
+      {voices.map(v => (
         <div
           key={v.id}
           className={`voice-card${selectedVoice === v.id ? ' voice-card--selected' : ''}`}
@@ -123,7 +131,7 @@ function VoicePicker({ selectedVoice, onSelect, keyConfigured }) {
       {previewErr && <p className="voice-picker__error">{previewErr}</p>}
       {!keyConfigured && (
         <p className="voice-picker__hint">
-          <a href="/account/settings#api-key">Add an OpenAI key</a> to preview voices.
+          <a href="/account/settings#api-key">Add a {keyHint} key</a> to preview voices.
         </p>
       )}
     </div>
@@ -249,10 +257,12 @@ function AudioPanel({ audioDevices }) {
 }
 
 // ── Model + TTS settings panel ────────────────────────────────────
-function SettingsPanel({ prefs, onPrefChange, keyConfigured }) {
-  const model = prefs.model || 'workers-ai';
-  const tts   = prefs.tts   || 'browser';
-  const voice = prefs.voice || 'nova';
+function SettingsPanel({ prefs, onPrefChange, keyConfigured, geminiKeyConfigured }) {
+  const model       = prefs.model       || 'workers-ai';
+  const tts         = prefs.tts         || 'browser';
+  const voice       = prefs.voice       || 'nova';
+  const geminiVoice = prefs.geminiVoice || 'Kore';
+  const anyKeyConfigured = keyConfigured || geminiKeyConfigured;
 
   return (
     <div className="settings-panel">
@@ -277,8 +287,8 @@ function SettingsPanel({ prefs, onPrefChange, keyConfigured }) {
         </div>
       </div>
 
-      {/* TTS engine — only shown if key is configured */}
-      {keyConfigured && (
+      {/* TTS engine — shown when at least one AI key is configured */}
+      {anyKeyConfigured && (
         <div className="settings-panel__group">
           <div className="settings-panel__label">Voice Engine</div>
           <div className="settings-panel__toggles">
@@ -289,32 +299,57 @@ function SettingsPanel({ prefs, onPrefChange, keyConfigured }) {
               <span className="settings-toggle__name">Browser voice</span>
               <span className="settings-toggle__tag settings-toggle__tag--free">Free</span>
             </button>
-            <button
-              className={`settings-toggle${tts === 'openai' ? ' settings-toggle--active' : ''}`}
-              onClick={() => onPrefChange('tts', 'openai')}
-            >
-              <span className="settings-toggle__name">OpenAI TTS</span>
-              <span className="settings-toggle__tag settings-toggle__tag--paid">Your key</span>
-            </button>
+            {keyConfigured && (
+              <button
+                className={`settings-toggle${tts === 'openai' ? ' settings-toggle--active' : ''}`}
+                onClick={() => onPrefChange('tts', 'openai')}
+              >
+                <span className="settings-toggle__name">OpenAI TTS</span>
+                <span className="settings-toggle__tag settings-toggle__tag--paid">Your key</span>
+              </button>
+            )}
+            {geminiKeyConfigured && (
+              <button
+                className={`settings-toggle${tts === 'gemini' ? ' settings-toggle--active' : ''}`}
+                onClick={() => onPrefChange('tts', 'gemini')}
+              >
+                <span className="settings-toggle__name">Gemini TTS</span>
+                <span className="settings-toggle__tag settings-toggle__tag--paid">Your key</span>
+              </button>
+            )}
           </div>
         </div>
       )}
 
-      {/* Voice picker — always visible; previews require key */}
+      {/* Voice picker — changes based on selected TTS engine */}
       <div className="settings-panel__group">
         <div className="settings-panel__label">Voice</div>
-        <VoicePicker
-          selectedVoice={voice}
-          onSelect={v => onPrefChange('voice', v)}
-          keyConfigured={keyConfigured}
-        />
+        {tts === 'gemini' ? (
+          <VoicePicker
+            voices={GEMINI_VOICES}
+            selectedVoice={geminiVoice}
+            onSelect={v => onPrefChange('geminiVoice', v)}
+            keyConfigured={geminiKeyConfigured}
+            sampleEndpointBase="/api/proxy/voice-sample-gemini"
+            keyHint="Gemini"
+          />
+        ) : (
+          <VoicePicker
+            voices={OPENAI_VOICES}
+            selectedVoice={voice}
+            onSelect={v => onPrefChange('voice', v)}
+            keyConfigured={keyConfigured}
+            sampleEndpointBase="/api/proxy/voice-sample"
+            keyHint="OpenAI"
+          />
+        )}
       </div>
     </div>
   );
 }
 
 // ── Setup screen ──────────────────────────────────────────────────
-function SetupView({ prefs, onPrefChange, onStart, isSupported, keyConfigured, audioDevices }) {
+function SetupView({ prefs, onPrefChange, onStart, isSupported, keyConfigured, geminiKeyConfigured, audioDevices }) {
   const [theme,       setTheme]       = useState(prefs.theme    || 'frontend');
   const [duration,    setDuration]    = useState(prefs.duration || 1800);
   const [showAudio,   setShowAudio]   = useState(false);
@@ -454,7 +489,7 @@ function SetupView({ prefs, onPrefChange, onStart, isSupported, keyConfigured, a
         transition={{ duration: 0.4, delay: 0.25 }}
       >
         <div className="interview-setup__label">Settings</div>
-        <SettingsPanel prefs={prefs} onPrefChange={onPrefChange} keyConfigured={keyConfigured} />
+        <SettingsPanel prefs={prefs} onPrefChange={onPrefChange} keyConfigured={keyConfigured} geminiKeyConfigured={geminiKeyConfigured} />
       </motion.section>
 
       {/* Audio devices */}
@@ -502,7 +537,7 @@ function SetupView({ prefs, onPrefChange, onStart, isSupported, keyConfigured, a
         Start Interview →
       </motion.button>
 
-      {!keyConfigured && (
+      {!keyConfigured && !geminiKeyConfigured && (
         <motion.div
           className="interview-setup__footer"
           initial={{ opacity: 0 }}
@@ -510,7 +545,7 @@ function SetupView({ prefs, onPrefChange, onStart, isSupported, keyConfigured, a
           transition={{ delay: 0.45 }}
         >
           <a href="/account/settings#api-key" className="interview-setup__api-link">
-            🔑 Setup OpenAI API Key for better voice
+            🔑 Add an OpenAI or Gemini key for higher-quality voice
           </a>
         </motion.div>
       )}
@@ -519,7 +554,7 @@ function SetupView({ prefs, onPrefChange, onStart, isSupported, keyConfigured, a
 }
 
 // ── Active interview ──────────────────────────────────────────────
-function ActiveView({ state, remaining, elapsed, lastText, transcript, ttsAnalyserRef, hasOpenAIKey, prefs, audioDevices, onEnd, onStopRecording, onInterrupt, onSendText }) {
+function ActiveView({ state, remaining, elapsed, lastText, transcript, ttsAnalyserRef, hasOpenAIKey, hasGeminiKey, prefs, audioDevices, onEnd, onStopRecording, onInterrupt, onSendText }) {
   const [showText,  setShowText]  = useState(false);
   const [typed,     setTyped]     = useState('');
   const [showAudio, setShowAudio] = useState(false);
@@ -546,7 +581,9 @@ function ActiveView({ state, remaining, elapsed, lastText, transcript, ttsAnalys
     setTimeout(() => inputRef.current?.focus(), 50);
   };
 
-  const ttsLabel = prefs?.tts === 'openai' && hasOpenAIKey ? 'OpenAI voice' : null;
+  const ttsLabel = prefs?.tts === 'openai' && hasOpenAIKey ? 'OpenAI TTS'
+                 : prefs?.tts === 'gemini' && hasGeminiKey ? 'Gemini TTS'
+                 : null;
 
   return (
     <motion.div
@@ -967,12 +1004,13 @@ function SummaryView({ transcript, elapsed, cost, ttsCost, modelChoice, sessionI
 export default function InterviewPage() {
   const { user } = useAuth();
   const [prefs,        setPrefs]        = useState(loadPrefs);
-  const [keyConfigured, setKeyConfigured] = useState(false);
+  const [keyConfigured,       setKeyConfigured]       = useState(false);
+  const [geminiKeyConfigured, setGeminiKeyConfigured] = useState(false);
   const audioDevices = useAudioDevices();
 
   const {
     state, sessionId, transcript, lastText, error,
-    elapsed, remaining, cost, ttsCost, hasOpenAIKey, ttsAnalyserRef,
+    elapsed, remaining, cost, ttsCost, hasOpenAIKey, hasGeminiKey, ttsAnalyserRef,
     start, endInterview, stopRecording, interrupt, sendText, clearError, isSupported,
   } = useVoiceInterview();
 
@@ -980,7 +1018,10 @@ export default function InterviewPage() {
     if (!user) return;
     fetch('/api/user/key/status')
       .then(r => r.json())
-      .then(d => setKeyConfigured(d?.configured === true))
+      .then(d => {
+        setKeyConfigured(d?.configured === true);
+        setGeminiKeyConfigured(d?.gemini?.configured === true);
+      })
       .catch(() => {});
   }, [user]);
 
@@ -997,9 +1038,10 @@ export default function InterviewPage() {
       theme,
       duration,
       customTopic,
-      model:          prefs.model     || 'workers-ai',
-      ttsMode:        prefs.tts       || 'browser',
-      voice:          prefs.voice     || 'nova',
+      model:          prefs.model       || 'workers-ai',
+      ttsMode:        prefs.tts         || 'browser',
+      voice:          prefs.voice       || 'nova',
+      geminiVoice:    prefs.geminiVoice || 'Kore',
       outputDeviceId: audioDevices.speakerId || null,
     });
   };
@@ -1032,6 +1074,7 @@ export default function InterviewPage() {
           onStart={handleStart}
           isSupported={isSupported}
           keyConfigured={keyConfigured}
+          geminiKeyConfigured={geminiKeyConfigured}
           audioDevices={audioDevices}
         />
       )}
@@ -1045,6 +1088,7 @@ export default function InterviewPage() {
           transcript={transcript}
           ttsAnalyserRef={ttsAnalyserRef}
           hasOpenAIKey={hasOpenAIKey}
+          hasGeminiKey={hasGeminiKey}
           prefs={prefs}
           audioDevices={audioDevices}
           onEnd={endInterview}
