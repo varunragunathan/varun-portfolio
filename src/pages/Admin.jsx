@@ -2315,8 +2315,12 @@ function SurveysTab({ t }) {
   }, [load]);
 
   const viewSessions = useCallback(async (survey) => {
-    const res = await fetch(`/api/admin/surveys/${survey.id}/sessions`, { credentials: 'include' });
-    const data = await res.json();
+    const res  = await fetch(`/api/admin/surveys/${survey.id}/sessions`, { credentials: 'include' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error || `Failed to load sessions (${res.status})`);
+      return;
+    }
     setViewing({ survey, sessions: data.sessions ?? [] });
     setTranscript(null);
   }, []);

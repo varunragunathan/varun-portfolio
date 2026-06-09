@@ -481,7 +481,7 @@ export async function adminListSessions(request, env, surveyId) {
   const { results } = await env.varun_portfolio_auth
     .prepare(`
       SELECT ss.id, ss.respondent_id, ss.started_at, ss.completed_at,
-             ss.tags, COUNT(sm.id) AS message_count
+             COALESCE(ss.tags, '[]') AS tags, COUNT(sm.id) AS message_count
       FROM survey_sessions ss
       LEFT JOIN survey_messages sm ON sm.session_id = ss.id
       WHERE ss.survey_id = ?
