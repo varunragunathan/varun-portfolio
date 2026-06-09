@@ -96,6 +96,11 @@ async function getKeyHint(env, userId) {
 
 async function saveGeminiKey(env, userId, apiKey) {
   if (!env.ENCRYPTION_SECRET) throw new Error('ENCRYPTION_SECRET not configured');
+  // Columns added by migration 007 — throw a clear message if not yet applied
+  const colCheck = await env.varun_portfolio_auth
+    .prepare("SELECT gemini_blob FROM user_encrypted_keys LIMIT 0").all()
+    .catch(() => { throw new Error('Gemini key columns not yet migrated — run migration 007'); });
+  void colCheck;
   const aesKey = await deriveUserKey(env.ENCRYPTION_SECRET, userId + ':gemini');
   const blob   = await encryptBlob(aesKey, apiKey);
   const hint   = 'Gemini •••• ' + apiKey.slice(-4);
@@ -111,25 +116,31 @@ async function saveGeminiKey(env, userId, apiKey) {
 
 async function loadGeminiKey(env, userId) {
   if (!env.ENCRYPTION_SECRET) return null;
-  const row = await env.varun_portfolio_auth.prepare(
-    'SELECT gemini_blob FROM user_encrypted_keys WHERE user_id = ?'
-  ).bind(userId).first();
-  if (!row?.gemini_blob) return null;
-  const aesKey = await deriveUserKey(env.ENCRYPTION_SECRET, userId + ':gemini');
-  return decryptBlob(aesKey, row.gemini_blob);
+  try {
+    const row = await env.varun_portfolio_auth.prepare(
+      'SELECT gemini_blob FROM user_encrypted_keys WHERE user_id = ?'
+    ).bind(userId).first();
+    if (!row?.gemini_blob) return null;
+    const aesKey = await deriveUserKey(env.ENCRYPTION_SECRET, userId + ':gemini');
+    return decryptBlob(aesKey, row.gemini_blob);
+  } catch { return null; }
 }
 
 async function deleteGeminiKey(env, userId) {
-  await env.varun_portfolio_auth.prepare(
-    'UPDATE user_encrypted_keys SET gemini_blob = NULL, gemini_hint = NULL WHERE user_id = ?'
-  ).bind(userId).run();
+  try {
+    await env.varun_portfolio_auth.prepare(
+      'UPDATE user_encrypted_keys SET gemini_blob = NULL, gemini_hint = NULL WHERE user_id = ?'
+    ).bind(userId).run();
+  } catch { /* column not yet migrated — no-op */ }
 }
 
 async function getGeminiKeyHint(env, userId) {
-  const row = await env.varun_portfolio_auth.prepare(
-    'SELECT gemini_hint FROM user_encrypted_keys WHERE user_id = ?'
-  ).bind(userId).first();
-  return row?.gemini_hint ?? null;
+  try {
+    const row = await env.varun_portfolio_auth.prepare(
+      'SELECT gemini_hint FROM user_encrypted_keys WHERE user_id = ?'
+    ).bind(userId).first();
+    return row?.gemini_hint ?? null;
+  } catch { return null; }
 }
 
 // ── Route handlers ────────────────────────────────────────────────

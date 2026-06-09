@@ -262,8 +262,6 @@ function SettingsPanel({ prefs, onPrefChange, keyConfigured, geminiKeyConfigured
   const tts         = prefs.tts         || 'browser';
   const voice       = prefs.voice       || 'nova';
   const geminiVoice = prefs.geminiVoice || 'Kore';
-  const anyKeyConfigured = keyConfigured || geminiKeyConfigured;
-
   return (
     <div className="settings-panel">
       {/* AI Model */}
@@ -287,39 +285,37 @@ function SettingsPanel({ prefs, onPrefChange, keyConfigured, geminiKeyConfigured
         </div>
       </div>
 
-      {/* TTS engine — shown when at least one AI key is configured */}
-      {anyKeyConfigured && (
-        <div className="settings-panel__group">
-          <div className="settings-panel__label">Voice Engine</div>
-          <div className="settings-panel__toggles">
+      {/* TTS engine — browser option always visible; AI options shown when key is stored */}
+      <div className="settings-panel__group">
+        <div className="settings-panel__label">Voice Engine</div>
+        <div className="settings-panel__toggles">
+          <button
+            className={`settings-toggle${tts === 'browser' ? ' settings-toggle--active' : ''}`}
+            onClick={() => onPrefChange('tts', 'browser')}
+          >
+            <span className="settings-toggle__name">Browser voice</span>
+            <span className="settings-toggle__tag settings-toggle__tag--free">Free</span>
+          </button>
+          {keyConfigured && (
             <button
-              className={`settings-toggle${tts === 'browser' ? ' settings-toggle--active' : ''}`}
-              onClick={() => onPrefChange('tts', 'browser')}
+              className={`settings-toggle${tts === 'openai' ? ' settings-toggle--active' : ''}`}
+              onClick={() => onPrefChange('tts', 'openai')}
             >
-              <span className="settings-toggle__name">Browser voice</span>
-              <span className="settings-toggle__tag settings-toggle__tag--free">Free</span>
+              <span className="settings-toggle__name">OpenAI TTS</span>
+              <span className="settings-toggle__tag settings-toggle__tag--paid">Your key</span>
             </button>
-            {keyConfigured && (
-              <button
-                className={`settings-toggle${tts === 'openai' ? ' settings-toggle--active' : ''}`}
-                onClick={() => onPrefChange('tts', 'openai')}
-              >
-                <span className="settings-toggle__name">OpenAI TTS</span>
-                <span className="settings-toggle__tag settings-toggle__tag--paid">Your key</span>
-              </button>
-            )}
-            {geminiKeyConfigured && (
-              <button
-                className={`settings-toggle${tts === 'gemini' ? ' settings-toggle--active' : ''}`}
-                onClick={() => onPrefChange('tts', 'gemini')}
-              >
-                <span className="settings-toggle__name">Gemini TTS</span>
-                <span className="settings-toggle__tag settings-toggle__tag--paid">Your key</span>
-              </button>
-            )}
-          </div>
+          )}
+          {geminiKeyConfigured && (
+            <button
+              className={`settings-toggle${tts === 'gemini' ? ' settings-toggle--active' : ''}`}
+              onClick={() => onPrefChange('tts', 'gemini')}
+            >
+              <span className="settings-toggle__name">Gemini TTS</span>
+              <span className="settings-toggle__tag settings-toggle__tag--paid">Your key</span>
+            </button>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Voice picker — changes based on selected TTS engine */}
       <div className="settings-panel__group">
