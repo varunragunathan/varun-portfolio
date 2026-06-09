@@ -481,7 +481,7 @@ export async function adminListSessions(request, env, surveyId) {
   const { results } = await env.varun_portfolio_auth
     .prepare(`
       SELECT ss.id, ss.respondent_id, ss.started_at, ss.completed_at,
-             COUNT(sm.id) AS message_count
+             ss.tags, COUNT(sm.id) AS message_count
       FROM survey_sessions ss
       LEFT JOIN survey_messages sm ON sm.session_id = ss.id
       WHERE ss.survey_id = ?
@@ -491,7 +491,8 @@ export async function adminListSessions(request, env, surveyId) {
     .bind(surveyId)
     .all();
 
-  return json({ sessions: results });
+  const sessions = results.map(r => ({ ...r, tags: JSON.parse(r.tags ?? '[]') }));
+  return json({ sessions });
 }
 
 // ── Admin: delete a session ───────────────────────────────────────
@@ -518,11 +519,13 @@ export async function adminGetSession(request, env, surveyId, sessionId) {
   const guard = await guardAdmin(request, env);
   if (guard) return guard;
 
-  const session = await env.varun_portfolio_auth
+  const raw = await env.varun_portfolio_auth
     .prepare('SELECT * FROM survey_sessions WHERE id = ? AND survey_id = ?')
     .bind(sessionId, surveyId)
     .first();
-  if (!session) return json({ error: 'Not found' }, 404);
+  if (!raw) return json({ error: 'Not found' }, 404);
+
+  const session = { ...raw, tags: JSON.parse(raw.tags ?? '[]') };
 
   const { results: messages } = await env.varun_portfolio_auth
     .prepare('SELECT role, content, created_at FROM survey_messages WHERE session_id = ? ORDER BY created_at ASC')
@@ -530,4 +533,31 @@ export async function adminGetSession(request, env, surveyId, sessionId) {
     .all();
 
   return json({ session, messages });
+}
+
+// ── Admin: update tags on a session ──────────────────────────────
+export async function adminUpdateSessionTags(request, env, surveyId, sessionId) {
+  const guard = await guardAdmin(request, env);
+  if (guard) return guard;
+
+  const session = await env.varun_portfolio_auth
+    .prepare('SELECT id FROM survey_sessions WHERE id = ? AND survey_id = ?')
+    .bind(sessionId, surveyId)
+    .first();
+  if (!session) return json({ error: 'Not found' }, 404);
+
+  const { tags } = await request.json().catch(() => ({}));
+  if (!Array.isArray(tags)) return json({ error: 'tags must be an array' }, 400);
+
+  const clean = [...new Set(
+    tags.map(t => String(t).trim().toLowerCase().replace(/\s+/g, '-').slice(0, 32))
+        .filter(Boolean)
+  )].slice(0, 15);
+
+  await env.varun_portfolio_auth
+    .prepare('UPDATE survey_sessions SET tags = ? WHERE id = ?')
+    .bind(JSON.stringify(clean), sessionId)
+    .run();
+
+  return json({ ok: true, tags: clean });
 }

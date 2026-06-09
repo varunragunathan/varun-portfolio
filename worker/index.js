@@ -26,7 +26,7 @@ import { listGlossary, createTerm, updateTerm, deleteTerm, bulkSync } from './gl
 import {
   listSurveys, getSurvey, getSurveyBySlug, createSession, sendMessage, completeSession,
   adminListSurveys, adminCreateSurvey, adminUpdateSurvey, adminDeleteSurvey,
-  adminListSessions, adminGetSession, adminDeleteSession,
+  adminListSessions, adminGetSession, adminDeleteSession, adminUpdateSessionTags,
 } from './surveys.js';
 import { submitFeedbackHandler } from './feedback.js';
 import {
@@ -203,6 +203,7 @@ async function handleRequest(request, env) {
         const adminSurveyMatch   = path.match(/^\/api\/admin\/surveys\/([^/]+)$/);
         const adminSessionsMatch = path.match(/^\/api\/admin\/surveys\/([^/]+)\/sessions$/);
         const adminSessionMatch  = path.match(/^\/api\/admin\/surveys\/([^/]+)\/sessions\/([^/]+)$/);
+        const adminSessionTagsMatch = path.match(/^\/api\/admin\/surveys\/([^/]+)\/sessions\/([^/]+)\/tags$/);
 
         if (adminPageMatch && method === 'GET') {
           response = await adminGetPage(request, env, adminPageMatch[1]);
@@ -212,6 +213,8 @@ async function handleRequest(request, env) {
           response = await adminDeletePage(request, env, adminPageMatch[1]);
         } else if (adminSessionsMatch && method === 'GET') {
           response = await adminListSessions(request, env, adminSessionsMatch[1]);
+        } else if (adminSessionTagsMatch && method === 'PATCH') {
+          response = await adminUpdateSessionTags(request, env, adminSessionTagsMatch[1], adminSessionTagsMatch[2]);
         } else if (adminSessionMatch && method === 'GET') {
           response = await adminGetSession(request, env, adminSessionMatch[1], adminSessionMatch[2]);
         } else if (adminSessionMatch && method === 'DELETE') {

@@ -2178,6 +2178,70 @@ Rules for the options block:
 
 Start: Greet the user warmly as the owl, introduce yourself briefly, and ask about their current experience with AI tools. Give 3–4 choice options covering the spectrum from "never used" to "use it daily".`;
 
+// ── Survey response tag helpers ───────────────────────────────────
+const TAG_PALETTE = [
+  { bg: 'rgba(99,102,241,0.15)',  border: 'rgba(99,102,241,0.4)',  text: '#818cf8' },
+  { bg: 'rgba(52,199,89,0.12)',   border: 'rgba(52,199,89,0.35)',  text: '#34c759' },
+  { bg: 'rgba(255,159,10,0.12)',  border: 'rgba(255,159,10,0.35)', text: '#ff9f0a' },
+  { bg: 'rgba(255,69,58,0.12)',   border: 'rgba(255,69,58,0.35)',  text: '#ff453a' },
+  { bg: 'rgba(0,199,190,0.12)',   border: 'rgba(0,199,190,0.35)',  text: '#00c7be' },
+  { bg: 'rgba(191,90,242,0.12)',  border: 'rgba(191,90,242,0.35)', text: '#bf5af2' },
+  { bg: 'rgba(255,214,10,0.12)',  border: 'rgba(255,214,10,0.35)', text: '#ffd60a' },
+];
+function tagColor(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return TAG_PALETTE[Math.abs(h) % TAG_PALETTE.length];
+}
+
+function TagChip({ name, onRemove }) {
+  const c = tagColor(name);
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      background: c.bg, border: `1px solid ${c.border}`, color: c.text,
+      borderRadius: 4, padding: '2px 7px', fontSize: 10, fontFamily: M,
+      letterSpacing: '0.04em', whiteSpace: 'nowrap', lineHeight: 1.4,
+    }}>
+      {name}
+      {onRemove && (
+        <button onClick={onRemove} style={{ background: 'none', border: 'none', cursor: 'pointer', color: c.text, padding: 0, lineHeight: 1, fontSize: 11, opacity: 0.65, marginLeft: 1 }}>×</button>
+      )}
+    </span>
+  );
+}
+
+function TagEditor({ tags, onSave }) {
+  const [input, setInput] = useState('');
+  const clean = (v) => v.trim().toLowerCase().replace(/[^a-z0-9-_]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 32);
+
+  const add = (raw) => {
+    const tag = clean(raw);
+    if (!tag || tags.includes(tag) || tags.length >= 15) return;
+    onSave([...tags, tag]);
+    setInput('');
+  };
+
+  const remove = (tag) => onSave(tags.filter(t => t !== tag));
+
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center', minHeight: 24 }}>
+      {tags.map(tag => <TagChip key={tag} name={tag} onRemove={() => remove(tag)} />)}
+      <input
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add(input); }
+          if (e.key === 'Backspace' && !input && tags.length) remove(tags[tags.length - 1]);
+        }}
+        onBlur={() => { if (input.trim()) add(input); }}
+        placeholder={tags.length ? '' : 'add tag…'}
+        style={{ fontFamily: M, fontSize: 11, background: 'none', border: 'none', outline: 'none', color: '#a4a4bc', width: 70, minWidth: 0 }}
+      />
+    </div>
+  );
+}
+
 function SurveysTab({ t }) {
   const [surveys,      setSurveys]      = useState([]);
   const [loading,      setLoading]      = useState(true);
@@ -2270,6 +2334,23 @@ function SurveysTab({ t }) {
     setViewing(prev => prev ? { ...prev, sessions: prev.sessions.filter(s => s.id !== sessionId) } : prev);
   }, [transcript]);
 
+  const updateTags = useCallback(async (surveyId, sessionId, tags) => {
+    const res  = await fetch(`/api/admin/surveys/${surveyId}/sessions/${sessionId}/tags`, {
+      method: 'PATCH', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tags }),
+    });
+    const data = await res.json();
+    const saved = data.tags ?? tags;
+    setViewing(prev => prev ? {
+      ...prev,
+      sessions: prev.sessions.map(s => s.id === sessionId ? { ...s, tags: saved } : s),
+    } : prev);
+    setTranscript(prev => prev?.session?.id === sessionId
+      ? { ...prev, session: { ...prev.session, tags: saved } }
+      : prev);
+  }, []);
+
   const cell = { fontFamily: M, fontSize: 12, color: t.text2, padding: '10px 12px', borderBottom: `1px solid ${t.border}` };
   const hcell = { ...cell, color: t.text3, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600 };
 
@@ -2278,9 +2359,10 @@ function SurveysTab({ t }) {
 
   // ── Transcript view ───────────────────────────────────────────
   if (transcript) {
+    const sessionTags = transcript.session?.tags ?? [];
     return (
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <button onClick={() => setTranscript(null)} style={{ fontFamily: M, fontSize: 12, color: t.accent, background: 'none', border: 'none', cursor: 'pointer' }}>
             ← Back to sessions
           </button>
@@ -2291,6 +2373,17 @@ function SurveysTab({ t }) {
             delete response
           </button>
         </div>
+
+        {/* Tags section */}
+        <div style={{ marginBottom: 20, padding: '10px 14px', borderRadius: 8, background: t.surfaceAlt, border: `1px solid ${t.border}` }}>
+          <div style={{ fontFamily: M, fontSize: 9, letterSpacing: '0.1em', color: t.text3, textTransform: 'uppercase', marginBottom: 8 }}>Tags</div>
+          <TagEditor
+            tags={sessionTags}
+            onSave={tags => updateTags(viewing?.survey?.id, transcript.session?.id, tags)}
+          />
+          <div style={{ fontFamily: M, fontSize: 10, color: t.text3, marginTop: 8 }}>Press Enter or , to add · Backspace to remove last · max 15</div>
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {transcript.messages.map((m, i) => (
             <div key={i} style={{
@@ -2326,7 +2419,7 @@ function SurveysTab({ t }) {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                {['Session', 'Started', 'Status', 'Messages', ''].map((h) => (
+                {['Session', 'Started', 'Status', 'Tags', 'Msgs', ''].map((h) => (
                   <th key={h} style={hcell}>{h}</th>
                 ))}
               </tr>
@@ -2345,6 +2438,12 @@ function SurveysTab({ t }) {
                     }}>
                       {s.completed_at ? 'done' : 'in progress'}
                     </span>
+                  </td>
+                  <td style={{ ...cell, maxWidth: 220 }}>
+                    <TagEditor
+                      tags={s.tags ?? []}
+                      onSave={tags => updateTags(viewing.survey.id, s.id, tags)}
+                    />
                   </td>
                   <td style={cell}>{s.message_count}</td>
                   <td style={{ ...cell, whiteSpace: 'nowrap' }}>
