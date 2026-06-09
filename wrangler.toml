@@ -16,7 +16,7 @@ TWILIO_WHATSAPP_FROM = "whatsapp:+14155238886"
 
 [assets]
 directory = "./dist"
-not_found_handling = "single-page-application"
+run_worker_first = true
 
 # D1 — wrangler dev uses a local SQLite file at .wrangler/state/v3/d1/
 [[d1_databases]]
