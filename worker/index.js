@@ -631,7 +631,11 @@ async function handleRequest(request, env) {
       asset = await env.ASSETS.fetch(new Request(new URL('/', url.origin)));
     }
   } catch {
-    asset = await env.ASSETS.fetch(new Request(new URL('/', url.origin)));
+    try {
+      asset = await env.ASSETS.fetch(new Request(new URL('/', url.origin)));
+    } catch {
+      return new Response('Service unavailable', { status: 503 });
+    }
   }
   const ct    = asset.headers.get('Content-Type') || '';
   if (!ct.includes('text/html')) return asset;
