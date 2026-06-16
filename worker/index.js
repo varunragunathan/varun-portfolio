@@ -596,7 +596,10 @@ async function handleRequest(request, env) {
         const pageUrl = url.href;
         const imgUrl  = `${url.origin}/icon-512.png`;
 
-        const asset = await env.ASSETS.fetch(request);
+        // /survey/:id has no literal file in dist/ — fetch index.html directly,
+        // same as the /s/:slug handler above (avoids a doomed literal-path
+        // lookup that's fragile on a cold Worker isolate).
+        const asset = await env.ASSETS.fetch(new Request(new URL('/', url.origin)));
         return new HTMLRewriter()
           .on('title', new TextReplacer(title))
           .on('meta[property="og:title"]',       { element: el => el.setAttribute('content', title) })
