@@ -622,20 +622,19 @@ async function handleRequest(request, env) {
 
   // All non-API requests → serve the React static build
   // Inject security headers on HTML responses.
-  // SPA routes (e.g. /interview) have no matching file in dist/ — fall back
-  // to index.html so React Router handles the path on the client.
+  // SPA routes (e.g. /interview, /survey/:id) have no matching file in dist/.
+  // Fetch index.html directly for extensionless paths instead of trying the
+  // literal path first and falling back — calling env.ASSETS.fetch() twice in
+  // one request can throw on a cold Worker isolate (warms up after the first
+  // successful call), which was surfacing as a hard failure on a visitor's
+  // very first direct navigation to a deep link.
   let asset;
   try {
-    asset = await env.ASSETS.fetch(request);
-    if (asset.status === 404 && !url.pathname.includes('.')) {
-      asset = await env.ASSETS.fetch(new Request(new URL('/', url.origin)));
-    }
+    asset = url.pathname.includes('.')
+      ? await env.ASSETS.fetch(request)
+      : await env.ASSETS.fetch(new Request(new URL('/', url.origin)));
   } catch {
-    try {
-      asset = await env.ASSETS.fetch(new Request(new URL('/', url.origin)));
-    } catch {
-      return new Response('Service unavailable', { status: 503 });
-    }
+    return new Response('Service unavailable', { status: 503 });
   }
   const ct    = asset.headers.get('Content-Type') || '';
   if (!ct.includes('text/html')) return asset;
