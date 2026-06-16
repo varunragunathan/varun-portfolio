@@ -173,6 +173,19 @@ async function callOpenRouter(apiKey, model, systemPrompt, messages) {
   return content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 }
 
+// Guard against the model marking done:true without delivering the closing
+// resources block — a real failure mode of the fast/quantized model where it
+// ends the survey mid-conversation on an ordinary question. The system prompt
+// requires resources on the final turn, so their absence means this isn't
+// really the end — treat it as a normal turn instead of ending the survey.
+function sanitizeOpts(opts) {
+  if (!opts) return { inputType: 'text', options: null, done: false };
+  if (opts.done && (!Array.isArray(opts.resources) || opts.resources.length === 0)) {
+    return { ...opts, done: false };
+  }
+  return opts;
+}
+
 // Returns the safe emit length: how much of `text` can be sent without risking
 // a partial delimiter appearing at the end.
 function getSafeEmitLength(text, delimiter) {
@@ -230,7 +243,7 @@ function buildSurveyStream(upstreamStream, source, onFullText) {
       async function handleDone() {
         const { prose, opts } = processText(fullText);
         await onFullText(prose);
-        emit({ type: 'opts', opts: opts ?? { inputType: 'text', options: null, done: false } });
+        emit({ type: 'opts', opts: sanitizeOpts(opts) });
         emit({ type: 'done' });
       }
 
@@ -339,7 +352,7 @@ export async function sendMessage(request, env, surveyId, sessionId) {
       return sse(new ReadableStream({
         start(c) {
           if (prose) c.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'delta', text: prose })}\n\n`));
-          c.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'opts', opts: opts ?? { inputType: 'text', options: null, done: false } })}\n\n`));
+          c.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'opts', opts: sanitizeOpts(opts) })}\n\n`));
           c.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
           c.close();
         },
