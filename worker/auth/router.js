@@ -41,8 +41,13 @@ export async function handleAuth(request, env, url) {
   const ip     = request.headers.get('CF-Connecting-IP');
 
   // ── Broad IP limit: 30 req / 10 min across all auth endpoints ───
-  const broad = await checkIpRateLimit(env.KV, ip, 'auth', 30, 10 * 60_000);
-  if (!broad.allowed) return tooManyRequests(broad.retryAfter);
+  // GET /me is a plain session read — no sensitive action, skip the rate limit
+  // to avoid KV ops on every page load.
+  const isGetMe = method === 'GET' && path === '/me';
+  if (!isGetMe) {
+    const broad = await checkIpRateLimit(env.KV, ip, 'auth', 30, 10 * 60_000);
+    if (!broad.allowed) return tooManyRequests(broad.retryAfter);
+  }
 
   // ── Tight IP limit: 5 req / 10 min for OTP and recovery send ────
   const isSensitive = (method === 'POST' && (

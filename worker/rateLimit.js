@@ -23,20 +23,38 @@ export const DEFAULT_LIMITS = {
 
 const LIMITS_KV_KEY = 'config:chat_rate_limits';
 
-// Read effective limits: KV overrides merged over defaults
+// Module-level cache so repeated chat requests within the same Worker instance
+// never hit KV for this rarely-changing config value.
+let _limitsCache = null;
+let _limitsCacheAt = 0;
+
+// Read effective limits: KV overrides merged over defaults.
+// Cached in-process for 60 s and at the CF edge for 300 s (cacheTtl).
 export async function getEffectiveLimits(kv) {
+  const now = Date.now();
+  if (_limitsCache && now - _limitsCacheAt < 60_000) return _limitsCache;
   try {
-    const raw = await kv.get(LIMITS_KV_KEY);
-    if (!raw) return DEFAULT_LIMITS;
-    const overrides = JSON.parse(raw);
-    const merged = { ...DEFAULT_LIMITS };
-    for (const role of ['user', 'pro', 'student']) {
-      if (overrides[role]) merged[role] = { ...DEFAULT_LIMITS[role], ...overrides[role] };
+    const raw = await kv.get(LIMITS_KV_KEY, { cacheTtl: 300 });
+    if (!raw) {
+      _limitsCache = DEFAULT_LIMITS;
+    } else {
+      const overrides = JSON.parse(raw);
+      const merged = { ...DEFAULT_LIMITS };
+      for (const role of ['user', 'pro', 'student']) {
+        if (overrides[role]) merged[role] = { ...DEFAULT_LIMITS[role], ...overrides[role] };
+      }
+      _limitsCache = merged;
     }
-    return merged;
   } catch {
-    return DEFAULT_LIMITS;
+    _limitsCache = DEFAULT_LIMITS;
   }
+  _limitsCacheAt = now;
+  return _limitsCache;
+}
+
+export function invalidateLimitsCache() {
+  _limitsCache = null;
+  _limitsCacheAt = 0;
 }
 
 export async function saveEffectiveLimits(kv, limits) {
@@ -157,7 +175,9 @@ export async function checkIpRateLimit(kv, ip, bucket, limit, windowMs) {
   const window = Math.floor(now / windowMs);
   const key    = `ip_rate:${bucket}:${ip}:${window}`;
 
-  const raw   = await kv.get(key);
+  // cacheTtl caches the read at the CF edge so repeated requests from the same
+  // IP (including rate-limited bots) don't generate a KV read each time.
+  const raw   = await kv.get(key, { cacheTtl: 60 });
   const count = raw !== null ? parseInt(raw, 10) : 0;
 
   if (count >= limit) {

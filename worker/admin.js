@@ -14,7 +14,7 @@
 
 import { getSession }                         from './auth/session.js';
 import { consumeStepUpToken }                from './auth/stepUp.js';
-import { DEFAULT_LIMITS, getEffectiveLimits, saveEffectiveLimits } from './rateLimit.js';
+import { DEFAULT_LIMITS, getEffectiveLimits, saveEffectiveLimits, invalidateLimitsCache } from './rateLimit.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -331,6 +331,7 @@ export async function updateRateLimits(request, env) {
     };
   }
   await saveEffectiveLimits(env.KV, sanitized);
+  invalidateLimitsCache();
   return json({ ok: true, effective: sanitized });
 }
 
@@ -340,5 +341,6 @@ export async function resetRateLimits(request, env) {
   const guard = await requireAdmin(session, env);
   if (guard) return guard;
   await env.KV.delete('config:chat_rate_limits');
+  invalidateLimitsCache();
   return json({ ok: true });
 }
