@@ -63,6 +63,9 @@ new_sqlite_classes = ["NumMatchDO"]
 [env.production]
 name = "varun-portfolio"
 
+[env.production.assets]
+directory = "./dist"
+
 [env.production.vars]
 ENABLE_AUTH = "true"
 RP_ID = "varunr.dev"
