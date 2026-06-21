@@ -66,11 +66,14 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
-          if (id.includes('react/') || id.includes('react-dom/')) return 'vendor';
-          if (id.includes('react-router-dom/') || id.includes('react-router/')) return 'vendor';
-          if (id.includes('framer-motion/')) return 'motion';
-          if (id.includes('@simplewebauthn/') || id.includes('qrcode/')) return 'auth-libs';
-          return 'vendor';
+          // Group core React and React Router libraries into a dedicated vendor chunk
+          if (id.includes('react/') || id.includes('react-dom/') || id.includes('react-router-dom/') || id.includes('react-router/')) {
+            return 'react-core-vendor';
+          }
+          // Allow Vite/Rollup to handle other node_modules, including framer-motion and auth-libs,
+          // using its default chunking strategy. This enables better dynamic splitting
+          // if these modules are imported lazily in the application code.
+          // No explicit return for other node_modules, letting Vite optimize.
         }
       }
     }
