@@ -382,6 +382,14 @@
 .kf__donate-method--interac,
 .kf__donate-method--upi { color: var(--accent); }
 
+.kf__donate-memo-hint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent);
+  margin: 6px 0 0;
+  letter-spacing: 0.02em;
+}
+
 .kf__donate-desc {
   font-family: var(--font-sans);
   font-size: 13px;

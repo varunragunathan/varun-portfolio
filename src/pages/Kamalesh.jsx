@@ -373,7 +373,9 @@ export default function KamaleshPage() {
                 <CopyField label="First Name"   value="Varun" />
                 <CopyField label="Last Name"    value="Ragunathan" />
                 <CopyField label="Phone"        value="+1 352-222-6680" />
+                <CopyField label="Memo / Note"  value="Kamalesh Fundraiser" />
               </div>
+              <p className="kf__donate-memo-hint">Please include the memo above with your transfer amount.</p>
               <p className="kf__donate-contact">
                 Point of contact: <strong>Varun Ragunathan</strong> · CEG ECE 2008–12
               </p>
@@ -393,7 +395,9 @@ export default function KamaleshPage() {
                 <CopyField label="Email"        value="shrikarth@gmail.com" />
                 <CopyField label="First Name"   value="Karthika" />
                 <CopyField label="Last Name"    value="Nallaperumal" />
+                <CopyField label="Message"      value="Kamalesh Fundraiser" />
               </div>
+              <p className="kf__donate-memo-hint">Please include the message above with your transfer amount.</p>
               <p className="kf__donate-contact">
                 Point of contact: <strong>Karthika Nallaperumal</strong> · CEG Civil 2008–12
               </p>
@@ -416,7 +420,9 @@ export default function KamaleshPage() {
                 <CopyField label="Branch"        value="Chennai – Ashok Nagar" />
                 <CopyField label="Account Name"  value="Nishanth" />
                 <CopyField label="UPI ID"        value="9994948251@kotak811" />
+                <CopyField label="Remarks"       value="Kamalesh Fundraiser" />
               </div>
+              <p className="kf__donate-memo-hint">Please add the remarks above when sending.</p>
               <p className="kf__donate-contact">
                 Direct to patient's family account
               </p>
