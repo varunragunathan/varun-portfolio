@@ -11,7 +11,7 @@ const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(file
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
   plugins: [react(), VitePWA({
-    registerType: 'autoUpdate',
+    registerType: 'deferred',
     includeAssets: ['favicon.svg', 'robots.txt', 'icon-192.png', 'icon-512.png'],
     manifest: {
       name: 'Varun Ragunathan — Staff Engineer',
@@ -66,11 +66,11 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
-          if (id.includes('react/') || id.includes('react-dom/')) return 'vendor';
-          if (id.includes('react-router-dom/') || id.includes('react-router/')) return 'vendor';
-          if (id.includes('framer-motion/')) return 'motion';
+          if (id.includes('react/') || id.includes('react-dom/')) return 'react-vendor';
+          if (id.includes('react-router-dom/') || id.includes('react-router/')) return 'react-router-vendor';
+          if (id.includes('framer-motion/')) return 'framer-motion-vendor';
           if (id.includes('@simplewebauthn/') || id.includes('qrcode/')) return 'auth-libs';
-          return 'vendor';
+          return 'vendor-misc';
         }
       }
     }
