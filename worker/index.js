@@ -672,6 +672,38 @@ async function handleRequest(request, env) {
     } catch { /* fall through */ }
   }
 
+  // ── Dynamic OG tags for /kamalesh fundraiser ─────────────────
+  if (url.pathname === '/kamalesh' && request.method === 'GET') {
+    try {
+      const title   = 'Help Save Kamalesh P — Kidney Transplant Fundraiser';
+      const desc    = 'A 25-year-old CEG engineer needs a kidney transplant. Rs. 4,15,789 still needed. Every contribution counts — donate via Zelle, Interac, or bank transfer.';
+      const pageUrl = url.href;
+      const imgUrl  = `${url.origin}/kamalesh-appeal.jpg`;
+      const asset   = await env.ASSETS.fetch(new Request(new URL('/', url.origin)));
+      return new HTMLRewriter()
+        .on('title', new TextReplacer(title))
+        .on('meta[property="og:title"]',       { element: el => el.setAttribute('content', title) })
+        .on('meta[property="og:description"]',  { element: el => el.setAttribute('content', desc) })
+        .on('meta[property="og:url"]',          { element: el => el.setAttribute('content', pageUrl) })
+        .on('meta[name="description"]',         { element: el => el.setAttribute('content', desc) })
+        .on('head', {
+          element(el) {
+            el.append(
+              `<meta property="og:image" content="${imgUrl}" />` +
+              `<meta property="og:image:width" content="1200" />` +
+              `<meta property="og:image:height" content="1200" />` +
+              `<meta name="twitter:card" content="summary_large_image" />` +
+              `<meta name="twitter:title" content="${escAttr(title)}" />` +
+              `<meta name="twitter:description" content="${escAttr(desc)}" />` +
+              `<meta name="twitter:image" content="${imgUrl}" />`,
+              { html: true },
+            );
+          },
+        })
+        .transform(asset);
+    } catch { /* fall through */ }
+  }
+
   // All non-API requests → serve the React static build
   // Inject security headers on HTML responses.
   // SPA routes (e.g. /interview, /kamalesh) have no matching file in dist/.
