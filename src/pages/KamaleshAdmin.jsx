@@ -180,9 +180,57 @@ function PledgesTab() {
 
   const t = data.totals;
 
+  const USD_TO_INR = 83.5, CAD_TO_INR = 61.0, SGD_TO_INR = 63.0, AED_TO_INR = 22.8;
+
+  const verifiedInrEq = Math.round(
+    (t?.verified_usd ?? 0) * USD_TO_INR +
+    (t?.verified_cad ?? 0) * CAD_TO_INR +
+    (t?.verified_inr ?? 0) +
+    (t?.verified_sgd ?? 0) * SGD_TO_INR +
+    (t?.verified_aed ?? 0) * AED_TO_INR
+  );
+  const pendingInrEq = Math.round(
+    (t?.pending_usd ?? 0) * USD_TO_INR +
+    (t?.pending_cad ?? 0) * CAD_TO_INR +
+    (t?.pending_inr ?? 0) +
+    (t?.pending_sgd ?? 0) * SGD_TO_INR +
+    (t?.pending_aed ?? 0) * AED_TO_INR
+  );
+
+  const breakdownParts = [
+    t?.verified_usd  > 0 && `$${(t.verified_usd).toFixed(2)} × 83.5`,
+    t?.verified_cad  > 0 && `C$${(t.verified_cad).toFixed(2)} × 61`,
+    t?.verified_sgd  > 0 && `S$${(t.verified_sgd).toFixed(2)} × 63`,
+    t?.verified_aed  > 0 && `د.إ${(t.verified_aed).toFixed(2)} × 22.8`,
+    t?.verified_inr  > 0 && `₹${Math.round(t.verified_inr).toLocaleString()} direct`,
+  ].filter(Boolean);
+
   return (
     <>
-      {/* Summary */}
+      {/* Total received — INR equivalent */}
+      <div style={{ ...s.card, marginBottom: 20, borderColor: 'var(--accent-dim)', background: 'var(--accent-ghost)' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+          <div>
+            <div style={{ ...s.label, color: 'var(--accent)' }}>Total Received (verified) · INR equivalent</div>
+            <div style={{ fontFamily: S, fontSize: 36, fontWeight: 700, color: 'var(--accent)' }}>
+              ₹{verifiedInrEq.toLocaleString('en-IN')}
+            </div>
+            {breakdownParts.length > 0 && (
+              <div style={{ fontFamily: M, fontSize: 10, color: 'var(--text-3)', marginTop: 4 }}>
+                {breakdownParts.join(' + ')}
+              </div>
+            )}
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ ...s.label }}>Pending (if verified)</div>
+            <div style={{ fontFamily: S, fontSize: 22, fontWeight: 600, color: 'var(--text-2)' }}>
+              + ₹{pendingInrEq.toLocaleString('en-IN')}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Per-currency breakdown */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 28 }}>
         <StatCard label="Verified USD"  value={`$${(t?.verified_usd ?? 0).toFixed(2)}`}  valueStyle={s.bigGreen} />
         <StatCard label="Verified CAD"  value={`C$${(t?.verified_cad ?? 0).toFixed(2)}`} valueStyle={s.bigGreen} />
