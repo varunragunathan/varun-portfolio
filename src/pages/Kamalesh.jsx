@@ -434,6 +434,36 @@ export default function KamaleshPage() {
           </div>
         </section>
 
+        {/* Volunteer */}
+        <section className="kf__section kf__volunteer">
+          <h2 className="kf__section-title">Help Us Reach Further</h2>
+          <p className="kf__volunteer-lead">
+            We are looking for volunteers to help spread the word and coordinate donations
+            within their country or community. If you can spare an hour to reach out to your
+            network — your college group, workplace, or local Tamil community — it could make
+            a real difference.
+          </p>
+          <div className="kf__volunteer-cards">
+            <div className="kf__volunteer-card">
+              <div className="kf__volunteer-icon">🌍</div>
+              <div className="kf__volunteer-text">
+                <strong>What you'd do</strong>
+                <p>Share the link, answer questions, and encourage your contacts to donate. No fundraising experience needed.</p>
+              </div>
+            </div>
+            <div className="kf__volunteer-card">
+              <div className="kf__volunteer-icon">⏱</div>
+              <div className="kf__volunteer-text">
+                <strong>Time commitment</strong>
+                <p>As little as an hour before June 30. Every message you send could bring us closer to the goal.</p>
+              </div>
+            </div>
+          </div>
+          <p className="kf__volunteer-cta">
+            Reach out to any of the organizers below — we'd love your help.
+          </p>
+        </section>
+
         {/* Verification */}
         <section className="kf__section">
           <h2 className="kf__section-title">Verification</h2>
