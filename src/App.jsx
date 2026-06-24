@@ -61,6 +61,7 @@ const InterviewPage      = lazy(() => import('./pages/Interview'));
 const DiscussionPage     = lazy(() => import('./pages/Discussion'));
 const DiscussionThread   = lazy(() => import('./pages/DiscussionThread'));
 const DiscussionAdmin    = lazy(() => import('./pages/DiscussionAdmin'));
+const KamaleshPage       = lazy(() => import('./pages/Kamalesh'));
 
 function Loading() {
   return (
@@ -145,7 +146,7 @@ function Shell() {
   const handleShake = useCallback(() => setFeedbackOpen(true), []);
   const { shakeState, requestPermission } = useShake(handleShake);
   const { pathname } = useLocation();
-  const hideFooter = !!matchPath('/chat', pathname) || pathname.startsWith('/survey/') || pathname.startsWith('/s/') || pathname.startsWith('/p/');
+  const hideFooter = !!matchPath('/chat', pathname) || pathname.startsWith('/survey/') || pathname.startsWith('/s/') || pathname.startsWith('/p/') || !!matchPath('/kamalesh', pathname);
 
   return (
     <div className="shell">
@@ -173,6 +174,7 @@ function Shell() {
             <Route path="/discussion" element={<DiscussionPage />} />
             <Route path="/discussion/:id" element={<DiscussionThread />} />
             <Route path="/admin/discussion" element={<DiscussionAdmin />} />
+            <Route path="/kamalesh" element={<KamaleshPage />} />
           </Routes>
         </Suspense>
       </main>

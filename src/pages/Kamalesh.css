@@ -1,0 +1,470 @@
+/* ── Kamalesh Fundraiser Page ─────────────────────────────────────── */
+@keyframes kf-fadein {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.kf {
+  min-height: 100vh;
+  padding: 80px 20px 80px;
+  animation: kf-fadein 0.6s cubic-bezier(0.22,1,0.36,1) both;
+}
+
+.kf__inner {
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────── */
+.kf__hero { text-align: center; }
+
+.kf__urgency-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--error-color);
+  border-radius: 4px;
+  padding: 4px 10px;
+  margin-bottom: 20px;
+}
+
+.kf__title {
+  font-family: var(--font-sans);
+  font-size: clamp(32px, 7vw, 52px);
+  font-weight: 600;
+  color: var(--text-1);
+  margin: 0 0 16px;
+  line-height: 1.15;
+}
+
+.kf__name {
+  color: var(--accent);
+}
+
+.kf__subtitle {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  color: var(--text-2);
+  line-height: 1.65;
+  max-width: 540px;
+  margin: 0 auto;
+}
+
+/* ── Progress card ────────────────────────────────────────────────── */
+.kf__progress-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.kf__progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.kf__raised {
+  font-family: var(--font-sans);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--success-color);
+}
+
+.kf__raised-sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 4px;
+}
+
+.kf__needed-box {
+  text-align: right;
+  background: rgba(248,113,113,0.08);
+  border: 1px solid rgba(248,113,113,0.20);
+  border-radius: 10px;
+  padding: 10px 16px;
+}
+
+[data-theme="light"] .kf__needed-box {
+  background: rgba(185,28,28,0.06);
+  border-color: rgba(185,28,28,0.18);
+}
+
+.kf__needed-amount {
+  font-family: var(--font-sans);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--error-color);
+}
+
+.kf__needed-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+  margin-top: 3px;
+}
+
+.kf__bar {
+  height: 10px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.kf__bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--success-color), var(--accent));
+  border-radius: 999px;
+  transition: width 1s ease;
+}
+
+.kf__bar-note {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+  margin: 0;
+}
+
+/* ── Sections ─────────────────────────────────────────────────────── */
+.kf__section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.kf__section-title {
+  font-family: var(--font-sans);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-1);
+  margin: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.kf__section-sub {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+
+.kf__section p {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--text-2);
+  line-height: 1.7;
+  margin: 0;
+}
+
+.kf__section strong { color: var(--text-1); }
+
+.kf__quote {
+  background: var(--surface-alt);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-style: italic;
+  color: var(--text-2);
+  line-height: 1.7;
+}
+
+.kf__quote cite {
+  display: block;
+  margin-top: 8px;
+  font-style: normal;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-3);
+}
+
+/* ── Cost table ───────────────────────────────────────────────────── */
+.kf__cost-table {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.kf__cost-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 16px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--text-2);
+  border-bottom: 1px solid var(--border);
+  gap: 16px;
+}
+
+.kf__cost-row:last-child { border-bottom: none; }
+
+.kf__cost-row span:last-child {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.kf__cost-total {
+  background: var(--surface-alt);
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.kf__cost-raised-row {
+  color: var(--success-color);
+}
+
+.kf__cost-raised-row span:last-child { color: var(--success-color); }
+
+.kf__cost-needed-row {
+  background: rgba(248,113,113,0.06);
+  font-weight: 700;
+  color: var(--error-color);
+}
+
+[data-theme="light"] .kf__cost-needed-row {
+  background: rgba(185,28,28,0.05);
+}
+
+.kf__cost-needed-row span:last-child { color: var(--error-color); }
+
+.kf__cost-note {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+  margin: 0;
+}
+
+/* ── Donate cards ─────────────────────────────────────────────────── */
+.kf__donate-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 600px) {
+  .kf__donate-grid { grid-template-columns: 1fr; }
+}
+
+.kf__donate-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.kf__donate-region {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.kf__donate-method {
+  font-family: var(--font-sans);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.kf__donate-method--zelle   { color: #6d1ed4; }
+.kf__donate-method--interac { color: #f4a22d; }
+
+[data-theme="light"] .kf__donate-method--zelle   { color: #5311b5; }
+[data-theme="light"] .kf__donate-method--interac { color: #c47f10; }
+
+.kf__donate-desc {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-3);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.kf__fields { display: flex; flex-direction: column; gap: 6px; }
+
+.kf__field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.kf__field-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+  width: 72px;
+  flex-shrink: 0;
+}
+
+.kf__field-value {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-1);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.kf__field-value:hover { color: var(--accent); }
+
+.kf__copy-hint {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--accent);
+  opacity: 0.6;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.kf__donate-contact {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-3);
+  margin: 0;
+}
+
+.kf__donate-contact strong { color: var(--text-2); }
+
+/* ── Verification ─────────────────────────────────────────────────── */
+.kf__verify-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .kf__verify-grid { grid-template-columns: 1fr; }
+}
+
+.kf__verify-item {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.kf__verify-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-muted);
+  margin-bottom: 6px;
+}
+
+.kf__verify-value {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-1);
+  line-height: 1.4;
+}
+
+.kf__verify-sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+  margin-top: 4px;
+}
+
+/* ── Organizers ───────────────────────────────────────────────────── */
+.kf__org-intro {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--text-3);
+  margin: 0;
+}
+
+.kf__org-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 500px) {
+  .kf__org-grid { grid-template-columns: 1fr; }
+}
+
+.kf__org-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.kf__org-name {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+  margin-bottom: 2px;
+}
+
+.kf__org-role {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 6px;
+}
+
+.kf__org-detail {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+  margin-bottom: 6px;
+}
+
+.kf__org-phone {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.kf__org-phone:hover { text-decoration: underline; }
+
+/* ── Footer note ──────────────────────────────────────────────────── */
+.kf__footer-note {
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--text-3);
+  padding: 20px 0 0;
+  border-top: 1px solid var(--border);
+  line-height: 1.6;
+}
