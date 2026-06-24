@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './Kamalesh.css';
 
 const COSTS = [
@@ -28,8 +28,8 @@ function CopyField({ label, value }) {
   return (
     <div className="kf__field">
       <span className="kf__field-label">{label}</span>
-      <button className="kf__field-value" onClick={copy} title="Click to copy">
-        {value}
+      <button className="kf__field-value" onClick={copy} title={`Copy ${value}`}>
+        <span className="kf__field-text">{value}</span>
         <span className="kf__copy-hint">{copied ? 'copied!' : 'copy'}</span>
       </button>
     </div>
@@ -46,11 +46,10 @@ function fmt(n) {
   return 'Rs. ' + Math.round(n).toLocaleString('en-IN');
 }
 
-function PledgeForm({ onSuccess }) {
-  const [name,     setName]     = useState('');
-  const [amount,   setAmount]   = useState('');
-  const [currency, setCurrency] = useState('USD');
-  const [sent,     setSent]     = useState(false);
+function PledgeForm({ onSuccess, currency, onCurrencyChange }) {
+  const [name,   setName]   = useState('');
+  const [amount, setAmount] = useState('');
+  const [sent,   setSent]   = useState(false);
   const [note,     setNote]     = useState('');
   const [busy,     setBusy]     = useState(false);
   const [error,    setError]    = useState('');
@@ -117,7 +116,7 @@ function PledgeForm({ onSuccess }) {
                   key={c}
                   type="button"
                   className={`kf__currency-btn${currency === c ? ' kf__currency-btn--active' : ''}`}
-                  onClick={() => setCurrency(c)}
+                  onClick={() => onCurrencyChange(c)}
                 >
                   {c}
                 </button>
@@ -160,8 +159,18 @@ function PledgeForm({ onSuccess }) {
 }
 
 export default function KamaleshPage() {
-  const [stats,   setStats]   = useState(null);
-  const [pledged, setPledged] = useState(false);
+  const [stats,    setStats]    = useState(null);
+  const [pledged,  setPledged]  = useState(false);
+  const [currency, setCurrency] = useState('USD');
+  const formRef = useRef(null);
+
+  function scrollToForm(cur) {
+    setCurrency(cur);
+    setPledged(false);
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  }
 
   useEffect(() => {
     fetch('/api/track/page', {
@@ -302,6 +311,9 @@ export default function KamaleshPage() {
               <p className="kf__donate-contact">
                 Point of contact: <strong>Varun Ragunathan</strong> · CEG ECE 2008–12
               </p>
+              <button className="kf__log-btn kf__log-btn--zelle" onClick={() => scrollToForm('USD')}>
+                Log my donation →
+              </button>
             </div>
 
             {/* Canada — Interac */}
@@ -315,11 +327,13 @@ export default function KamaleshPage() {
                 <CopyField label="Email"        value="shrikarth@gmail.com" />
                 <CopyField label="First Name"   value="Karthika" />
                 <CopyField label="Last Name"    value="Nallaperumal" />
-                <CopyField label="Phone"        value="+1 437-984-6976" />
               </div>
               <p className="kf__donate-contact">
                 Point of contact: <strong>Karthika Nallaperumal</strong> · CEG Civil 2008–12
               </p>
+              <button className="kf__log-btn kf__log-btn--interac" onClick={() => scrollToForm('CAD')}>
+                Log my donation →
+              </button>
             </div>
 
           </div>
@@ -372,7 +386,6 @@ export default function KamaleshPage() {
               </div>
               <div className="kf__org-role">Canada Coordinator</div>
               <div className="kf__org-detail">CEG Civil 2008–12</div>
-              <a className="kf__org-phone" href="tel:+14379846976">+1 437-984-6976</a>
             </div>
             <div className="kf__org-card">
               <div className="kf__org-name">
@@ -395,7 +408,7 @@ export default function KamaleshPage() {
         </section>
 
         {/* Pledge form */}
-        <section className="kf__section">
+        <section className="kf__section" ref={formRef}>
           <h2 className="kf__section-title">Log Your Donation</h2>
           {pledged ? (
             <div className="kf__pledge-success">
@@ -418,7 +431,7 @@ export default function KamaleshPage() {
                 After sending via Zelle or Interac, let us know here. Once verified by the organizers,
                 your amount will be reflected in the progress bar above.
               </p>
-              <PledgeForm onSuccess={() => {
+              <PledgeForm currency={currency} onCurrencyChange={setCurrency} onSuccess={() => {
                 setPledged(true);
                 fetch('/api/kamalesh/stats')
                   .then(r => r.ok ? r.json() : null)

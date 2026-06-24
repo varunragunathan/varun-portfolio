@@ -270,6 +270,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow: hidden;
 }
 
 .kf__donate-region {
@@ -335,9 +336,18 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+  overflow: hidden;
 }
 
 .kf__field-value:hover { color: var(--accent); }
+
+.kf__field-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
 
 .kf__copy-hint {
   font-family: var(--font-mono);
@@ -357,6 +367,45 @@
 }
 
 .kf__donate-contact strong { color: var(--text-2); }
+
+.kf__log-btn {
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  margin-top: 4px;
+}
+
+.kf__log-btn:hover { opacity: 0.85; }
+
+.kf__log-btn--zelle {
+  background: rgba(109,30,212,0.12);
+  color: #6d1ed4;
+  border: 1px solid rgba(109,30,212,0.25);
+}
+
+.kf__log-btn--interac {
+  background: rgba(244,162,45,0.12);
+  color: #f4a22d;
+  border: 1px solid rgba(244,162,45,0.25);
+}
+
+[data-theme="light"] .kf__log-btn--zelle {
+  background: rgba(83,17,181,0.07);
+  color: #5311b5;
+  border-color: rgba(83,17,181,0.2);
+}
+
+[data-theme="light"] .kf__log-btn--interac {
+  background: rgba(196,127,16,0.07);
+  color: #c47f10;
+  border-color: rgba(196,127,16,0.2);
+}
 
 /* ── Verification ─────────────────────────────────────────────────── */
 .kf__verify-grid {
