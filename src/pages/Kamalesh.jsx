@@ -50,7 +50,7 @@ function getTimeLeft() {
   };
 }
 
-function Countdown() {
+function Countdown({ goalReached }) {
   const [left, setLeft] = useState(getTimeLeft);
   useEffect(() => {
     const id = setInterval(() => setLeft(getTimeLeft()), 1000);
@@ -60,7 +60,9 @@ function Countdown() {
   if (!left) {
     return (
       <div className="kf__countdown-done">
-        Surgery day has arrived — your support made this possible. 🙏
+        {goalReached
+          ? 'Surgery day has arrived — your support made this possible. 🙏'
+          : 'There is still time to support Kamalesh — every contribution counts. 🙏'}
       </div>
     );
   }
@@ -265,7 +267,7 @@ export default function KamaleshPage() {
         </div>
 
         {/* Countdown */}
-        <Countdown />
+        <Countdown goalReached={totalRaisedInr >= GOAL_INR} />
 
         {/* Progress */}
         <div className="kf__progress-card">
