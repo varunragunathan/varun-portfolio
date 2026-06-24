@@ -202,6 +202,11 @@ export default function KamaleshPage() {
             A 25-year-old engineer battling kidney failure. His father is ready to donate.
             The surgery is booked. We are only waiting on funds.
           </p>
+          <img
+            src="/kamalesh-appeal.jpg"
+            alt="Kamalesh P — kidney transplant patient from CEG Anna University seeking help"
+            className="kf__hero-img"
+          />
         </div>
 
         {/* Progress */}
