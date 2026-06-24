@@ -111,7 +111,7 @@ function PledgeForm({ onSuccess, currency, onCurrencyChange }) {
               required
             />
             <div className="kf__currency-toggle">
-              {['USD', 'CAD'].map(c => (
+              {['USD', 'CAD', 'INR', 'SGD', 'AED'].map(c => (
                 <button
                   key={c}
                   type="button"
@@ -185,7 +185,7 @@ export default function KamaleshPage() {
       .catch(() => {});
   }, []);
 
-  const pledgedInr   = stats ? Math.round(stats.usd * USD_TO_INR + stats.cad * CAD_TO_INR) : 0;
+  const pledgedInr   = stats ? (stats.inrEq ?? Math.round((stats.usd ?? 0) * USD_TO_INR + (stats.cad ?? 0) * CAD_TO_INR)) : 0;
   const totalRaisedInr = MILAAP_INR + pledgedInr;
   const stillNeeded  = Math.max(0, GOAL_INR - totalRaisedInr);
   const pct          = Math.min(100, Math.round((totalRaisedInr / GOAL_INR) * 100));
@@ -337,6 +337,29 @@ export default function KamaleshPage() {
                 Point of contact: <strong>Karthika Nallaperumal</strong> · CEG Civil 2008–12
               </p>
               <button className="kf__log-btn kf__log-btn--interac" onClick={() => scrollToForm('CAD')}>
+                Log my donation →
+              </button>
+            </div>
+
+            {/* India — Bank Transfer / UPI */}
+            <div className="kf__donate-card">
+              <div className="kf__donate-region">From India</div>
+              <div className="kf__donate-method kf__donate-method--upi">Bank Transfer / UPI</div>
+              <p className="kf__donate-desc">
+                Transfer directly to the family's bank account or pay instantly via UPI.
+              </p>
+              <div className="kf__fields">
+                <CopyField label="Account No."   value="1713366025" />
+                <CopyField label="IFSC Code"     value="KKBK0008479" />
+                <CopyField label="Bank"          value="Kotak Mahindra Bank" />
+                <CopyField label="Branch"        value="Chennai – Ashok Nagar" />
+                <CopyField label="Account Name"  value="Nishanth" />
+                <CopyField label="UPI ID"        value="9994948251@kotak811" />
+              </div>
+              <p className="kf__donate-contact">
+                Direct to patient's family account
+              </p>
+              <button className="kf__log-btn kf__log-btn--upi" onClick={() => scrollToForm('INR')}>
                 Log my donation →
               </button>
             </div>

@@ -12,6 +12,8 @@ import { checkIpRateLimit } from './rateLimit.js';
 // Approximate INR conversion rates (mid-2026)
 const USD_TO_INR = 83.5;
 const CAD_TO_INR = 61.0;
+const SGD_TO_INR = 63.0;
+const AED_TO_INR = 22.8;
 
 const DB = env => env.varun_portfolio_auth;
 
@@ -41,8 +43,8 @@ export async function submitPledge(request, env) {
   if (!amount || typeof amount !== 'number' || amount <= 0 || amount > 100000) {
     return json({ error: 'Amount must be a positive number.' }, 400);
   }
-  if (!['USD', 'CAD'].includes(currency)) {
-    return json({ error: 'Currency must be USD or CAD.' }, 400);
+  if (!['USD', 'CAD', 'INR', 'SGD', 'AED'].includes(currency)) {
+    return json({ error: 'Currency must be USD, CAD, INR, SGD, or AED.' }, 400);
   }
 
   const ts      = Math.floor(Date.now() / 1000);
@@ -77,9 +79,14 @@ export async function getPledgeStats(request, env) {
 
   const usd    = byC['USD'] ?? 0;
   const cad    = byC['CAD'] ?? 0;
-  const inrEq  = Math.round(usd * USD_TO_INR + cad * CAD_TO_INR);
+  const inr    = byC['INR'] ?? 0;
+  const sgd    = byC['SGD'] ?? 0;
+  const aed    = byC['AED'] ?? 0;
+  const inrEq  = Math.round(
+    usd * USD_TO_INR + cad * CAD_TO_INR + sgd * SGD_TO_INR + aed * AED_TO_INR
+  ) + inr;
 
-  return json({ usd, cad, inrEq, count: count?.n ?? 0 });
+  return json({ usd, cad, inr, sgd, aed, inrEq, count: count?.n ?? 0 });
 }
 
 // GET /api/admin/kamalesh/pledges
@@ -103,8 +110,14 @@ export async function adminListPledges(request, env) {
     SELECT
       SUM(CASE WHEN verified = 1 AND currency = 'USD' THEN amount ELSE 0 END) AS verified_usd,
       SUM(CASE WHEN verified = 1 AND currency = 'CAD' THEN amount ELSE 0 END) AS verified_cad,
+      SUM(CASE WHEN verified = 1 AND currency = 'INR' THEN amount ELSE 0 END) AS verified_inr,
+      SUM(CASE WHEN verified = 1 AND currency = 'SGD' THEN amount ELSE 0 END) AS verified_sgd,
+      SUM(CASE WHEN verified = 1 AND currency = 'AED' THEN amount ELSE 0 END) AS verified_aed,
       SUM(CASE WHEN verified = 0 AND currency = 'USD' THEN amount ELSE 0 END) AS pending_usd,
       SUM(CASE WHEN verified = 0 AND currency = 'CAD' THEN amount ELSE 0 END) AS pending_cad,
+      SUM(CASE WHEN verified = 0 AND currency = 'INR' THEN amount ELSE 0 END) AS pending_inr,
+      SUM(CASE WHEN verified = 0 AND currency = 'SGD' THEN amount ELSE 0 END) AS pending_sgd,
+      SUM(CASE WHEN verified = 0 AND currency = 'AED' THEN amount ELSE 0 END) AS pending_aed,
       COUNT(*) AS total_count,
       SUM(verified) AS verified_count
     FROM pledges

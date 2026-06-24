@@ -183,11 +183,17 @@ function PledgesTab() {
   return (
     <>
       {/* Summary */}
-      <div style={s.grid4}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 28 }}>
         <StatCard label="Verified USD"  value={`$${(t?.verified_usd ?? 0).toFixed(2)}`}  valueStyle={s.bigGreen} />
         <StatCard label="Verified CAD"  value={`C$${(t?.verified_cad ?? 0).toFixed(2)}`} valueStyle={s.bigGreen} />
+        <StatCard label="Verified INR"  value={`₹${Math.round(t?.verified_inr ?? 0).toLocaleString()}`} valueStyle={s.bigGreen} />
+        <StatCard label="Verified SGD"  value={`S$${(t?.verified_sgd ?? 0).toFixed(2)}`} valueStyle={s.bigGreen} />
+        <StatCard label="Verified AED"  value={`د.إ${(t?.verified_aed ?? 0).toFixed(2)}`} valueStyle={s.bigGreen} />
         <StatCard label="Pending USD"   value={`$${(t?.pending_usd ?? 0).toFixed(2)}`} />
         <StatCard label="Pending CAD"   value={`C$${(t?.pending_cad ?? 0).toFixed(2)}`} />
+        <StatCard label="Pending INR"   value={`₹${Math.round(t?.pending_inr ?? 0).toLocaleString()}`} />
+        <StatCard label="Pending SGD"   value={`S$${(t?.pending_sgd ?? 0).toFixed(2)}`} />
+        <StatCard label="Pending AED"   value={`د.إ${(t?.pending_aed ?? 0).toFixed(2)}`} />
       </div>
       <p style={{ fontFamily: M, fontSize: 11, color: 'var(--text-3)', marginBottom: 20, marginTop: -20 }}>
         {t?.verified_count ?? 0} verified · {(t?.total_count ?? 0) - (t?.verified_count ?? 0)} pending · {t?.total_count ?? 0} total
