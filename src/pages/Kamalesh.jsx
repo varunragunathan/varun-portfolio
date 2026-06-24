@@ -36,6 +36,61 @@ function CopyField({ label, value }) {
   );
 }
 
+// Surgery target: June 30 2026 00:00 PDT = UTC-7 = 07:00 UTC
+const SURGERY_DATE = new Date('2026-06-30T07:00:00Z');
+
+function getTimeLeft() {
+  const diff = SURGERY_DATE - Date.now();
+  if (diff <= 0) return null;
+  return {
+    days:    Math.floor(diff / 86400000),
+    hours:   Math.floor((diff % 86400000) / 3600000),
+    minutes: Math.floor((diff % 3600000) / 60000),
+    seconds: Math.floor((diff % 60000) / 1000),
+  };
+}
+
+function Countdown() {
+  const [left, setLeft] = useState(getTimeLeft);
+  useEffect(() => {
+    const id = setInterval(() => setLeft(getTimeLeft()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (!left) {
+    return (
+      <div className="kf__countdown-done">
+        Surgery day has arrived — your support made this possible. 🙏
+      </div>
+    );
+  }
+
+  const units = [
+    { n: left.days,                         u: 'days' },
+    { n: String(left.hours).padStart(2,'0'), u: 'hrs'  },
+    { n: String(left.minutes).padStart(2,'0'), u: 'min' },
+    { n: String(left.seconds).padStart(2,'0'), u: 'sec' },
+  ];
+
+  return (
+    <div className="kf__countdown">
+      <div className="kf__countdown-label">Surgery scheduled in</div>
+      <div className="kf__countdown-units">
+        {units.map(({ n, u }, i) => (
+          <React.Fragment key={u}>
+            {i > 0 && <span className="kf__countdown-sep">:</span>}
+            <div className="kf__countdown-unit">
+              <span className="kf__countdown-n">{n}</span>
+              <span className="kf__countdown-u">{u}</span>
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
+      <div className="kf__countdown-date">June 30, 2026 · KMCH Coimbatore</div>
+    </div>
+  );
+}
+
 // INR constants (matches worker/pledges.js)
 const MILAAP_INR  = 809211;
 const GOAL_INR    = 1225000;
@@ -208,6 +263,9 @@ export default function KamaleshPage() {
             className="kf__hero-img"
           />
         </div>
+
+        {/* Countdown */}
+        <Countdown />
 
         {/* Progress */}
         <div className="kf__progress-card">
