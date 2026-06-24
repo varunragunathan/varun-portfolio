@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 const M = "'IBM Plex Mono', monospace";
 const S = "'Outfit', sans-serif";
@@ -140,26 +140,26 @@ function ViewsTab({ data, onRefresh }) {
 const DEFAULT_RATES = { usd: 94.7, cad: 68.1, sgd: 73.1, aed: 25.7 };
 
 // ── Rates editor ──────────────────────────────────────────────────
-function RatesEditor({ onRatesChange }) {
+function RatesEditor({ onRatesChange, kfFetch }) {
   const [rates,   setRates]   = useState(null);
   const [draft,   setDraft]   = useState(null);
   const [saving,  setSaving]  = useState(false);
   const [msg,     setMsg]     = useState('');
 
   useEffect(() => {
-    fetch('/api/admin/kamalesh/rates', { credentials: 'include' })
+    kfFetch('/api/admin/kamalesh/rates')
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (d) { setRates(d.rates); setDraft(d.rates); }
       })
       .catch(() => {});
-  }, []);
+  }, [kfFetch]);
 
   async function save() {
     setSaving(true); setMsg('');
     try {
-      const res = await fetch('/api/admin/kamalesh/rates', {
-        method: 'PUT', credentials: 'include',
+      const res = await kfFetch('/api/admin/kamalesh/rates', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(draft),
       });
@@ -226,7 +226,7 @@ function RatesEditor({ onRatesChange }) {
 }
 
 // ── Pledges tab ───────────────────────────────────────────────────
-function PledgesTab() {
+function PledgesTab({ kfFetch }) {
   const [data,    setData]    = useState(null);
   const [filter,  setFilter]  = useState('all');
   const [busy,    setBusy]    = useState({});
@@ -237,19 +237,19 @@ function PledgesTab() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/kamalesh/pledges?filter=${filter}`, { credentials: 'include' });
+      const res = await kfFetch(`/api/admin/kamalesh/pledges?filter=${filter}`);
       if (!res.ok) throw new Error('Failed to load pledges');
       setData(await res.json());
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
-  }, [filter]);
+  }, [filter, kfFetch]);
 
   useEffect(() => { load(); }, [load]);
 
   async function verify(id, val) {
     setBusy(b => ({ ...b, [id]: true }));
-    await fetch(`/api/admin/kamalesh/pledges/${id}`, {
-      method: 'PATCH', credentials: 'include',
+    await kfFetch(`/api/admin/kamalesh/pledges/${id}`, {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ verified: val }),
     });
@@ -260,7 +260,7 @@ function PledgesTab() {
   async function remove(id) {
     if (!window.confirm('Delete this pledge?')) return;
     setBusy(b => ({ ...b, [id]: true }));
-    await fetch(`/api/admin/kamalesh/pledges/${id}`, { method: 'DELETE', credentials: 'include' });
+    await kfFetch(`/api/admin/kamalesh/pledges/${id}`, { method: 'DELETE' });
     load();
   }
 
@@ -386,46 +386,196 @@ function PledgesTab() {
           </table>
         )}
 
-      <RatesEditor onRatesChange={setLiveRates} />
+      <RatesEditor onRatesChange={setLiveRates} kfFetch={kfFetch} />
     </>
+  );
+}
+
+const PIN_KEY = 'kf_admin_pin';
+
+function authHeaders(pin) {
+  return pin ? { 'X-KF-Pin': pin } : {};
+}
+
+// ── PIN manager (only shown when logged in as full admin) ─────────
+function PinManager() {
+  const [current, setCurrent] = useState(null);
+  const [draft,   setDraft]   = useState('');
+  const [busy,    setBusy]    = useState(false);
+  const [msg,     setMsg]     = useState('');
+
+  useEffect(() => {
+    fetch('/api/admin/kamalesh/pin', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) { setCurrent(d.pin); setDraft(d.pin || ''); } })
+      .catch(() => {});
+  }, []);
+
+  async function save() {
+    setBusy(true); setMsg('');
+    try {
+      const res = await fetch('/api/admin/kamalesh/pin', {
+        method: 'PUT', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: draft }),
+      });
+      const d = await res.json();
+      if (!res.ok) { setMsg(d.error || 'Failed'); return; }
+      setCurrent(d.pin); setMsg(d.pin ? 'Saved ✓' : 'PIN cleared');
+    } catch { setMsg('Network error'); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <div style={{ ...s.card, marginBottom: 28 }}>
+      <div style={{ ...s.sh, marginBottom: 12 }}>Classmate Access PIN</div>
+      <p style={{ fontFamily: M, fontSize: 11, color: 'var(--text-3)', marginBottom: 12, lineHeight: 1.6 }}>
+        Share this PIN with classmates. They visit <strong>varunr.dev/admin/kamalesh</strong> and enter it — no account needed.<br />
+        Leave blank to disable PIN access.
+      </p>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input
+          type="text"
+          placeholder="e.g. ceg2012"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          style={{
+            fontFamily: M, fontSize: 14, letterSpacing: '0.08em',
+            background: 'var(--surface-alt)', border: '1px solid var(--border)',
+            borderRadius: 6, padding: '6px 12px', color: 'var(--text-1)', width: 160,
+          }}
+        />
+        <button onClick={save} disabled={busy || draft === current} style={s.btnGreen}>
+          {busy ? 'Saving…' : 'Save'}
+        </button>
+        {current && (
+          <span style={{ fontFamily: M, fontSize: 11, color: 'var(--text-3)' }}>
+            Active PIN: <strong style={{ color: 'var(--text-1)' }}>{current}</strong>
+          </span>
+        )}
+        {msg && <span style={{ fontFamily: M, fontSize: 11, color: msg.includes('✓') || msg.includes('cleared') ? 'var(--success-color)' : 'var(--error-color)' }}>{msg}</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── PIN gate ──────────────────────────────────────────────────────
+function PinGate({ onUnlock }) {
+  const [input, setInput] = useState('');
+  const [error, setError] = useState('');
+  const [busy,  setBusy]  = useState(false);
+
+  async function tryPin(e) {
+    e.preventDefault();
+    if (!input.trim()) return;
+    setBusy(true); setError('');
+    try {
+      const res = await fetch('/api/admin/kamalesh/pledges?filter=all', {
+        headers: { 'X-KF-Pin': input.trim() },
+      });
+      if (res.ok) {
+        localStorage.setItem(PIN_KEY, input.trim());
+        onUnlock(input.trim());
+      } else {
+        setError('Incorrect PIN. Ask Varun for the access code.');
+      }
+    } catch { setError('Network error. Try again.'); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <div style={{ maxWidth: 360, margin: '80px auto', textAlign: 'center' }}>
+      <div style={{ fontFamily: M, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 16 }}>Kamalesh Fundraiser Admin</div>
+      <h2 style={{ fontFamily: S, fontSize: 22, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 8px' }}>Enter Access PIN</h2>
+      <p style={{ fontFamily: S, fontSize: 14, color: 'var(--text-3)', marginBottom: 28 }}>Ask Varun for the PIN to access this dashboard.</p>
+      <form onSubmit={tryPin} style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+        <input
+          type="text"
+          placeholder="PIN"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          style={{
+            fontFamily: M, fontSize: 16, letterSpacing: '0.15em', width: 140, textAlign: 'center',
+            background: 'var(--surface-alt)', border: '1px solid var(--border)',
+            borderRadius: 8, padding: '8px 12px', color: 'var(--text-1)',
+          }}
+        />
+        <button type="submit" disabled={busy} style={{ ...s.btnGreen, padding: '8px 16px', fontSize: 13 }}>
+          {busy ? '…' : 'Enter'}
+        </button>
+      </form>
+      {error && <p style={{ fontFamily: M, fontSize: 11, color: 'var(--error-color)', marginTop: 12 }}>{error}</p>}
+    </div>
   );
 }
 
 // ── Main page ─────────────────────────────────────────────────────
 export default function KamaleshAdmin() {
-  const navigate  = useNavigate();
-  const [tab,     setTab]     = useState('pledges');
-  const [views,   setViews]   = useState(null);
-  const [vError,  setVError]  = useState(null);
-  const [vLoad,   setVLoad]   = useState(false);
+  const [tab,     setTab]   = useState('pledges');
+  const [views,   setViews] = useState(null);
+  const [vError,  setVError] = useState(null);
+  const [vLoad,   setVLoad] = useState(false);
+  const [isFullAdmin, setIsFullAdmin] = useState(false);
+
+  // PIN state — try saved PIN first, then check admin session
+  const [pin,     setPin]   = useState(null);   // null = not yet resolved
+  const [authed,  setAuthed] = useState(false);
+
+  useEffect(() => {
+    // Check if logged in as full admin
+    fetch('/api/admin/kamalesh/pin', { credentials: 'include' })
+      .then(r => { if (r.ok) { setIsFullAdmin(true); setAuthed(true); } })
+      .catch(() => {});
+
+    // Try saved PIN
+    const saved = localStorage.getItem(PIN_KEY);
+    if (saved) {
+      fetch('/api/admin/kamalesh/pledges?filter=all', { headers: { 'X-KF-Pin': saved } })
+        .then(r => { if (r.ok) { setPin(saved); setAuthed(true); } else { localStorage.removeItem(PIN_KEY); } })
+        .catch(() => {});
+    }
+  }, []);
+
+  const kfFetch = useCallback((url, opts = {}) => {
+    const headers = { ...(opts.headers || {}), ...authHeaders(pin) };
+    return fetch(url, { ...opts, credentials: 'include', headers });
+  }, [pin]);
 
   const loadViews = useCallback(async () => {
     setVLoad(true);
     try {
-      const res = await fetch('/api/admin/page-views?page=kamalesh', { credentials: 'include' });
-      if (res.status === 403) { navigate('/'); return; }
+      const res = await kfFetch('/api/admin/page-views?page=kamalesh');
       if (!res.ok) throw new Error('Failed to load');
       setViews(await res.json());
     } catch (e) { setVError(e.message); }
     finally { setVLoad(false); }
-  }, [navigate]);
+  }, [kfFetch]);
 
   useEffect(() => {
-    if (tab === 'views' && !views) loadViews();
-  }, [tab, views, loadViews]);
+    if (tab === 'views' && !views && authed) loadViews();
+  }, [tab, views, authed, loadViews]);
+
+  // Not yet resolved — wait silently
+  if (!authed && localStorage.getItem(PIN_KEY)) return null;
+
+  if (!authed) {
+    return <PinGate onUnlock={p => { setPin(p); setAuthed(true); }} />;
+  }
 
   return (
     <div style={s.page}>
-      <Link to="/admin" style={s.back}>← admin</Link>
+      {isFullAdmin && <Link to="/admin" style={s.back}>← admin</Link>}
       <h1 style={s.h1}>Kamalesh Fundraiser</h1>
       <p style={s.sub}>varunr.dev/kamalesh · donations &amp; analytics</p>
+
+      {isFullAdmin && <PinManager />}
 
       <div style={s.tabs}>
         <button style={tab === 'pledges' ? s.tabAct : s.tab} onClick={() => setTab('pledges')}>Pledges</button>
         <button style={tab === 'views'   ? s.tabAct : s.tab} onClick={() => setTab('views')}>Page Views</button>
       </div>
 
-      {tab === 'pledges' && <PledgesTab />}
+      {tab === 'pledges' && <PledgesTab kfFetch={kfFetch} />}
 
       {tab === 'views' && (
         vLoad  ? <p style={{ fontFamily: M, fontSize: 12, color: 'var(--text-3)' }}>Loading…</p> :

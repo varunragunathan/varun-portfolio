@@ -6,13 +6,28 @@
 // DELETE /api/admin/kamalesh/pledges/:id — admin, delete
 
 import { getSession } from './auth/session.js';
-import { requireAdmin } from './admin.js';
+import { requireAdmin, isAdmin } from './admin.js';
 import { checkIpRateLimit } from './rateLimit.js';
 
 // Default INR conversion rates — updated June 24 2026
 // Can be overridden per-deploy via KV key 'kf:rates'
 const DEFAULT_RATES = { usd: 94.7, cad: 68.1, sgd: 73.1, aed: 25.7 };
 const RATES_KV_KEY  = 'kf:rates';
+const PIN_KV_KEY    = 'kf:pin';
+
+// Allows access if the caller is a site admin OR presents the correct kamalesh PIN.
+async function requireKamaleshAccess(request, env) {
+  const session = await getSession(env.KV, request);
+  if (await isAdmin(session, env)) return null; // full admin always allowed
+
+  const pin = await env.KV.get(PIN_KV_KEY);
+  if (pin) {
+    const supplied = request.headers.get('X-KF-Pin') || '';
+    if (supplied === pin) return null; // correct PIN
+  }
+
+  return json({ error: 'Forbidden' }, 403);
+}
 
 async function getRates(kv) {
   try {
@@ -99,8 +114,7 @@ export async function getPledgeStats(request, env) {
 
 // GET /api/admin/kamalesh/pledges
 export async function adminListPledges(request, env) {
-  const session = await getSession(env.KV, request);
-  const denied  = await requireAdmin(session, env);
+  const denied = await requireKamaleshAccess(request, env);
   if (denied) return denied;
 
   const url    = new URL(request.url);
@@ -137,8 +151,7 @@ export async function adminListPledges(request, env) {
 // PATCH /api/admin/kamalesh/pledges/:id
 // Body: { verified: boolean }
 export async function adminUpdatePledge(request, env, id) {
-  const session = await getSession(env.KV, request);
-  const denied  = await requireAdmin(session, env);
+  const denied = await requireKamaleshAccess(request, env);
   if (denied) return denied;
 
   let body;
@@ -154,28 +167,53 @@ export async function adminUpdatePledge(request, env, id) {
 
 // DELETE /api/admin/kamalesh/pledges/:id
 export async function adminDeletePledge(request, env, id) {
-  const session = await getSession(env.KV, request);
-  const denied  = await requireAdmin(session, env);
+  const denied = await requireKamaleshAccess(request, env);
   if (denied) return denied;
 
   await DB(env).prepare('DELETE FROM pledges WHERE id = ?').bind(id).run();
   return json({ ok: true });
 }
 
-// GET /api/admin/kamalesh/rates
-export async function adminGetRates(request, env) {
+// GET /api/admin/kamalesh/pin  — admin only
+export async function adminGetPin(request, env) {
   const session = await getSession(env.KV, request);
   const denied  = await requireAdmin(session, env);
+  if (denied) return denied;
+  const pin = await env.KV.get(PIN_KV_KEY);
+  return json({ pin: pin || null });
+}
+
+// PUT /api/admin/kamalesh/pin  — admin only; body: { pin }
+export async function adminSetPin(request, env) {
+  const session = await getSession(env.KV, request);
+  const denied  = await requireAdmin(session, env);
+  if (denied) return denied;
+
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'Bad request' }, 400); }
+
+  const pin = (body.pin ?? '').toString().trim();
+  if (!pin) {
+    await env.KV.delete(PIN_KV_KEY);
+    return json({ ok: true, pin: null });
+  }
+  if (pin.length < 4 || pin.length > 32) return json({ error: 'PIN must be 4–32 characters' }, 400);
+  await env.KV.put(PIN_KV_KEY, pin);
+  return json({ ok: true, pin });
+}
+
+// GET /api/admin/kamalesh/rates
+export async function adminGetRates(request, env) {
+  const denied = await requireKamaleshAccess(request, env);
   if (denied) return denied;
 
   const rates = await getRates(env.KV);
   return json({ rates, defaults: DEFAULT_RATES });
 }
 
-// PUT /api/admin/kamalesh/rates
+// PUT /api/admin/kamalesh/rates — PIN holders can update rates too
 export async function adminSetRates(request, env) {
-  const session = await getSession(env.KV, request);
-  const denied  = await requireAdmin(session, env);
+  const denied = await requireKamaleshAccess(request, env);
   if (denied) return denied;
 
   let body;

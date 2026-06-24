@@ -3,7 +3,17 @@
 // GET  /api/admin/page-views?page=kamalesh  — admin only
 
 import { getSession } from './auth/session.js';
-import { requireAdmin } from './admin.js';
+import { requireAdmin, isAdmin } from './admin.js';
+
+const PIN_KV_KEY = 'kf:pin';
+
+async function requireKamaleshAccess(request, env) {
+  const session = await getSession(env.KV, request);
+  if (await isAdmin(session, env)) return null;
+  const pin = await env.KV.get(PIN_KV_KEY);
+  if (pin && request.headers.get('X-KF-Pin') === pin) return null;
+  return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
 
 const DB = env => env.varun_portfolio_auth;
 
@@ -47,8 +57,7 @@ export async function trackPageView(request, env) {
 // GET /api/admin/page-views?page=kamalesh
 // Returns: { total, byDay: [{date, count}], byCountry: [{country, count}], last50 }
 export async function getPageViewStats(request, env) {
-  const session = await getSession(env.KV, request);
-  const denied  = await requireAdmin(session, env);
+  const denied = await requireKamaleshAccess(request, env);
   if (denied) return denied;
 
   const url  = new URL(request.url);

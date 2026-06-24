@@ -58,6 +58,7 @@ import {
   submitPledge, getPledgeStats,
   adminListPledges, adminUpdatePledge, adminDeletePledge,
   adminGetRates, adminSetRates,
+  adminGetPin, adminSetPin,
 } from './pledges.js';
 export { NumMatchDO } from './numMatchDO.js';
 
@@ -199,6 +200,10 @@ async function handleRequest(request, env) {
         response = await adminGetRates(request, env);
       } else if (path === '/api/admin/kamalesh/rates' && method === 'PUT') {
         response = await adminSetRates(request, env);
+      } else if (path === '/api/admin/kamalesh/pin' && method === 'GET') {
+        response = await adminGetPin(request, env);
+      } else if (path === '/api/admin/kamalesh/pin' && method === 'PUT') {
+        response = await adminSetPin(request, env);
       } else if (path === '/api/admin/pages' && method === 'GET') {
         response = await adminListPages(request, env);
       } else if (path === '/api/admin/pages' && method === 'POST') {
