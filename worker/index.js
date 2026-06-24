@@ -674,18 +674,27 @@ async function handleRequest(request, env) {
 
   // All non-API requests → serve the React static build
   // Inject security headers on HTML responses.
-  // SPA routes (e.g. /interview, /survey/:id) have no matching file in dist/.
-  // Fetch index.html directly for extensionless paths instead of trying the
-  // literal path first and falling back — calling env.ASSETS.fetch() twice in
-  // one request can throw on a cold Worker isolate (warms up after the first
-  // successful call), which was surfacing as a hard failure on a visitor's
-  // very first direct navigation to a deep link.
+  // SPA routes (e.g. /interview, /kamalesh) have no matching file in dist/.
+  // Fetch index.html directly for extensionless paths.
+  // ASSETS.fetch() can throw on a cold Worker isolate — retry up to 3 times
+  // before giving up so that direct deep-link visits don't land on a 503.
+  const assetReq = url.pathname.includes('.')
+    ? request
+    : new Request(new URL('/', url.origin));
+
   let asset;
-  try {
-    asset = url.pathname.includes('.')
-      ? await env.ASSETS.fetch(request)
-      : await env.ASSETS.fetch(new Request(new URL('/', url.origin)));
-  } catch {
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      asset = await env.ASSETS.fetch(assetReq);
+      lastErr = null;
+      break;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  if (lastErr) {
+    console.error('ASSETS fetch failed after 3 attempts:', lastErr);
     return new Response('Service unavailable', { status: 503 });
   }
   const ct    = asset.headers.get('Content-Type') || '';
