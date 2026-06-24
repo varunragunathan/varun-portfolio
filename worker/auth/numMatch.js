@@ -61,7 +61,9 @@ export async function numMatchPending(request, env) {
     .bind(tokenHash).first();
   if (!sessionRecord) return json({ pending: false });
 
-  const raw = await env.KV.get(`num_match_for_user:${session.userId}`);
+  // cacheTtl: 5 matches the poll interval — idle polls (no pending approval)
+  // are served from edge cache rather than generating a fresh KV read each time.
+  const raw = await env.KV.get(`num_match_for_user:${session.userId}`, { cacheTtl: 5 });
   if (!raw) return json({ pending: false });
 
   const { approvalToken, code, userAgent, deviceNames } = JSON.parse(raw);

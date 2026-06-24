@@ -41,10 +41,13 @@ export async function handleAuth(request, env, url) {
   const ip     = request.headers.get('CF-Connecting-IP');
 
   // ── Broad IP limit: 30 req / 10 min across all auth endpoints ───
-  // GET /me is a plain session read — no sensitive action, skip the rate limit
-  // to avoid KV ops on every page load.
-  const isGetMe = method === 'GET' && path === '/me';
-  if (!isGetMe) {
+  // Exempt background-polling reads that fire automatically (no user action):
+  //   GET /me              — session check on every page load
+  //   GET /num-match/pending — trusted-device poll every 5 s
+  // Both are read-only and rate-limiting them generates a KV write on every
+  // automatic request, which rapidly exhausts the free-tier write budget.
+  const isPollingRead = (method === 'GET') && (path === '/me' || path === '/num-match/pending');
+  if (!isPollingRead) {
     const broad = await checkIpRateLimit(env.KV, ip, 'auth', 30, 10 * 60_000);
     if (!broad.allowed) return tooManyRequests(broad.retryAfter);
   }
