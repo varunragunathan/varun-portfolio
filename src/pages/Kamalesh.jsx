@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './Kamalesh.css';
 
 const COSTS = [
@@ -29,6 +29,14 @@ function CopyField({ label, value }) {
 }
 
 export default function KamaleshPage() {
+  useEffect(() => {
+    fetch('/api/track/page', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ page: 'kamalesh' }),
+    }).catch(() => {});
+  }, []);
+
   return (
     <div className="kf">
       <div className="kf__inner">

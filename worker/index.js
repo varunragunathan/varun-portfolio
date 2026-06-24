@@ -53,6 +53,7 @@ import {
 import { checkIpRateLimit } from './rateLimit.js';
 import { getMetrics } from './metrics.js';
 import { logEndpointRequest, getEndpointMetrics } from './endpointMetrics.js';
+import { trackPageView, getPageViewStats } from './pageViews.js';
 export { NumMatchDO } from './numMatchDO.js';
 
 const ALLOWED_ORIGINS = ['https://varunr.dev', 'http://localhost:5173'];
@@ -185,6 +186,8 @@ async function handleRequest(request, env) {
         response = await updateRateLimits(request, env);
       } else if (path === '/api/admin/rate-limits' && method === 'DELETE') {
         response = await resetRateLimits(request, env);
+      } else if (path === '/api/admin/page-views' && method === 'GET') {
+        response = await getPageViewStats(request, env);
       } else if (path === '/api/admin/pages' && method === 'GET') {
         response = await adminListPages(request, env);
       } else if (path === '/api/admin/pages' && method === 'POST') {
@@ -242,6 +245,18 @@ async function handleRequest(request, env) {
         status: 500,
         headers: { 'Content-Type': 'application/json', ...cors },
       });
+    }
+  }
+
+  // ── /api/track/page ───────────────────────────────────────────
+  if (url.pathname === '/api/track/page' && request.method === 'POST') {
+    try {
+      return withCors(await trackPageView(request, env), cors);
+    } catch (err) {
+      console.error('Track error:', err);
+      return withCors(new Response(JSON.stringify({ error: 'Internal server error' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' },
+      }), cors);
     }
   }
 

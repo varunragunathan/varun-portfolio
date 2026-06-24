@@ -62,6 +62,7 @@ const DiscussionPage     = lazy(() => import('./pages/Discussion'));
 const DiscussionThread   = lazy(() => import('./pages/DiscussionThread'));
 const DiscussionAdmin    = lazy(() => import('./pages/DiscussionAdmin'));
 const KamaleshPage       = lazy(() => import('./pages/Kamalesh'));
+const KamaleshAdmin      = lazy(() => import('./pages/KamaleshAdmin'));
 
 function Loading() {
   return (
@@ -175,6 +176,7 @@ function Shell() {
             <Route path="/discussion" element={<DiscussionPage />} />
             <Route path="/discussion/:id" element={<DiscussionThread />} />
             <Route path="/admin/discussion" element={<DiscussionAdmin />} />
+            <Route path="/admin/kamalesh" element={<KamaleshAdmin />} />
             <Route path="/kamalesh" element={<KamaleshPage />} />
           </Routes>
         </Suspense>
