@@ -147,12 +147,13 @@ function Shell() {
   const { shakeState, requestPermission } = useShake(handleShake);
   const { pathname } = useLocation();
   const hideFooter = !!matchPath('/chat', pathname) || pathname.startsWith('/survey/') || pathname.startsWith('/s/') || pathname.startsWith('/p/') || !!matchPath('/kamalesh', pathname);
+  const hideNav    = !!matchPath('/kamalesh', pathname);
 
   return (
     <div className="shell">
       <ScrollToTop />
       <SkipLink />
-      <Nav />
+      {!hideNav && <Nav />}
       <main id="main" className="shell__content">
         <Suspense fallback={<Loading />}>
           <Routes>

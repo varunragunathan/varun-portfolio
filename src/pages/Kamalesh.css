@@ -6,7 +6,7 @@
 
 .kf {
   min-height: 100vh;
-  padding: 80px 20px 80px;
+  padding: 48px 20px 80px;
   animation: kf-fadein 0.6s cubic-bezier(0.22,1,0.36,1) both;
 }
 
