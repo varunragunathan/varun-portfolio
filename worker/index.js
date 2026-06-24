@@ -54,6 +54,10 @@ import { checkIpRateLimit } from './rateLimit.js';
 import { getMetrics } from './metrics.js';
 import { logEndpointRequest, getEndpointMetrics } from './endpointMetrics.js';
 import { trackPageView, getPageViewStats } from './pageViews.js';
+import {
+  submitPledge, getPledgeStats,
+  adminListPledges, adminUpdatePledge, adminDeletePledge,
+} from './pledges.js';
 export { NumMatchDO } from './numMatchDO.js';
 
 const ALLOWED_ORIGINS = ['https://varunr.dev', 'http://localhost:5173'];
@@ -188,6 +192,8 @@ async function handleRequest(request, env) {
         response = await resetRateLimits(request, env);
       } else if (path === '/api/admin/page-views' && method === 'GET') {
         response = await getPageViewStats(request, env);
+      } else if (path === '/api/admin/kamalesh/pledges' && method === 'GET') {
+        response = await adminListPledges(request, env);
       } else if (path === '/api/admin/pages' && method === 'GET') {
         response = await adminListPages(request, env);
       } else if (path === '/api/admin/pages' && method === 'POST') {
@@ -202,13 +208,18 @@ async function handleRequest(request, env) {
 
       // ── Pattern-matched admin routes (pages + surveys) ────────
       else {
+        const pledgeMatch        = path.match(/^\/api\/admin\/kamalesh\/pledges\/([^/]+)$/);
         const adminPageMatch     = path.match(/^\/api\/admin\/pages\/([^/]+)$/);
         const adminSurveyMatch   = path.match(/^\/api\/admin\/surveys\/([^/]+)$/);
         const adminSessionsMatch = path.match(/^\/api\/admin\/surveys\/([^/]+)\/sessions$/);
         const adminSessionMatch  = path.match(/^\/api\/admin\/surveys\/([^/]+)\/sessions\/([^/]+)$/);
         const adminSessionTagsMatch = path.match(/^\/api\/admin\/surveys\/([^/]+)\/sessions\/([^/]+)\/tags$/);
 
-        if (adminPageMatch && method === 'GET') {
+        if (pledgeMatch && method === 'PATCH') {
+          response = await adminUpdatePledge(request, env, pledgeMatch[1]);
+        } else if (pledgeMatch && method === 'DELETE') {
+          response = await adminDeletePledge(request, env, pledgeMatch[1]);
+        } else if (adminPageMatch && method === 'GET') {
           response = await adminGetPage(request, env, adminPageMatch[1]);
         } else if (adminPageMatch && method === 'PATCH') {
           response = await adminUpdatePage(request, env, adminPageMatch[1]);
@@ -254,6 +265,29 @@ async function handleRequest(request, env) {
       return withCors(await trackPageView(request, env), cors);
     } catch (err) {
       console.error('Track error:', err);
+      return withCors(new Response(JSON.stringify({ error: 'Internal server error' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' },
+      }), cors);
+    }
+  }
+
+  // ── /api/kamalesh (public pledge + stats) ─────────────────────
+  if (url.pathname.startsWith('/api/kamalesh/')) {
+    try {
+      const path = url.pathname;
+      let response;
+      if (path === '/api/kamalesh/pledge' && request.method === 'POST') {
+        response = await submitPledge(request, env);
+      } else if (path === '/api/kamalesh/stats' && request.method === 'GET') {
+        response = await getPledgeStats(request, env);
+      } else {
+        response = new Response(JSON.stringify({ error: 'Not found' }), {
+          status: 404, headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return withCors(response, cors);
+    } catch (err) {
+      console.error('Pledge error:', err);
       return withCors(new Response(JSON.stringify({ error: 'Internal server error' }), {
         status: 500, headers: { 'Content-Type': 'application/json' },
       }), cors);

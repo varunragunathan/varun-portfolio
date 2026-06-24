@@ -36,14 +36,150 @@ function CopyField({ label, value }) {
   );
 }
 
+// INR constants (matches worker/pledges.js)
+const MILAAP_INR  = 809211;
+const GOAL_INR    = 1225000;
+const USD_TO_INR  = 83.5;
+const CAD_TO_INR  = 61.0;
+
+function fmt(n) {
+  return 'Rs. ' + Math.round(n).toLocaleString('en-IN');
+}
+
+function PledgeForm({ onSuccess }) {
+  const [name,     setName]     = useState('');
+  const [amount,   setAmount]   = useState('');
+  const [currency, setCurrency] = useState('USD');
+  const [sent,     setSent]     = useState(false);
+  const [note,     setNote]     = useState('');
+  const [busy,     setBusy]     = useState(false);
+  const [error,    setError]    = useState('');
+
+  async function submit(e) {
+    e.preventDefault();
+    setError('');
+    const num = parseFloat(amount);
+    if (!name.trim()) return setError('Please enter your name.');
+    if (!num || num <= 0) return setError('Please enter a valid amount.');
+    setBusy(true);
+    try {
+      const res = await fetch('/api/kamalesh/pledge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), amount: num, currency, sent, note: note.trim() || null }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error || 'Something went wrong. Please try again.');
+      } else {
+        onSuccess();
+      }
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="kf__pledge-form" onSubmit={submit}>
+      <div className="kf__pledge-row">
+        <div className="kf__pledge-field">
+          <label className="kf__pledge-label" htmlFor="pf-name">Your name</label>
+          <input
+            id="pf-name"
+            className="kf__pledge-input"
+            type="text"
+            placeholder="e.g. Priya S."
+            value={name}
+            onChange={e => setName(e.target.value)}
+            maxLength={100}
+            required
+          />
+        </div>
+        <div className="kf__pledge-field kf__pledge-field--amount">
+          <label className="kf__pledge-label" htmlFor="pf-amount">Amount</label>
+          <div className="kf__pledge-amount-row">
+            <input
+              id="pf-amount"
+              className="kf__pledge-input kf__pledge-input--num"
+              type="number"
+              min="1"
+              step="any"
+              placeholder="100"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              required
+            />
+            <div className="kf__currency-toggle">
+              {['USD', 'CAD'].map(c => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`kf__currency-btn${currency === c ? ' kf__currency-btn--active' : ''}`}
+                  onClick={() => setCurrency(c)}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="kf__pledge-check">
+        <input
+          id="pf-sent"
+          type="checkbox"
+          checked={sent}
+          onChange={e => setSent(e.target.checked)}
+        />
+        <label htmlFor="pf-sent">I have already sent this payment via Zelle / Interac</label>
+      </div>
+
+      <div className="kf__pledge-field">
+        <label className="kf__pledge-label" htmlFor="pf-note">Message <span className="kf__pledge-optional">(optional)</span></label>
+        <input
+          id="pf-note"
+          className="kf__pledge-input"
+          type="text"
+          placeholder="e.g. Get well soon Kamalesh!"
+          value={note}
+          onChange={e => setNote(e.target.value)}
+          maxLength={300}
+        />
+      </div>
+
+      {error && <p className="kf__pledge-error">{error}</p>}
+
+      <button className="kf__pledge-submit" type="submit" disabled={busy}>
+        {busy ? 'Submitting…' : 'Log my donation'}
+      </button>
+    </form>
+  );
+}
+
 export default function KamaleshPage() {
+  const [stats,   setStats]   = useState(null);
+  const [pledged, setPledged] = useState(false);
+
   useEffect(() => {
     fetch('/api/track/page', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ page: 'kamalesh' }),
     }).catch(() => {});
+
+    fetch('/api/kamalesh/stats')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setStats(d); })
+      .catch(() => {});
   }, []);
+
+  const pledgedInr   = stats ? Math.round(stats.usd * USD_TO_INR + stats.cad * CAD_TO_INR) : 0;
+  const totalRaisedInr = MILAAP_INR + pledgedInr;
+  const stillNeeded  = Math.max(0, GOAL_INR - totalRaisedInr);
+  const pct          = Math.min(100, Math.round((totalRaisedInr / GOAL_INR) * 100));
 
   return (
     <div className="kf">
@@ -63,17 +199,32 @@ export default function KamaleshPage() {
         <div className="kf__progress-card">
           <div className="kf__progress-header">
             <div>
-              <div className="kf__raised">Rs. 8,09,211 raised</div>
-              <div className="kf__raised-sub">of Rs. 12,25,000 goal · 385 supporters</div>
+              <div className="kf__raised">{fmt(totalRaisedInr)} raised</div>
+              <div className="kf__raised-sub">
+                of {fmt(GOAL_INR)} goal · 385 Milaap supporters
+                {stats?.count > 0 && ` · ${stats.count} via this page`}
+              </div>
             </div>
             <div className="kf__needed-box">
-              <div className="kf__needed-amount">Rs. 4,15,789</div>
-              <div className="kf__needed-label">still needed · ≈ $4,400 USD</div>
+              <div className="kf__needed-amount">{fmt(stillNeeded)}</div>
+              <div className="kf__needed-label">
+                still needed · ≈ ${Math.round(stillNeeded / USD_TO_INR).toLocaleString()} USD
+              </div>
             </div>
           </div>
           <div className="kf__bar">
-            <div className="kf__bar-fill" style={{ width: '66%' }} />
+            <div className="kf__bar-fill" style={{ width: `${pct}%` }} />
           </div>
+          {pledgedInr > 0 && (
+            <div className="kf__bar-breakdown">
+              <span className="kf__bar-segment kf__bar-segment--milaap">
+                Rs. 8,09,211 Milaap
+              </span>
+              <span className="kf__bar-segment kf__bar-segment--pledged">
+                + {fmt(pledgedInr)} pledged here
+              </span>
+            </div>
+          )}
           <p className="kf__bar-note">
             Milaap campaign raised 66% then closed. Zelle &amp; Interac are the only active channels.
           </p>
@@ -241,6 +392,41 @@ export default function KamaleshPage() {
               <a className="kf__org-phone" href="tel:+919787973729">+91 97879 73729</a>
             </div>
           </div>
+        </section>
+
+        {/* Pledge form */}
+        <section className="kf__section">
+          <h2 className="kf__section-title">Log Your Donation</h2>
+          {pledged ? (
+            <div className="kf__pledge-success">
+              <div className="kf__pledge-success-icon">✓</div>
+              <div className="kf__pledge-success-title">Thank you!</div>
+              <p className="kf__pledge-success-text">
+                Your donation has been logged. The organizers will verify and update the progress shortly.
+                Please share this page with your network — every share helps.
+              </p>
+              <button
+                className="kf__pledge-again"
+                onClick={() => setPledged(false)}
+              >
+                Log another donation
+              </button>
+            </div>
+          ) : (
+            <>
+              <p className="kf__section p" style={{ marginBottom: 0 }}>
+                After sending via Zelle or Interac, let us know here. Once verified by the organizers,
+                your amount will be reflected in the progress bar above.
+              </p>
+              <PledgeForm onSuccess={() => {
+                setPledged(true);
+                fetch('/api/kamalesh/stats')
+                  .then(r => r.ok ? r.json() : null)
+                  .then(d => { if (d) setStats(d); })
+                  .catch(() => {});
+              }} />
+            </>
+          )}
         </section>
 
         <div className="kf__footer-note">

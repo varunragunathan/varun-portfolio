@@ -469,6 +469,226 @@
 
 .kf__org-li:hover { color: #0a66c2; }
 
+/* ── Pledge form ──────────────────────────────────────────────────── */
+.kf__pledge-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.kf__pledge-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 560px) {
+  .kf__pledge-row { grid-template-columns: 1fr; }
+}
+
+.kf__pledge-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kf__pledge-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.kf__pledge-optional {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 10px;
+  color: var(--text-3);
+  opacity: 0.7;
+}
+
+.kf__pledge-input {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--text-1);
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.kf__pledge-input:focus { border-color: var(--accent-border); }
+.kf__pledge-input::placeholder { color: var(--text-3); }
+
+.kf__pledge-amount-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.kf__pledge-input--num {
+  flex: 1;
+  min-width: 0;
+}
+
+.kf__currency-toggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.kf__currency-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 8px 12px;
+  background: var(--surface-alt);
+  border: none;
+  cursor: pointer;
+  color: var(--text-3);
+  transition: background 0.15s, color 0.15s;
+}
+
+.kf__currency-btn + .kf__currency-btn {
+  border-left: 1px solid var(--border);
+}
+
+.kf__currency-btn--active {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.kf__pledge-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.kf__pledge-check input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.kf__pledge-error {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--error-color);
+  margin: 0;
+}
+
+.kf__pledge-submit {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 11px 20px;
+  background: var(--accent);
+  color: var(--text-inverse);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  align-self: flex-start;
+}
+
+.kf__pledge-submit:hover:not(:disabled) { opacity: 0.88; }
+.kf__pledge-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Pledge success state ─────────────────────────────────────────── */
+.kf__pledge-success {
+  background: var(--card-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: 14px;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+}
+
+.kf__pledge-success-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  margin-bottom: 4px;
+}
+
+.kf__pledge-success-title {
+  font-family: var(--font-sans);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.kf__pledge-success-text {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--text-2);
+  line-height: 1.6;
+  max-width: 420px;
+  margin: 0;
+}
+
+.kf__pledge-again {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 6px;
+  text-decoration: underline;
+}
+
+/* ── Progress bar breakdown ───────────────────────────────────────── */
+.kf__bar-breakdown {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.kf__bar-segment {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.kf__bar-segment--milaap {
+  background: rgba(52,211,153,0.1);
+  color: var(--success-color);
+}
+
+.kf__bar-segment--pledged {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
 /* ── Footer note ──────────────────────────────────────────────────── */
 .kf__footer-note {
   text-align: center;

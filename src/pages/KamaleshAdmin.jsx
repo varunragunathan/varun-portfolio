@@ -5,28 +5,36 @@ const M = "'IBM Plex Mono', monospace";
 const S = "'Outfit', sans-serif";
 
 const s = {
-  page:    { padding: '72px 24px 80px', maxWidth: 820, margin: '0 auto', fontFamily: S },
+  page:    { padding: '72px 24px 80px', maxWidth: 860, margin: '0 auto', fontFamily: S },
   h1:      { fontFamily: S, fontSize: 24, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 4px' },
-  sub:     { fontFamily: M, fontSize: 11, color: 'var(--text-3)', margin: '0 0 32px' },
-  grid:    { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 32 },
-  card:    { background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px' },
-  label:   { fontFamily: M, fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 6 },
-  big:     { fontFamily: S, fontSize: 32, fontWeight: 700, color: 'var(--text-1)' },
+  sub:     { fontFamily: M, fontSize: 11, color: 'var(--text-3)', margin: '0 0 24px' },
+  grid3:   { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 28 },
+  grid4:   { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 },
+  card:    { background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px' },
+  label:   { fontFamily: M, fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 5 },
+  big:     { fontFamily: S, fontSize: 28, fontWeight: 700, color: 'var(--text-1)' },
+  bigGreen:{ fontFamily: S, fontSize: 28, fontWeight: 700, color: 'var(--success-color)' },
   section: { marginBottom: 28 },
   sh:      { fontFamily: S, fontSize: 15, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 10px', paddingBottom: 8, borderBottom: '1px solid var(--border)' },
   table:   { width: '100%', borderCollapse: 'collapse', fontFamily: M, fontSize: 12 },
   th:      { textAlign: 'left', padding: '6px 10px', color: 'var(--text-3)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', borderBottom: '1px solid var(--border)' },
-  td:      { padding: '7px 10px', color: 'var(--text-2)', borderBottom: '1px solid var(--border)' },
+  td:      { padding: '7px 10px', color: 'var(--text-2)', borderBottom: '1px solid var(--border)', verticalAlign: 'middle' },
   bar:     { height: 8, background: 'var(--border)', borderRadius: 999, overflow: 'hidden', marginTop: 4 },
   fill:    { height: '100%', background: 'var(--accent)', borderRadius: 999 },
   back:    { display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: M, fontSize: 11, color: 'var(--text-3)', textDecoration: 'none', marginBottom: 20 },
+  tabs:    { display: 'flex', gap: 2, marginBottom: 28, borderBottom: '1px solid var(--border)' },
+  tab:     { fontFamily: M, fontSize: 12, padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', borderBottom: '2px solid transparent', marginBottom: -1 },
+  tabAct:  { fontFamily: M, fontSize: 12, padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', borderBottom: '2px solid var(--accent)', marginBottom: -1 },
+  btn:     { fontFamily: M, fontSize: 11, padding: '3px 10px', borderRadius: 5, border: '1px solid var(--border)', background: 'none', cursor: 'pointer', color: 'var(--text-2)' },
+  btnGreen:{ fontFamily: M, fontSize: 11, padding: '3px 10px', borderRadius: 5, border: '1px solid var(--accent-border)', background: 'var(--accent-dim)', cursor: 'pointer', color: 'var(--accent)' },
+  btnRed:  { fontFamily: M, fontSize: 11, padding: '3px 10px', borderRadius: 5, border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.08)', cursor: 'pointer', color: 'var(--error-color)' },
 };
 
-function StatCard({ label, value }) {
+function StatCard({ label, value, valueStyle }) {
   return (
     <div style={s.card}>
       <div style={s.label}>{label}</div>
-      <div style={s.big}>{value}</div>
+      <div style={valueStyle || s.big}>{value}</div>
     </div>
   );
 }
@@ -35,148 +43,252 @@ function formatDate(ts) {
   return new Date(ts * 1000).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
 }
 
-export default function KamaleshAdmin() {
-  const navigate  = useNavigate();
+// ── Views tab ─────────────────────────────────────────────────────
+function ViewsTab({ data, onRefresh }) {
+  const maxDay  = Math.max(...(data.byDay.map(r => r.count)), 1);
+  const maxCtry = Math.max(...(data.byCountry.map(r => r.count)), 1);
+  const todayStr   = new Date().toISOString().slice(0, 10);
+  const todayViews = data.byDay.find(r => r.date === todayStr)?.count ?? 0;
+  const last7      = data.byDay.slice(-7).reduce((a, r) => a + r.count, 0);
+
+  return (
+    <>
+      <div style={s.grid3}>
+        <StatCard label="Total views"  value={data.total.toLocaleString()} />
+        <StatCard label="Today"        value={todayViews} />
+        <StatCard label="Last 7 days"  value={last7} />
+      </div>
+
+      <div style={s.section}>
+        <div style={s.sh}>Views per day — last 30 days</div>
+        {data.byDay.length === 0
+          ? <p style={{ fontFamily: M, fontSize: 12, color: 'var(--text-3)' }}>No data yet.</p>
+          : (
+            <table style={s.table}>
+              <thead><tr>
+                <th style={s.th}>Date</th>
+                <th style={s.th}>Views</th>
+                <th style={{ ...s.th, width: '40%' }}>Bar</th>
+              </tr></thead>
+              <tbody>
+                {[...data.byDay].reverse().map(row => (
+                  <tr key={row.date}>
+                    <td style={s.td}>{row.date}</td>
+                    <td style={{ ...s.td, fontWeight: 600, color: 'var(--text-1)' }}>{row.count}</td>
+                    <td style={s.td}><div style={s.bar}><div style={{ ...s.fill, width: `${(row.count / maxDay) * 100}%` }} /></div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+      </div>
+
+      <div style={s.section}>
+        <div style={s.sh}>Top countries</div>
+        {data.byCountry.length === 0
+          ? <p style={{ fontFamily: M, fontSize: 12, color: 'var(--text-3)' }}>No data yet.</p>
+          : (
+            <table style={s.table}>
+              <thead><tr>
+                <th style={s.th}>Country</th>
+                <th style={s.th}>Views</th>
+                <th style={{ ...s.th, width: '40%' }}>Share</th>
+              </tr></thead>
+              <tbody>
+                {data.byCountry.map(row => (
+                  <tr key={row.country}>
+                    <td style={s.td}>{row.country}</td>
+                    <td style={{ ...s.td, fontWeight: 600, color: 'var(--text-1)' }}>{row.count}</td>
+                    <td style={s.td}><div style={s.bar}><div style={{ ...s.fill, width: `${(row.count / maxCtry) * 100}%` }} /></div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+      </div>
+
+      <div style={s.section}>
+        <div style={{ ...s.sh, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>Recent visits (last 50)</span>
+          <button onClick={onRefresh} style={{ ...s.btn, borderColor: 'transparent' }}>refresh</button>
+        </div>
+        {data.last50.length === 0
+          ? <p style={{ fontFamily: M, fontSize: 12, color: 'var(--text-3)' }}>No visits yet.</p>
+          : (
+            <table style={s.table}>
+              <thead><tr>
+                <th style={s.th}>Time</th>
+                <th style={s.th}>Country</th>
+                <th style={s.th}>Referrer</th>
+              </tr></thead>
+              <tbody>
+                {data.last50.map((row, i) => (
+                  <tr key={i}>
+                    <td style={s.td}>{formatDate(row.ts)}</td>
+                    <td style={s.td}>{row.country || '—'}</td>
+                    <td style={{ ...s.td, color: 'var(--text-3)' }}>{row.referrer || 'direct'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+      </div>
+    </>
+  );
+}
+
+// ── Pledges tab ───────────────────────────────────────────────────
+function PledgesTab() {
   const [data,    setData]    = useState(null);
+  const [filter,  setFilter]  = useState('all');
+  const [busy,    setBusy]    = useState({});
   const [error,   setError]   = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/page-views?page=kamalesh', { credentials: 'include' });
-      if (res.status === 403) { navigate('/'); return; }
-      if (!res.ok) throw new Error('Failed to load');
+      const res = await fetch(`/api/admin/kamalesh/pledges?filter=${filter}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to load pledges');
       setData(await res.json());
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [navigate]);
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  }, [filter]);
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <div style={{ ...s.page, color: 'var(--text-3)' }}>Loading…</div>;
-  if (error)   return <div style={{ ...s.page, color: 'var(--error-color)' }}>Error: {error}</div>;
+  async function verify(id, val) {
+    setBusy(b => ({ ...b, [id]: true }));
+    await fetch(`/api/admin/kamalesh/pledges/${id}`, {
+      method: 'PATCH', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ verified: val }),
+    });
+    setBusy(b => ({ ...b, [id]: false }));
+    load();
+  }
 
-  const maxDay  = Math.max(...(data.byDay.map(r => r.count)), 1);
-  const maxCtry = Math.max(...(data.byCountry.map(r => r.count)), 1);
+  async function remove(id) {
+    if (!window.confirm('Delete this pledge?')) return;
+    setBusy(b => ({ ...b, [id]: true }));
+    await fetch(`/api/admin/kamalesh/pledges/${id}`, { method: 'DELETE', credentials: 'include' });
+    load();
+  }
 
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const todayViews = data.byDay.find(r => r.date === todayStr)?.count ?? 0;
-  const last7 = data.byDay.slice(-7).reduce((a, r) => a + r.count, 0);
+  if (loading) return <p style={{ fontFamily: M, fontSize: 12, color: 'var(--text-3)' }}>Loading…</p>;
+  if (error)   return <p style={{ fontFamily: M, fontSize: 12, color: 'var(--error-color)' }}>{error}</p>;
+
+  const t = data.totals;
+
+  return (
+    <>
+      {/* Summary */}
+      <div style={s.grid4}>
+        <StatCard label="Verified USD"  value={`$${(t?.verified_usd ?? 0).toFixed(2)}`}  valueStyle={s.bigGreen} />
+        <StatCard label="Verified CAD"  value={`C$${(t?.verified_cad ?? 0).toFixed(2)}`} valueStyle={s.bigGreen} />
+        <StatCard label="Pending USD"   value={`$${(t?.pending_usd ?? 0).toFixed(2)}`} />
+        <StatCard label="Pending CAD"   value={`C$${(t?.pending_cad ?? 0).toFixed(2)}`} />
+      </div>
+      <p style={{ fontFamily: M, fontSize: 11, color: 'var(--text-3)', marginBottom: 20, marginTop: -20 }}>
+        {t?.verified_count ?? 0} verified · {(t?.total_count ?? 0) - (t?.verified_count ?? 0)} pending · {t?.total_count ?? 0} total
+      </p>
+
+      {/* Filter */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+        {['all', 'pending', 'verified'].map(f => (
+          <button key={f} onClick={() => setFilter(f)} style={filter === f ? s.tabAct : s.tab}>
+            {f}
+          </button>
+        ))}
+        <button onClick={load} style={{ ...s.btn, marginLeft: 'auto' }}>refresh</button>
+      </div>
+
+      {data.pledges.length === 0
+        ? <p style={{ fontFamily: M, fontSize: 12, color: 'var(--text-3)' }}>No pledges yet.</p>
+        : (
+          <table style={s.table}>
+            <thead><tr>
+              <th style={s.th}>Time</th>
+              <th style={s.th}>Name</th>
+              <th style={s.th}>Amount</th>
+              <th style={s.th}>Sent?</th>
+              <th style={s.th}>Country</th>
+              <th style={s.th}>Note</th>
+              <th style={s.th}>Actions</th>
+            </tr></thead>
+            <tbody>
+              {data.pledges.map(row => (
+                <tr key={row.id} style={row.verified ? { background: 'rgba(52,211,153,0.04)' } : {}}>
+                  <td style={s.td}>{formatDate(row.ts)}</td>
+                  <td style={{ ...s.td, color: 'var(--text-1)', fontWeight: 500 }}>{row.name}</td>
+                  <td style={{ ...s.td, color: row.verified ? 'var(--success-color)' : 'var(--text-1)', fontWeight: 600 }}>
+                    {row.currency === 'USD' ? '$' : 'C$'}{row.amount.toFixed(2)}
+                  </td>
+                  <td style={s.td}>{row.sent ? '✓ yes' : 'no'}</td>
+                  <td style={s.td}>{row.country || '—'}</td>
+                  <td style={{ ...s.td, color: 'var(--text-3)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {row.note || '—'}
+                  </td>
+                  <td style={{ ...s.td, whiteSpace: 'nowrap' }}>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {row.verified
+                        ? <button disabled={busy[row.id]} style={s.btn} onClick={() => verify(row.id, false)}>Unverify</button>
+                        : <button disabled={busy[row.id]} style={s.btnGreen} onClick={() => verify(row.id, true)}>Verify ✓</button>
+                      }
+                      <button disabled={busy[row.id]} style={s.btnRed} onClick={() => remove(row.id)}>✕</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+    </>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────
+export default function KamaleshAdmin() {
+  const navigate  = useNavigate();
+  const [tab,     setTab]     = useState('pledges');
+  const [views,   setViews]   = useState(null);
+  const [vError,  setVError]  = useState(null);
+  const [vLoad,   setVLoad]   = useState(false);
+
+  const loadViews = useCallback(async () => {
+    setVLoad(true);
+    try {
+      const res = await fetch('/api/admin/page-views?page=kamalesh', { credentials: 'include' });
+      if (res.status === 403) { navigate('/'); return; }
+      if (!res.ok) throw new Error('Failed to load');
+      setViews(await res.json());
+    } catch (e) { setVError(e.message); }
+    finally { setVLoad(false); }
+  }, [navigate]);
+
+  useEffect(() => {
+    if (tab === 'views' && !views) loadViews();
+  }, [tab, views, loadViews]);
 
   return (
     <div style={s.page}>
       <Link to="/admin" style={s.back}>← admin</Link>
+      <h1 style={s.h1}>Kamalesh Fundraiser</h1>
+      <p style={s.sub}>varunr.dev/kamalesh · donations &amp; analytics</p>
 
-      <h1 style={s.h1}>Kamalesh Fundraiser — Views</h1>
-      <p style={s.sub}>varunr.dev/kamalesh · page view analytics</p>
-
-      {/* Summary cards */}
-      <div style={s.grid}>
-        <StatCard label="Total views"   value={data.total.toLocaleString()} />
-        <StatCard label="Today"         value={todayViews} />
-        <StatCard label="Last 7 days"   value={last7} />
+      <div style={s.tabs}>
+        <button style={tab === 'pledges' ? s.tabAct : s.tab} onClick={() => setTab('pledges')}>Pledges</button>
+        <button style={tab === 'views'   ? s.tabAct : s.tab} onClick={() => setTab('views')}>Page Views</button>
       </div>
 
-      {/* Views by day */}
-      <div style={s.section}>
-        <div style={s.sh}>Views per day — last 30 days</div>
-        {data.byDay.length === 0 ? (
-          <p style={{ fontFamily: M, fontSize: 12, color: 'var(--text-3)' }}>No data yet.</p>
-        ) : (
-          <table style={s.table}>
-            <thead>
-              <tr>
-                <th style={s.th}>Date</th>
-                <th style={s.th}>Views</th>
-                <th style={{ ...s.th, width: '40%' }}>Bar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...data.byDay].reverse().map(row => (
-                <tr key={row.date}>
-                  <td style={s.td}>{row.date}</td>
-                  <td style={{ ...s.td, fontWeight: 600, color: 'var(--text-1)' }}>{row.count}</td>
-                  <td style={s.td}>
-                    <div style={s.bar}>
-                      <div style={{ ...s.fill, width: `${(row.count / maxDay) * 100}%` }} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {tab === 'pledges' && <PledgesTab />}
 
-      {/* By country */}
-      <div style={s.section}>
-        <div style={s.sh}>Top countries</div>
-        {data.byCountry.length === 0 ? (
-          <p style={{ fontFamily: M, fontSize: 12, color: 'var(--text-3)' }}>No data yet.</p>
-        ) : (
-          <table style={s.table}>
-            <thead>
-              <tr>
-                <th style={s.th}>Country</th>
-                <th style={s.th}>Views</th>
-                <th style={{ ...s.th, width: '40%' }}>Share</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.byCountry.map(row => (
-                <tr key={row.country}>
-                  <td style={s.td}>{row.country}</td>
-                  <td style={{ ...s.td, fontWeight: 600, color: 'var(--text-1)' }}>{row.count}</td>
-                  <td style={s.td}>
-                    <div style={s.bar}>
-                      <div style={{ ...s.fill, width: `${(row.count / maxCtry) * 100}%` }} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* Recent visits */}
-      <div style={s.section}>
-        <div style={{ ...s.sh, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Recent visits (last 50)</span>
-          <button
-            onClick={load}
-            style={{ fontFamily: M, fontSize: 11, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-          >
-            refresh
-          </button>
-        </div>
-        {data.last50.length === 0 ? (
-          <p style={{ fontFamily: M, fontSize: 12, color: 'var(--text-3)' }}>No visits yet.</p>
-        ) : (
-          <table style={s.table}>
-            <thead>
-              <tr>
-                <th style={s.th}>Time</th>
-                <th style={s.th}>Country</th>
-                <th style={s.th}>Referrer</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.last50.map((row, i) => (
-                <tr key={i}>
-                  <td style={s.td}>{formatDate(row.ts)}</td>
-                  <td style={s.td}>{row.country || '—'}</td>
-                  <td style={{ ...s.td, color: 'var(--text-3)' }}>{row.referrer || 'direct'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {tab === 'views' && (
+        vLoad  ? <p style={{ fontFamily: M, fontSize: 12, color: 'var(--text-3)' }}>Loading…</p> :
+        vError ? <p style={{ fontFamily: M, fontSize: 12, color: 'var(--error-color)' }}>{vError}</p> :
+        views  ? <ViewsTab data={views} onRefresh={loadViews} /> :
+        null
+      )}
     </div>
   );
 }
