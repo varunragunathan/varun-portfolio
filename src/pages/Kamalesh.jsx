@@ -96,7 +96,7 @@ function Countdown({ goalReached }) {
 // INR constants — rates updated June 24 2026; inrEq comes from server
 const MILAAP_INR  = 809211;
 const GOAL_INR    = 1225000;
-const USD_TO_INR  = 84.7;
+const USD_TO_INR  = 94.7;
 const CAD_TO_INR  = 68.1;
 
 function fmt(n) {

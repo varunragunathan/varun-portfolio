@@ -137,7 +137,7 @@ function ViewsTab({ data, onRefresh }) {
   );
 }
 
-const DEFAULT_RATES = { usd: 84.7, cad: 68.1, sgd: 73.1, aed: 25.7 };
+const DEFAULT_RATES = { usd: 94.7, cad: 68.1, sgd: 73.1, aed: 25.7 };
 
 // ── Rates editor ──────────────────────────────────────────────────
 function RatesEditor({ onRatesChange }) {

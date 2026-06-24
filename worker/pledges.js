@@ -11,7 +11,7 @@ import { checkIpRateLimit } from './rateLimit.js';
 
 // Default INR conversion rates — updated June 24 2026
 // Can be overridden per-deploy via KV key 'kf:rates'
-const DEFAULT_RATES = { usd: 84.7, cad: 68.1, sgd: 73.1, aed: 25.7 };
+const DEFAULT_RATES = { usd: 94.7, cad: 68.1, sgd: 73.1, aed: 25.7 };
 const RATES_KV_KEY  = 'kf:rates';
 
 async function getRates(kv) {
