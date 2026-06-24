@@ -458,6 +458,17 @@
 
 .kf__org-phone:hover { text-decoration: underline; }
 
+.kf__org-li {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-3);
+  margin-left: 6px;
+  vertical-align: middle;
+  transition: color 0.15s;
+}
+
+.kf__org-li:hover { color: #0a66c2; }
+
 /* ── Footer note ──────────────────────────────────────────────────── */
 .kf__footer-note {
   text-align: center;
