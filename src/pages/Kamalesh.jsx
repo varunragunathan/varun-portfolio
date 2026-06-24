@@ -263,6 +263,7 @@ export default function KamaleshPage() {
             src="/kamalesh-appeal.jpg"
             alt="Kamalesh P — kidney transplant patient from CEG Anna University seeking help"
             className="kf__hero-img"
+            onError={e => { e.currentTarget.style.display = 'none'; }}
           />
         </div>
 
