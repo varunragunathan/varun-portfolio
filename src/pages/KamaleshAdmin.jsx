@@ -137,6 +137,94 @@ function ViewsTab({ data, onRefresh }) {
   );
 }
 
+const DEFAULT_RATES = { usd: 84.7, cad: 68.1, sgd: 73.1, aed: 25.7 };
+
+// ── Rates editor ──────────────────────────────────────────────────
+function RatesEditor({ onRatesChange }) {
+  const [rates,   setRates]   = useState(null);
+  const [draft,   setDraft]   = useState(null);
+  const [saving,  setSaving]  = useState(false);
+  const [msg,     setMsg]     = useState('');
+
+  useEffect(() => {
+    fetch('/api/admin/kamalesh/rates', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d) { setRates(d.rates); setDraft(d.rates); }
+      })
+      .catch(() => {});
+  }, []);
+
+  async function save() {
+    setSaving(true); setMsg('');
+    try {
+      const res = await fetch('/api/admin/kamalesh/rates', {
+        method: 'PUT', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(draft),
+      });
+      const d = await res.json();
+      if (!res.ok) { setMsg(d.error || 'Failed to save'); return; }
+      setRates(d.rates); setDraft(d.rates);
+      setMsg('Saved ✓');
+      onRatesChange(d.rates);
+    } catch { setMsg('Network error'); }
+    finally { setSaving(false); }
+  }
+
+  function reset() {
+    setDraft({ ...DEFAULT_RATES });
+    setMsg('');
+  }
+
+  if (!draft) return null;
+
+  const fields = [
+    { key: 'usd', label: 'USD → INR', prefix: '$' },
+    { key: 'cad', label: 'CAD → INR', prefix: 'C$' },
+    { key: 'sgd', label: 'SGD → INR', prefix: 'S$' },
+    { key: 'aed', label: 'AED → INR', prefix: 'د.إ' },
+  ];
+
+  const changed = JSON.stringify(draft) !== JSON.stringify(rates);
+
+  return (
+    <div style={{ ...s.card, marginTop: 28 }}>
+      <div style={{ ...s.sh, marginBottom: 14 }}>Exchange Rates (1 unit → INR)</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+        {fields.map(({ key, label, prefix }) => (
+          <div key={key}>
+            <div style={{ ...s.label, marginBottom: 4 }}>{label}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontFamily: M, fontSize: 12, color: 'var(--text-3)' }}>{prefix}1 =</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={draft[key]}
+                onChange={e => setDraft(d => ({ ...d, [key]: e.target.value }))}
+                style={{
+                  fontFamily: M, fontSize: 13, width: 80,
+                  background: 'var(--surface-alt)', border: '1px solid var(--border)',
+                  borderRadius: 6, padding: '4px 8px', color: 'var(--text-1)',
+                }}
+              />
+              <span style={{ fontFamily: M, fontSize: 12, color: 'var(--text-3)' }}>₹</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14 }}>
+        <button onClick={save} disabled={saving || !changed} style={s.btnGreen}>
+          {saving ? 'Saving…' : 'Save rates'}
+        </button>
+        <button onClick={reset} style={s.btn}>Reset to defaults</button>
+        {msg && <span style={{ fontFamily: M, fontSize: 11, color: msg.includes('✓') ? 'var(--success-color)' : 'var(--error-color)' }}>{msg}</span>}
+      </div>
+    </div>
+  );
+}
+
 // ── Pledges tab ───────────────────────────────────────────────────
 function PledgesTab() {
   const [data,    setData]    = useState(null);
@@ -144,6 +232,7 @@ function PledgesTab() {
   const [busy,    setBusy]    = useState({});
   const [error,   setError]   = useState(null);
   const [loading, setLoading] = useState(true);
+  const [liveRates, setLiveRates] = useState(DEFAULT_RATES);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -179,30 +268,29 @@ function PledgesTab() {
   if (error)   return <p style={{ fontFamily: M, fontSize: 12, color: 'var(--error-color)' }}>{error}</p>;
 
   const t = data.totals;
-
-  const USD_TO_INR = 83.5, CAD_TO_INR = 61.0, SGD_TO_INR = 63.0, AED_TO_INR = 22.8;
+  const r = liveRates;
 
   const verifiedInrEq = Math.round(
-    (t?.verified_usd ?? 0) * USD_TO_INR +
-    (t?.verified_cad ?? 0) * CAD_TO_INR +
+    (t?.verified_usd ?? 0) * r.usd +
+    (t?.verified_cad ?? 0) * r.cad +
     (t?.verified_inr ?? 0) +
-    (t?.verified_sgd ?? 0) * SGD_TO_INR +
-    (t?.verified_aed ?? 0) * AED_TO_INR
+    (t?.verified_sgd ?? 0) * r.sgd +
+    (t?.verified_aed ?? 0) * r.aed
   );
   const pendingInrEq = Math.round(
-    (t?.pending_usd ?? 0) * USD_TO_INR +
-    (t?.pending_cad ?? 0) * CAD_TO_INR +
+    (t?.pending_usd ?? 0) * r.usd +
+    (t?.pending_cad ?? 0) * r.cad +
     (t?.pending_inr ?? 0) +
-    (t?.pending_sgd ?? 0) * SGD_TO_INR +
-    (t?.pending_aed ?? 0) * AED_TO_INR
+    (t?.pending_sgd ?? 0) * r.sgd +
+    (t?.pending_aed ?? 0) * r.aed
   );
 
   const breakdownParts = [
-    t?.verified_usd  > 0 && `$${(t.verified_usd).toFixed(2)} × 83.5`,
-    t?.verified_cad  > 0 && `C$${(t.verified_cad).toFixed(2)} × 61`,
-    t?.verified_sgd  > 0 && `S$${(t.verified_sgd).toFixed(2)} × 63`,
-    t?.verified_aed  > 0 && `د.إ${(t.verified_aed).toFixed(2)} × 22.8`,
-    t?.verified_inr  > 0 && `₹${Math.round(t.verified_inr).toLocaleString()} direct`,
+    t?.verified_usd > 0 && `$${(t.verified_usd).toFixed(2)} × ${r.usd}`,
+    t?.verified_cad > 0 && `C$${(t.verified_cad).toFixed(2)} × ${r.cad}`,
+    t?.verified_sgd > 0 && `S$${(t.verified_sgd).toFixed(2)} × ${r.sgd}`,
+    t?.verified_aed > 0 && `د.إ${(t.verified_aed).toFixed(2)} × ${r.aed}`,
+    t?.verified_inr > 0 && `₹${Math.round(t.verified_inr).toLocaleString()} direct`,
   ].filter(Boolean);
 
   return (
@@ -297,6 +385,8 @@ function PledgesTab() {
             </tbody>
           </table>
         )}
+
+      <RatesEditor onRatesChange={setLiveRates} />
     </>
   );
 }

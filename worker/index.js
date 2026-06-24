@@ -57,6 +57,7 @@ import { trackPageView, getPageViewStats } from './pageViews.js';
 import {
   submitPledge, getPledgeStats,
   adminListPledges, adminUpdatePledge, adminDeletePledge,
+  adminGetRates, adminSetRates,
 } from './pledges.js';
 export { NumMatchDO } from './numMatchDO.js';
 
@@ -194,6 +195,10 @@ async function handleRequest(request, env) {
         response = await getPageViewStats(request, env);
       } else if (path === '/api/admin/kamalesh/pledges' && method === 'GET') {
         response = await adminListPledges(request, env);
+      } else if (path === '/api/admin/kamalesh/rates' && method === 'GET') {
+        response = await adminGetRates(request, env);
+      } else if (path === '/api/admin/kamalesh/rates' && method === 'PUT') {
+        response = await adminSetRates(request, env);
       } else if (path === '/api/admin/pages' && method === 'GET') {
         response = await adminListPages(request, env);
       } else if (path === '/api/admin/pages' && method === 'POST') {

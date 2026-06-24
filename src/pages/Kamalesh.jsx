@@ -93,11 +93,11 @@ function Countdown({ goalReached }) {
   );
 }
 
-// INR constants (matches worker/pledges.js)
+// INR constants — rates updated June 24 2026; inrEq comes from server
 const MILAAP_INR  = 809211;
 const GOAL_INR    = 1225000;
-const USD_TO_INR  = 83.5;
-const CAD_TO_INR  = 61.0;
+const USD_TO_INR  = 84.7;
+const CAD_TO_INR  = 68.1;
 
 function fmt(n) {
   return 'Rs. ' + Math.round(n).toLocaleString('en-IN');

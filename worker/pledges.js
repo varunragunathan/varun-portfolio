@@ -9,11 +9,18 @@ import { getSession } from './auth/session.js';
 import { requireAdmin } from './admin.js';
 import { checkIpRateLimit } from './rateLimit.js';
 
-// Approximate INR conversion rates (mid-2026)
-const USD_TO_INR = 83.5;
-const CAD_TO_INR = 61.0;
-const SGD_TO_INR = 63.0;
-const AED_TO_INR = 22.8;
+// Default INR conversion rates — updated June 24 2026
+// Can be overridden per-deploy via KV key 'kf:rates'
+const DEFAULT_RATES = { usd: 84.7, cad: 68.1, sgd: 73.1, aed: 25.7 };
+const RATES_KV_KEY  = 'kf:rates';
+
+async function getRates(kv) {
+  try {
+    const stored = await kv.get(RATES_KV_KEY, 'json');
+    if (stored) return { ...DEFAULT_RATES, ...stored };
+  } catch { /* fall through to defaults */ }
+  return DEFAULT_RATES;
+}
 
 const DB = env => env.varun_portfolio_auth;
 
@@ -82,11 +89,12 @@ export async function getPledgeStats(request, env) {
   const inr    = byC['INR'] ?? 0;
   const sgd    = byC['SGD'] ?? 0;
   const aed    = byC['AED'] ?? 0;
+  const rates  = await getRates(env.KV);
   const inrEq  = Math.round(
-    usd * USD_TO_INR + cad * CAD_TO_INR + sgd * SGD_TO_INR + aed * AED_TO_INR
+    usd * rates.usd + cad * rates.cad + sgd * rates.sgd + aed * rates.aed
   ) + inr;
 
-  return json({ usd, cad, inr, sgd, aed, inrEq, count: count?.n ?? 0 });
+  return json({ usd, cad, inr, sgd, aed, inrEq, rates, count: count?.n ?? 0 });
 }
 
 // GET /api/admin/kamalesh/pledges
@@ -152,4 +160,34 @@ export async function adminDeletePledge(request, env, id) {
 
   await DB(env).prepare('DELETE FROM pledges WHERE id = ?').bind(id).run();
   return json({ ok: true });
+}
+
+// GET /api/admin/kamalesh/rates
+export async function adminGetRates(request, env) {
+  const session = await getSession(env.KV, request);
+  const denied  = await requireAdmin(session, env);
+  if (denied) return denied;
+
+  const rates = await getRates(env.KV);
+  return json({ rates, defaults: DEFAULT_RATES });
+}
+
+// PUT /api/admin/kamalesh/rates
+export async function adminSetRates(request, env) {
+  const session = await getSession(env.KV, request);
+  const denied  = await requireAdmin(session, env);
+  if (denied) return denied;
+
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'Bad request' }, 400); }
+
+  const rates = {};
+  for (const key of ['usd', 'cad', 'sgd', 'aed']) {
+    const v = parseFloat(body[key]);
+    if (!v || v <= 0 || v > 1000) return json({ error: `Invalid rate for ${key.toUpperCase()}` }, 400);
+    rates[key] = Math.round(v * 100) / 100;
+  }
+
+  await env.KV.put(RATES_KV_KEY, JSON.stringify(rates));
+  return json({ ok: true, rates });
 }
