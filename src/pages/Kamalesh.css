@@ -890,3 +890,55 @@
   border-top: 1px solid var(--border);
   line-height: 1.6;
 }
+
+/* ── Thank you banner (fundraiser closed) ─────────────────────────── */
+.kf__thankyou {
+  background: var(--card-bg);
+  border: 1px solid var(--accent-dim);
+  border-radius: 16px;
+  padding: 36px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.kf__thankyou-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--success-color);
+  background: rgba(52,211,153,0.1);
+  border: 1px solid rgba(52,211,153,0.2);
+  border-radius: 4px;
+  padding: 4px 12px;
+}
+
+.kf__thankyou-heading {
+  font-family: var(--font-sans);
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--text-1);
+  margin: 0;
+}
+
+.kf__thankyou-body {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--text-2);
+  line-height: 1.8;
+  max-width: 560px;
+  margin: 0;
+}
+
+.kf__thankyou-body strong { color: var(--text-1); }
+
+.kf__thankyou-sig {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 8px;
+  line-height: 1.8;
+}

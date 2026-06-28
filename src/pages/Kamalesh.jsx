@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './Kamalesh.css';
 
+const FUNDRAISER_CLOSED = true;
+
 const COSTS = [
   { label: 'Initial patient evaluation',              amount: 'Rs. 75,000' },
   { label: 'Donor check-up',                          amount: 'Rs. 75,000' },
@@ -215,6 +217,32 @@ function PledgeForm({ onSuccess, currency, onCurrencyChange }) {
   );
 }
 
+function ThankYouSection() {
+  return (
+    <div className="kf__thankyou">
+      <div className="kf__thankyou-badge">Fundraiser Closed</div>
+      <h2 className="kf__thankyou-heading">Thank You</h2>
+      <p className="kf__thankyou-body">
+        To every person who donated, shared this page, or simply sent a prayer — you made this possible.
+        When we put out this call, we weren't sure how the world would respond. What happened moved us deeply.
+        Hundreds of people — many who had never met Kamalesh — showed up with extraordinary generosity.
+      </p>
+      <p className="kf__thankyou-body">
+        Kamalesh's surgery is scheduled for <strong>June 30, 2026 at KMCH Coimbatore</strong>.
+        He will walk into that hospital knowing that people cared enough to stand behind him.
+        That means more than we can put into words.
+      </p>
+      <p className="kf__thankyou-body">
+        We will share updates on his recovery here. Please keep him in your prayers.
+      </p>
+      <div className="kf__thankyou-sig">
+        With gratitude,<br />
+        Varun, Karthika, Srinath, Bala &amp; the entire CEG family
+      </div>
+    </div>
+  );
+}
+
 export default function KamaleshPage() {
   const [stats,    setStats]    = useState(null);
   const [pledged,  setPledged]  = useState(false);
@@ -253,11 +281,14 @@ export default function KamaleshPage() {
 
         {/* Hero */}
         <div className="kf__hero">
-          <div className="kf__urgency-badge">Urgent Medical Appeal</div>
+          <div className="kf__urgency-badge" style={FUNDRAISER_CLOSED ? { background: 'var(--success-color)' } : {}}>
+            {FUNDRAISER_CLOSED ? 'Surgery: June 30, 2026' : 'Urgent Medical Appeal'}
+          </div>
           <h1 className="kf__title">Help Save <span className="kf__name">Kamalesh P</span></h1>
           <p className="kf__subtitle">
-            A 25-year-old engineer battling kidney failure. His father is ready to donate.
-            The surgery is booked. We are only waiting on funds.
+            {FUNDRAISER_CLOSED
+              ? 'The fundraiser has closed. Surgery is on June 30 at KMCH Coimbatore. Thank you to everyone who showed up for Kamalesh.'
+              : 'A 25-year-old engineer battling kidney failure. His father is ready to donate. The surgery is booked. We are only waiting on funds.'}
           </p>
           <img
             src="/kamalesh-appeal.jpg"
@@ -280,12 +311,14 @@ export default function KamaleshPage() {
                 {stats?.count > 0 && ` · ${stats.count} via this page`}
               </div>
             </div>
-            <div className="kf__needed-box">
-              <div className="kf__needed-amount">{fmt(stillNeeded)}</div>
-              <div className="kf__needed-label">
-                still needed · ≈ ${Math.round(stillNeeded / USD_TO_INR).toLocaleString()} USD
+            {!FUNDRAISER_CLOSED && (
+              <div className="kf__needed-box">
+                <div className="kf__needed-amount">{fmt(stillNeeded)}</div>
+                <div className="kf__needed-label">
+                  still needed · ≈ ${Math.round(stillNeeded / USD_TO_INR).toLocaleString()} USD
+                </div>
               </div>
-            </div>
+            )}
           </div>
           <div className="kf__bar">
             <div className="kf__bar-fill" style={{ width: `${pct}%` }} />
@@ -301,9 +334,14 @@ export default function KamaleshPage() {
             </div>
           )}
           <p className="kf__bar-note">
-            Milaap campaign raised 66% then closed. Zelle &amp; Interac are the only active channels.
+            {FUNDRAISER_CLOSED
+              ? 'Fundraiser closed. Thank you to all 385+ supporters across Milaap and this page.'
+              : 'Milaap campaign raised 66% then closed. Zelle & Interac are the only active channels.'}
           </p>
         </div>
+
+        {/* Thank you (closed state) */}
+        {FUNDRAISER_CLOSED && <ThankYouSection />}
 
         {/* Story */}
         <section className="kf__section">
@@ -346,10 +384,18 @@ export default function KamaleshPage() {
               <span>Already raised (385 supporters)</span>
               <span>– Rs. 8,09,211</span>
             </div>
-            <div className="kf__cost-row kf__cost-needed-row">
-              <span>Still needed — urgently</span>
-              <span>Rs. 4,15,789</span>
-            </div>
+            {FUNDRAISER_CLOSED
+              ? (
+                <div className="kf__cost-row kf__cost-raised-row">
+                  <span>Fundraiser closed — goal funded</span>
+                  <span>✓</span>
+                </div>
+              ) : (
+                <div className="kf__cost-row kf__cost-needed-row">
+                  <span>Still needed — urgently</span>
+                  <span>Rs. 4,15,789</span>
+                </div>
+              )}
           </div>
           <p className="kf__cost-note">
             Post-transplant medication continues long-term at approx. Rs. 800–1,000/month if well matched.
@@ -357,7 +403,7 @@ export default function KamaleshPage() {
         </section>
 
         {/* Donation channels */}
-        <section className="kf__section">
+        {!FUNDRAISER_CLOSED && <section className="kf__section">
           <h2 className="kf__section-title">Donate Now</h2>
           <div className="kf__donate-grid">
 
@@ -432,10 +478,10 @@ export default function KamaleshPage() {
             </div>
 
           </div>
-        </section>
+        </section>}
 
         {/* Volunteer */}
-        <section className="kf__section kf__volunteer">
+        {!FUNDRAISER_CLOSED && <section className="kf__section kf__volunteer">
           <h2 className="kf__section-title">Help Us Reach Further</h2>
           <p className="kf__volunteer-lead">
             We are looking for volunteers to help spread the word and coordinate donations
@@ -462,7 +508,7 @@ export default function KamaleshPage() {
           <p className="kf__volunteer-cta">
             Reach out to any of the organizers below — we'd love your help.
           </p>
-        </section>
+        </section>}
 
         {/* Verification */}
         <section className="kf__section">
@@ -533,7 +579,7 @@ export default function KamaleshPage() {
         </section>
 
         {/* Pledge form */}
-        <section className="kf__section" ref={formRef}>
+        {!FUNDRAISER_CLOSED && <section className="kf__section" ref={formRef}>
           <h2 className="kf__section-title">Log Your Donation</h2>
           {pledged ? (
             <div className="kf__pledge-success">
@@ -565,10 +611,12 @@ export default function KamaleshPage() {
               }} />
             </>
           )}
-        </section>
+        </section>}
 
         <div className="kf__footer-note">
-          Every rupee and every dollar counts. Please share this page with your network.
+          {FUNDRAISER_CLOSED
+            ? 'Thank you for being part of Kamalesh\'s journey. Please keep him in your prayers.'
+            : 'Every rupee and every dollar counts. Please share this page with your network.'}
         </div>
 
       </div>
