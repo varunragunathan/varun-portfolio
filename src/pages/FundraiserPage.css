@@ -153,6 +153,33 @@
   border-bottom: 1px solid var(--border);
 }
 
+.fr__collapsible {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  margin-bottom: 0;
+  font-family: 'Outfit', sans-serif;
+}
+.fr__collapsible:hover { color: var(--accent); }
+
+.fr__chevron {
+  font-size: 18px;
+  color: var(--text-3);
+  transition: transform 0.2s;
+  display: inline-block;
+}
+.fr__chevron--open {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
+
 /* story */
 .fr__story {
   color: var(--text-2);

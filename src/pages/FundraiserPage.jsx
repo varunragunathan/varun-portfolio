@@ -54,6 +54,7 @@ function StoryParagraphs({ text }) {
 }
 
 function CostBreakdown({ json }) {
+  const [open, setOpen] = useState(false);
   let items;
   try { items = JSON.parse(json); } catch { return null; }
   if (!Array.isArray(items) || !items.length) return null;
@@ -61,28 +62,35 @@ function CostBreakdown({ json }) {
   const fmtInr = n => '₹' + Math.round(n).toLocaleString('en-IN');
   return (
     <div className="fr__section">
-      <h2 className="fr__section-title">Treatment Cost Breakdown</h2>
-      <p className="fr__cost-note">Estimated medicine expenses as certified by Dr. U. Saktheeshwaran, Neuro-Oncologist — Sri Meenakshi Healthcare, Trichy.</p>
-      <div className="fr__cost-table">
-        {items.map((it, i) => {
-          const pct = total > 0 ? (it.amount / total) * 100 : 0;
-          return (
-            <div key={i} className="fr__cost-row">
-              <div className="fr__cost-label">{it.label}</div>
-              <div className="fr__cost-right">
-                <div className="fr__cost-bar-wrap">
-                  <div className="fr__cost-bar-fill" style={{ width: `${pct}%` }} />
+      <button className="fr__section-title fr__collapsible" onClick={() => setOpen(o => !o)}>
+        Treatment Cost Breakdown
+        <span className={`fr__chevron${open ? ' fr__chevron--open' : ''}`}>▾</span>
+      </button>
+      {open && (
+        <>
+          <p className="fr__cost-note">Estimated medicine expenses as certified by Dr. U. Saktheeshwaran, Neuro-Oncologist — Sri Meenakshi Healthcare, Trichy.</p>
+          <div className="fr__cost-table">
+            {items.map((it, i) => {
+              const pct = total > 0 ? (it.amount / total) * 100 : 0;
+              return (
+                <div key={i} className="fr__cost-row">
+                  <div className="fr__cost-label">{it.label}</div>
+                  <div className="fr__cost-right">
+                    <div className="fr__cost-bar-wrap">
+                      <div className="fr__cost-bar-fill" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="fr__cost-amount">{fmtInr(it.amount)}</span>
+                  </div>
                 </div>
-                <span className="fr__cost-amount">{fmtInr(it.amount)}</span>
-              </div>
+              );
+            })}
+            <div className="fr__cost-total">
+              <span>Total Estimated Cost</span>
+              <span>{fmtInr(total)}</span>
             </div>
-          );
-        })}
-        <div className="fr__cost-total">
-          <span>Total Estimated Cost</span>
-          <span>{fmtInr(total)}</span>
-        </div>
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
