@@ -120,9 +120,7 @@ export default function FundraiserPage() {
       {(hasZelle || hasInterac || hasIndia) && (
         <div className="fr__section">
           <h2 className="fr__section-title">How to Donate</h2>
-          <p className="fr__donate-intro">
-            Every contribution helps. Please add the memo <strong>&ldquo;{data.memo || data.beneficiary}&rdquo;</strong> to your transfer so we can track it.
-          </p>
+          <p className="fr__donate-intro">Every contribution helps. Please add the memo when transferring so we can track it.</p>
           <div className="fr__cards">
             {hasZelle && (
               <div className="fr__card">
@@ -130,11 +128,7 @@ export default function FundraiserPage() {
                 {data.payment_zelle_email && <CopyField label="Email"  value={data.payment_zelle_email} />}
                 {data.payment_zelle_name  && <CopyField label="Name"   value={data.payment_zelle_name} />}
                 {data.payment_zelle_phone && <CopyField label="Phone"  value={data.payment_zelle_phone} />}
-                {data.memo && (
-                  <div className="fr__memo">
-                    Memo: <span className="fr__memo-val">{data.memo}</span>
-                  </div>
-                )}
+                {data.memo && <CopyField label="Memo" value={data.memo} />}
               </div>
             )}
 
@@ -143,11 +137,7 @@ export default function FundraiserPage() {
                 <div className="fr__card-label">Canada · Interac</div>
                 {data.payment_interac_email && <CopyField label="Email" value={data.payment_interac_email} />}
                 {data.payment_interac_name  && <CopyField label="Name"  value={data.payment_interac_name} />}
-                {data.memo && (
-                  <div className="fr__memo">
-                    Memo: <span className="fr__memo-val">{data.memo}</span>
-                  </div>
-                )}
+                {data.memo && <CopyField label="Memo" value={data.memo} />}
               </div>
             )}
 
@@ -158,11 +148,7 @@ export default function FundraiserPage() {
                 {data.payment_bank_ac   && <CopyField label="Account No."  value={data.payment_bank_ac} />}
                 {data.payment_bank_ifsc && <CopyField label="IFSC"         value={data.payment_bank_ifsc} />}
                 {data.payment_bank_name && <CopyField label="Account Name" value={data.payment_bank_name} />}
-                {data.memo && (
-                  <div className="fr__memo">
-                    Memo: <span className="fr__memo-val">{data.memo}</span>
-                  </div>
-                )}
+                {data.memo && <CopyField label="Memo" value={data.memo} />}
               </div>
             )}
           </div>
