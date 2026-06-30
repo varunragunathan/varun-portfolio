@@ -2,6 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import './FundraiserPage.css';
 
+function LinkedInIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+    </svg>
+  );
+}
+
 function CopyField({ label, value }) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
@@ -43,6 +51,69 @@ function StoryParagraphs({ text }) {
       ? <li key={i} className="fr__story-item">{line.slice(1).trim()}</li>
       : <p key={i} className="fr__story-p">{line}</p>
   ));
+}
+
+function CostBreakdown({ json }) {
+  let items;
+  try { items = JSON.parse(json); } catch { return null; }
+  if (!Array.isArray(items) || !items.length) return null;
+  const total = items.reduce((s, it) => s + (it.amount || 0), 0);
+  const fmtInr = n => '₹' + Math.round(n).toLocaleString('en-IN');
+  return (
+    <div className="fr__section">
+      <h2 className="fr__section-title">Treatment Cost Breakdown</h2>
+      <p className="fr__cost-note">Estimated medicine expenses as certified by Dr. U. Saktheeshwaran, Neuro-Oncologist — Sri Meenakshi Healthcare, Trichy.</p>
+      <div className="fr__cost-table">
+        {items.map((it, i) => {
+          const pct = total > 0 ? (it.amount / total) * 100 : 0;
+          return (
+            <div key={i} className="fr__cost-row">
+              <div className="fr__cost-label">{it.label}</div>
+              <div className="fr__cost-right">
+                <div className="fr__cost-bar-wrap">
+                  <div className="fr__cost-bar-fill" style={{ width: `${pct}%` }} />
+                </div>
+                <span className="fr__cost-amount">{fmtInr(it.amount)}</span>
+              </div>
+            </div>
+          );
+        })}
+        <div className="fr__cost-total">
+          <span>Total Estimated Cost</span>
+          <span>{fmtInr(total)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Organizers({ json }) {
+  let orgs;
+  try { orgs = JSON.parse(json); } catch { return null; }
+  if (!Array.isArray(orgs) || !orgs.length) return null;
+  return (
+    <div className="fr__section">
+      <h2 className="fr__section-title">Organized By</h2>
+      <p className="fr__org-lead">Anna University CEG Alumni — coordinating from the US, Canada &amp; India</p>
+      <div className="fr__org-grid">
+        {orgs.map((org, i) => (
+          <div key={i} className="fr__org-card">
+            <div className="fr__org-name">
+              {org.name}
+              {org.linkedin && (
+                <a className="fr__org-li" href={org.linkedin} target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+                  <LinkedInIcon />
+                </a>
+              )}
+            </div>
+            <div className="fr__org-role">{org.role}</div>
+            {org.batch && <div className="fr__org-batch">{org.batch}</div>}
+            {org.phone && <div className="fr__org-phone">{org.phone}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function FundraiserPage() {
@@ -154,6 +225,12 @@ export default function FundraiserPage() {
           </div>
         </div>
       )}
+
+      {/* cost breakdown */}
+      {data.cost_items_json && <CostBreakdown json={data.cost_items_json} />}
+
+      {/* organizers */}
+      {data.organizers_json && <Organizers json={data.organizers_json} />}
 
       {/* footer */}
       <div className="fr__footer">
