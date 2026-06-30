@@ -1,0 +1,342 @@
+/* ── Fundraiser Page ── */
+
+.fr__page {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: 'Outfit', sans-serif;
+  padding-bottom: 64px;
+}
+
+.fr__page--center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 64px 24px;
+}
+
+/* top bar */
+.fr__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px;
+  border-bottom: 1px solid var(--border);
+}
+
+.fr__site-link {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  color: var(--text-3);
+  text-decoration: none;
+}
+.fr__site-link:hover { color: var(--accent); }
+
+.fr__topbar-badge {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-ghost);
+  border: 1px solid var(--accent-dim);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+/* hero */
+.fr__hero {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 40px;
+  align-items: center;
+  max-width: 1000px;
+  margin: 48px auto 0;
+  padding: 0 32px;
+}
+
+.fr__hero-img {
+  width: 100%;
+  max-height: 440px;
+  object-fit: cover;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+
+.fr__hero-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.fr__condition-badge {
+  display: inline-block;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-ghost);
+  border: 1px solid var(--accent-dim);
+  border-radius: 999px;
+  padding: 4px 12px;
+  width: fit-content;
+}
+
+.fr__title {
+  font-size: clamp(22px, 3vw, 30px);
+  font-weight: 700;
+  color: var(--text-1);
+  line-height: 1.25;
+  margin: 0;
+}
+
+.fr__subtitle {
+  font-size: 14px;
+  color: var(--text-3);
+  margin: 0;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* progress */
+.fr__progress {
+  margin-top: 4px;
+}
+
+.fr__progress-bar {
+  height: 10px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.fr__progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-dim));
+  border-radius: 999px;
+  transition: width 0.6s ease;
+}
+
+.fr__progress-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.fr__progress-raised {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.fr__progress-pct {
+  color: var(--text-3);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+}
+
+/* sections */
+.fr__section {
+  max-width: 1000px;
+  margin: 52px auto 0;
+  padding: 0 32px;
+}
+
+.fr__section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-1);
+  margin: 0 0 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* story */
+.fr__story {
+  color: var(--text-2);
+  line-height: 1.75;
+}
+
+.fr__story-p {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+.fr__story-item {
+  font-size: 15px;
+  margin: 4px 0 4px 20px;
+}
+
+/* donate intro */
+.fr__donate-intro {
+  font-size: 14px;
+  color: var(--text-2);
+  margin: -4px 0 20px;
+  line-height: 1.6;
+}
+
+/* donate cards */
+.fr__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.fr__card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fr__card-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+/* copy field */
+.fr__field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.fr__field:last-of-type {
+  border-bottom: none;
+}
+
+.fr__field-label {
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: 'IBM Plex Mono', monospace;
+  flex-shrink: 0;
+  width: 90px;
+}
+
+.fr__field-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 0;
+  flex: 1;
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.fr__field-text {
+  font-size: 13px;
+  color: var(--text-1);
+  font-family: 'IBM Plex Mono', monospace;
+  word-break: break-all;
+}
+
+.fr__copy-hint {
+  font-size: 10px;
+  color: var(--accent);
+  font-family: 'IBM Plex Mono', monospace;
+  white-space: nowrap;
+  opacity: 0.7;
+  min-width: 34px;
+  text-align: right;
+}
+.fr__field-value:hover .fr__copy-hint { opacity: 1; }
+
+/* memo */
+.fr__memo {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.fr__memo-val {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* footer */
+.fr__footer {
+  max-width: 1000px;
+  margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.fr__footer-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+.fr__footer-link:hover { text-decoration: underline; }
+
+/* misc */
+.fr__error {
+  color: var(--error-color, #f87171);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+}
+
+.fr__back {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  color: var(--text-3);
+  text-decoration: none;
+}
+
+.fr__spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: fr-spin 0.7s linear infinite;
+}
+
+@keyframes fr-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* responsive */
+@media (max-width: 720px) {
+  .fr__hero {
+    grid-template-columns: 1fr;
+    margin-top: 24px;
+  }
+
+  .fr__hero-img {
+    max-height: 320px;
+  }
+
+  .fr__topbar,
+  .fr__section,
+  .fr__footer {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .fr__footer {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
+}

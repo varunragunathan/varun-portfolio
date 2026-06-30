@@ -55,6 +55,10 @@ import { getMetrics } from './metrics.js';
 import { logEndpointRequest, getEndpointMetrics } from './endpointMetrics.js';
 import { trackPageView, getPageViewStats } from './pageViews.js';
 import {
+  getFundraiser,
+  listFundraisers, createFundraiser, updateFundraiser,
+} from './fundraiserPages.js';
+import {
   submitPledge, getPledgeStats,
   adminListPledges, adminUpdatePledge, adminDeletePledge,
   adminGetRates, adminSetRates,
@@ -204,6 +208,10 @@ async function handleRequest(request, env) {
         response = await adminGetPin(request, env);
       } else if (path === '/api/admin/kamalesh/pin' && method === 'PUT') {
         response = await adminSetPin(request, env);
+      } else if (path === '/api/admin/fundraisers' && method === 'GET') {
+        response = await listFundraisers(request, env);
+      } else if (path === '/api/admin/fundraisers' && method === 'POST') {
+        response = await createFundraiser(request, env);
       } else if (path === '/api/admin/pages' && method === 'GET') {
         response = await adminListPages(request, env);
       } else if (path === '/api/admin/pages' && method === 'POST') {
@@ -218,6 +226,7 @@ async function handleRequest(request, env) {
 
       // ── Pattern-matched admin routes (pages + surveys) ────────
       else {
+        const fundraiserMatch    = path.match(/^\/api\/admin\/fundraisers\/([^/]+)$/);
         const pledgeMatch        = path.match(/^\/api\/admin\/kamalesh\/pledges\/([^/]+)$/);
         const adminPageMatch     = path.match(/^\/api\/admin\/pages\/([^/]+)$/);
         const adminSurveyMatch   = path.match(/^\/api\/admin\/surveys\/([^/]+)$/);
@@ -225,7 +234,9 @@ async function handleRequest(request, env) {
         const adminSessionMatch  = path.match(/^\/api\/admin\/surveys\/([^/]+)\/sessions\/([^/]+)$/);
         const adminSessionTagsMatch = path.match(/^\/api\/admin\/surveys\/([^/]+)\/sessions\/([^/]+)\/tags$/);
 
-        if (pledgeMatch && method === 'PATCH') {
+        if (fundraiserMatch && method === 'PUT') {
+          response = await updateFundraiser(request, env, fundraiserMatch[1]);
+        } else if (pledgeMatch && method === 'PATCH') {
           response = await adminUpdatePledge(request, env, pledgeMatch[1]);
         } else if (pledgeMatch && method === 'DELETE') {
           response = await adminDeletePledge(request, env, pledgeMatch[1]);
@@ -275,6 +286,19 @@ async function handleRequest(request, env) {
       return withCors(await trackPageView(request, env), cors);
     } catch (err) {
       console.error('Track error:', err);
+      return withCors(new Response(JSON.stringify({ error: 'Internal server error' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' },
+      }), cors);
+    }
+  }
+
+  // ── /api/fundraiser/:slug (public) ───────────────────────────
+  const publicFundraiserMatch = url.pathname.match(/^\/api\/fundraiser\/([^/]+)$/);
+  if (publicFundraiserMatch && request.method === 'GET') {
+    try {
+      return withCors(await getFundraiser(publicFundraiserMatch[1], env), cors);
+    } catch (err) {
+      console.error('Fundraiser error:', err);
       return withCors(new Response(JSON.stringify({ error: 'Internal server error' }), {
         status: 500, headers: { 'Content-Type': 'application/json' },
       }), cors);
@@ -678,6 +702,46 @@ async function handleRequest(request, env) {
             },
           })
           .transform(asset);
+      }
+    } catch { /* fall through */ }
+  }
+
+  // ── Dynamic OG tags for /f/:slug fundraiser pages ───────────
+  const fSlugMatch = url.pathname.match(/^\/f\/([a-z0-9-]+)$/);
+  if (fSlugMatch && request.method === 'GET') {
+    try {
+      const row = await env.varun_portfolio_auth
+        .prepare('SELECT title, beneficiary, condition, image_url FROM fundraisers WHERE slug = ? AND active = 1')
+        .bind(fSlugMatch[1])
+        .first();
+      if (row) {
+        const title   = row.title;
+        const desc    = `Help ${row.beneficiary} with ${row.condition} treatment. Contribute via Zelle, Interac, or bank transfer.`;
+        const pageUrl = url.href;
+        const imgUrl  = row.image_url ? `${url.origin}${row.image_url}` : null;
+        const asset   = await env.ASSETS.fetch(new Request(new URL('/', url.origin)));
+        let rw = new HTMLRewriter()
+          .on('title', new TextReplacer(title))
+          .on('meta[property="og:title"]',      { element: el => el.setAttribute('content', title) })
+          .on('meta[property="og:description"]', { element: el => el.setAttribute('content', desc) })
+          .on('meta[property="og:url"]',         { element: el => el.setAttribute('content', pageUrl) })
+          .on('meta[name="description"]',        { element: el => el.setAttribute('content', desc) });
+        if (imgUrl) {
+          const img = escAttr(imgUrl);
+          rw = rw.on('head', {
+            element(el) {
+              el.append(
+                `<meta property="og:image" content="${img}" />` +
+                `<meta name="twitter:card" content="summary_large_image" />` +
+                `<meta name="twitter:title" content="${escAttr(title)}" />` +
+                `<meta name="twitter:description" content="${escAttr(desc)}" />` +
+                `<meta name="twitter:image" content="${img}" />`,
+                { html: true },
+              );
+            },
+          });
+        }
+        return rw.transform(asset);
       }
     } catch { /* fall through */ }
   }

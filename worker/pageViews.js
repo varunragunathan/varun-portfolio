@@ -62,6 +62,8 @@ export async function getPageViewStats(request, env) {
 
   const url  = new URL(request.url);
   const page = url.searchParams.get('page') || 'kamalesh';
+  const rawDays = parseInt(url.searchParams.get('days') || '30', 10);
+  const days = [7, 30, 90].includes(rawDays) ? rawDays : 30;
 
   const db = DB(env);
 
@@ -71,7 +73,7 @@ export async function getPageViewStats(request, env) {
     db.prepare(`
       SELECT date(ts, 'unixepoch') AS date, COUNT(*) AS count
       FROM page_views
-      WHERE page = ? AND ts >= strftime('%s', 'now', '-30 days')
+      WHERE page = ? AND ts >= strftime('%s', 'now', '-${days} days')
       GROUP BY date
       ORDER BY date ASC
     `).bind(page).all(),
@@ -96,6 +98,7 @@ export async function getPageViewStats(request, env) {
 
   return json({
     page,
+    days,
     total:     totalRow?.total ?? 0,
     byDay:     byDay.results     ?? [],
     byCountry: byCountry.results ?? [],

@@ -43,49 +43,168 @@ function formatDate(ts) {
   return new Date(ts * 1000).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
 }
 
+// ── Timeline SVG chart ─────────────────────────────────────────────
+function TimelineChart({ data }) {
+  const [tip, setTip] = useState(null);
+  if (!data.length) return <p style={{ fontFamily: M, fontSize: 12, color: 'var(--text-3)' }}>No data for this period.</p>;
+
+  const W = 700, H = 180, pL = 36, pR = 8, pT = 12, pB = 28;
+  const cW = W - pL - pR, cH = H - pT - pB;
+  const max = Math.max(...data.map(d => d.count), 1);
+  const bW  = cW / data.length;
+
+  // show ~6 x-axis labels
+  const step = Math.max(1, Math.ceil(data.length / 6));
+
+  // y-axis tick values
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => ({ f, val: Math.round(max * f) }));
+
+  // line path across bar midpoints
+  const linePts = data.map((d, i) => {
+    const x = pL + i * bW + bW / 2;
+    const y = pT + cH - (d.count / max) * cH;
+    return `${x},${y}`;
+  });
+
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}
+      onMouseLeave={() => setTip(null)}
+    >
+      {/* grid lines + y labels */}
+      {yTicks.map(({ f, val }) => {
+        const y = pT + cH * (1 - f);
+        return (
+          <g key={f}>
+            <line x1={pL} y1={y} x2={pL + cW} y2={y} stroke="var(--border)" strokeWidth={0.5} />
+            {val > 0 && (
+              <text x={pL - 4} y={y + 4} textAnchor="end" fill="var(--text-3)" fontSize={9} fontFamily={M}>{val}</text>
+            )}
+          </g>
+        );
+      })}
+
+      {/* bars */}
+      {data.map((d, i) => {
+        const x  = pL + i * bW;
+        const bH = Math.max((d.count / max) * cH, d.count > 0 ? 2 : 0);
+        const y  = pT + cH - bH;
+        const hl = tip?.i === i;
+        return (
+          <rect
+            key={d.date} x={x + bW * 0.12} y={y}
+            width={bW * 0.76} height={bH}
+            fill="var(--accent)" rx={2}
+            opacity={tip === null ? 0.65 : hl ? 1 : 0.3}
+            style={{ transition: 'opacity 0.1s', cursor: 'default' }}
+            onMouseEnter={() => setTip({ i, d, mx: x + bW / 2 })}
+          />
+        );
+      })}
+
+      {/* trend line */}
+      <polyline
+        points={linePts.join(' ')}
+        fill="none"
+        stroke="var(--accent)"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+        opacity={0.5}
+        style={{ pointerEvents: 'none' }}
+      />
+
+      {/* x-axis labels */}
+      {data.map((d, i) => {
+        if (i % step !== 0 && i !== data.length - 1) return null;
+        return (
+          <text key={d.date} x={pL + i * bW + bW / 2} y={H - 4}
+            textAnchor="middle" fill="var(--text-3)" fontSize={9} fontFamily={M}>
+            {d.date.slice(5)}
+          </text>
+        );
+      })}
+
+      {/* tooltip */}
+      {tip && (() => {
+        const tx = Math.min(Math.max(tip.mx - 38, pL), W - 80);
+        const ty = pT + cH - (tip.d.count / max) * cH - 34;
+        return (
+          <g style={{ pointerEvents: 'none' }}>
+            <rect x={tx} y={Math.max(2, ty)} width={76} height={24} rx={4}
+              fill="var(--card-bg)" stroke="var(--accent-dim)" strokeWidth={1} />
+            <text x={tx + 38} y={Math.max(2, ty) + 15} textAnchor="middle"
+              fill="var(--text-1)" fontSize={10} fontFamily={M}>
+              {tip.d.count} · {tip.d.date.slice(5)}
+            </text>
+          </g>
+        );
+      })()}
+    </svg>
+  );
+}
+
 // ── Views tab ─────────────────────────────────────────────────────
-function ViewsTab({ data, onRefresh }) {
-  const maxDay  = Math.max(...(data.byDay.map(r => r.count)), 1);
-  const maxCtry = Math.max(...(data.byCountry.map(r => r.count)), 1);
+function ViewsTab({ kfFetch }) {
+  const [days,    setDays]    = useState(30);
+  const [data,    setData]    = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(null);
+
+  const load = useCallback(async (d) => {
+    setLoading(true); setError(null);
+    try {
+      const res = await kfFetch(`/api/admin/page-views?page=kamalesh&days=${d}`);
+      if (!res.ok) throw new Error('Failed to load');
+      setData(await res.json());
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  }, [kfFetch]);
+
+  useEffect(() => { load(days); }, [days, load]);
+
+  const PERIODS = [7, 30, 90];
+
+  if (error) return <p style={{ fontFamily: M, fontSize: 12, color: 'var(--error-color)' }}>{error}</p>;
+
   const todayStr   = new Date().toISOString().slice(0, 10);
-  const todayViews = data.byDay.find(r => r.date === todayStr)?.count ?? 0;
-  const last7      = data.byDay.slice(-7).reduce((a, r) => a + r.count, 0);
+  const todayViews = data?.byDay.find(r => r.date === todayStr)?.count ?? 0;
+  const periodSum  = data?.byDay.reduce((a, r) => a + r.count, 0) ?? 0;
+  const maxCtry    = Math.max(...(data?.byCountry.map(r => r.count) ?? [1]), 1);
 
   return (
     <>
+      {/* stat cards */}
       <div style={s.grid3}>
-        <StatCard label="Total views"  value={data.total.toLocaleString()} />
-        <StatCard label="Today"        value={todayViews} />
-        <StatCard label="Last 7 days"  value={last7} />
+        <StatCard label="Total views (all time)" value={data ? data.total.toLocaleString() : '…'} />
+        <StatCard label="Today"                  value={loading ? '…' : todayViews} />
+        <StatCard label={`Last ${days} days`}    value={loading ? '…' : periodSum} />
       </div>
 
+      {/* timeline chart */}
       <div style={s.section}>
-        <div style={s.sh}>Views per day — last 30 days</div>
-        {data.byDay.length === 0
-          ? <p style={{ fontFamily: M, fontSize: 12, color: 'var(--text-3)' }}>No data yet.</p>
-          : (
-            <table style={s.table}>
-              <thead><tr>
-                <th style={s.th}>Date</th>
-                <th style={s.th}>Views</th>
-                <th style={{ ...s.th, width: '40%' }}>Bar</th>
-              </tr></thead>
-              <tbody>
-                {[...data.byDay].reverse().map(row => (
-                  <tr key={row.date}>
-                    <td style={s.td}>{row.date}</td>
-                    <td style={{ ...s.td, fontWeight: 600, color: 'var(--text-1)' }}>{row.count}</td>
-                    <td style={s.td}><div style={s.bar}><div style={{ ...s.fill, width: `${(row.count / maxDay) * 100}%` }} /></div></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+        <div style={{ ...s.sh, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>Views per day</span>
+          <div style={{ display: 'flex', gap: 2 }}>
+            {PERIODS.map(p => (
+              <button key={p} onClick={() => setDays(p)}
+                style={days === p ? s.tabAct : { ...s.tab, padding: '4px 12px' }}>
+                {p}D
+              </button>
+            ))}
+            <button onClick={() => load(days)} style={{ ...s.btn, marginLeft: 6 }}>↻</button>
+          </div>
+        </div>
+        {loading
+          ? <p style={{ fontFamily: M, fontSize: 12, color: 'var(--text-3)' }}>Loading…</p>
+          : <TimelineChart data={data?.byDay ?? []} />
+        }
       </div>
 
+      {/* top countries */}
       <div style={s.section}>
         <div style={s.sh}>Top countries</div>
-        {data.byCountry.length === 0
+        {!data || data.byCountry.length === 0
           ? <p style={{ fontFamily: M, fontSize: 12, color: 'var(--text-3)' }}>No data yet.</p>
           : (
             <table style={s.table}>
@@ -107,12 +226,10 @@ function ViewsTab({ data, onRefresh }) {
           )}
       </div>
 
+      {/* recent visits */}
       <div style={s.section}>
-        <div style={{ ...s.sh, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Recent visits (last 50)</span>
-          <button onClick={onRefresh} style={{ ...s.btn, borderColor: 'transparent' }}>refresh</button>
-        </div>
-        {data.last50.length === 0
+        <div style={s.sh}>Recent visits (last 50)</div>
+        {!data || data.last50.length === 0
           ? <p style={{ fontFamily: M, fontSize: 12, color: 'var(--text-3)' }}>No visits yet.</p>
           : (
             <table style={s.table}>
@@ -512,9 +629,6 @@ function PinGate({ onUnlock }) {
 // ── Main page ─────────────────────────────────────────────────────
 export default function KamaleshAdmin() {
   const [tab,     setTab]   = useState('pledges');
-  const [views,   setViews] = useState(null);
-  const [vError,  setVError] = useState(null);
-  const [vLoad,   setVLoad] = useState(false);
   const [isFullAdmin, setIsFullAdmin] = useState(false);
 
   // PIN state — try saved PIN first, then check admin session
@@ -541,20 +655,6 @@ export default function KamaleshAdmin() {
     return fetch(url, { ...opts, credentials: 'include', headers });
   }, [pin]);
 
-  const loadViews = useCallback(async () => {
-    setVLoad(true);
-    try {
-      const res = await kfFetch('/api/admin/page-views?page=kamalesh');
-      if (!res.ok) throw new Error('Failed to load');
-      setViews(await res.json());
-    } catch (e) { setVError(e.message); }
-    finally { setVLoad(false); }
-  }, [kfFetch]);
-
-  useEffect(() => {
-    if (tab === 'views' && !views && authed) loadViews();
-  }, [tab, views, authed, loadViews]);
-
   // Not yet resolved — wait silently
   if (!authed && localStorage.getItem(PIN_KEY)) return null;
 
@@ -577,12 +677,7 @@ export default function KamaleshAdmin() {
 
       {tab === 'pledges' && <PledgesTab kfFetch={kfFetch} />}
 
-      {tab === 'views' && (
-        vLoad  ? <p style={{ fontFamily: M, fontSize: 12, color: 'var(--text-3)' }}>Loading…</p> :
-        vError ? <p style={{ fontFamily: M, fontSize: 12, color: 'var(--error-color)' }}>{vError}</p> :
-        views  ? <ViewsTab data={views} onRefresh={loadViews} /> :
-        null
-      )}
+      {tab === 'views' && <ViewsTab kfFetch={kfFetch} />}
     </div>
   );
 }

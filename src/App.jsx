@@ -63,6 +63,8 @@ const DiscussionThread   = lazy(() => import('./pages/DiscussionThread'));
 const DiscussionAdmin    = lazy(() => import('./pages/DiscussionAdmin'));
 const KamaleshPage       = lazy(() => import('./pages/Kamalesh'));
 const KamaleshAdmin      = lazy(() => import('./pages/KamaleshAdmin'));
+const FundraiserPage     = lazy(() => import('./pages/FundraiserPage'));
+const FundraiserAdmin    = lazy(() => import('./pages/FundraiserAdmin'));
 
 function Loading() {
   return (
@@ -147,8 +149,8 @@ function Shell() {
   const handleShake = useCallback(() => setFeedbackOpen(true), []);
   const { shakeState, requestPermission } = useShake(handleShake);
   const { pathname } = useLocation();
-  const hideFooter = !!matchPath('/chat', pathname) || pathname.startsWith('/survey/') || pathname.startsWith('/s/') || pathname.startsWith('/p/') || !!matchPath('/kamalesh', pathname);
-  const hideNav    = !!matchPath('/kamalesh', pathname);
+  const hideFooter = !!matchPath('/chat', pathname) || pathname.startsWith('/survey/') || pathname.startsWith('/s/') || pathname.startsWith('/p/') || !!matchPath('/kamalesh', pathname) || pathname.startsWith('/f/');
+  const hideNav    = !!matchPath('/kamalesh', pathname) || pathname.startsWith('/f/');
 
   return (
     <div className="shell">
@@ -178,6 +180,8 @@ function Shell() {
             <Route path="/admin/discussion" element={<DiscussionAdmin />} />
             <Route path="/admin/kamalesh" element={<KamaleshAdmin />} />
             <Route path="/kamalesh" element={<KamaleshPage />} />
+            <Route path="/admin/fundraisers" element={<FundraiserAdmin />} />
+            <Route path="/f/:slug" element={<FundraiserPage />} />
           </Routes>
         </Suspense>
       </main>
