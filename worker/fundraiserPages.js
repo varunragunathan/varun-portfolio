@@ -5,6 +5,7 @@
 // PUT  /api/admin/fundraisers/:slug     — admin: update
 
 import { requireAdmin } from './admin.js';
+import { getSession }   from './auth/session.js';
 
 const DB = env => env.varun_portfolio_auth;
 
@@ -34,7 +35,8 @@ export async function getFundraiser(slug, env) {
 }
 
 export async function listFundraisers(request, env) {
-  const denied = await requireAdmin(request, env);
+  const session = await getSession(env.KV, request);
+  const denied = await requireAdmin(session, env);
   if (denied) return denied;
   const { results } = await DB(env)
     .prepare('SELECT * FROM fundraisers ORDER BY created_at DESC')
@@ -43,7 +45,8 @@ export async function listFundraisers(request, env) {
 }
 
 export async function createFundraiser(request, env) {
-  const denied = await requireAdmin(request, env);
+  const session = await getSession(env.KV, request);
+  const denied = await requireAdmin(session, env);
   if (denied) return denied;
   const body = await request.json();
   if (!body.slug || !body.title || !body.beneficiary || !body.condition) {
@@ -66,7 +69,8 @@ export async function createFundraiser(request, env) {
 }
 
 export async function updateFundraiser(request, env, slug) {
-  const denied = await requireAdmin(request, env);
+  const session = await getSession(env.KV, request);
+  const denied = await requireAdmin(session, env);
   if (denied) return denied;
   const body = await request.json();
   const sets = MUTABLE_FIELDS.filter(f => f in body);
