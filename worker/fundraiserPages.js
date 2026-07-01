@@ -1,9 +1,12 @@
 // ── Generic fundraiser page CRUD ──────────────────────────────────
-// GET  /api/fundraiser/:slug            — public
-// POST /api/fundraiser/:slug/pledge     — public, log a contribution
-// GET  /api/admin/fundraisers           — admin: list all
-// POST /api/admin/fundraisers           — admin: create
-// PUT  /api/admin/fundraisers/:slug     — admin: update
+// GET    /api/fundraiser/:slug                             — public
+// POST   /api/fundraiser/:slug/pledge                     — public, log a contribution
+// GET    /api/admin/fundraisers                           — admin: list all
+// POST   /api/admin/fundraisers                           — admin: create
+// PUT    /api/admin/fundraisers/:slug                     — admin: update
+// GET    /api/admin/fundraisers/:slug/contributions       — admin: list contributions
+// PATCH  /api/admin/fundraisers/:slug/contributions/:id  — admin: verify toggle
+// DELETE /api/admin/fundraisers/:slug/contributions/:id  — admin: delete
 
 import { requireAdmin }      from './admin.js';
 import { getSession }        from './auth/session.js';
@@ -108,5 +111,74 @@ export async function updateFundraiser(request, env, slug) {
     .bind(...params)
     .run();
   if (result.meta?.changes === 0) return json({ error: 'Not found' }, 404);
+  return json({ ok: true });
+}
+
+// GET /api/admin/fundraisers/:slug/contributions
+export async function adminListContributions(request, env, slug) {
+  const session = await getSession(env.KV, request);
+  const denied  = await requireAdmin(session, env);
+  if (denied) return denied;
+
+  const url    = new URL(request.url);
+  const filter = url.searchParams.get('filter') || 'all';
+
+  let where = 'slug = ?';
+  if (filter === 'verified') where += ' AND verified = 1';
+  if (filter === 'pending')  where += ' AND verified = 0';
+
+  const { results: contributions } = await DB(env)
+    .prepare(`SELECT * FROM fundraiser_contributions WHERE ${where} ORDER BY ts DESC LIMIT 200`)
+    .bind(slug)
+    .all();
+
+  // totals by currency, split verified vs pending
+  const { results: rows } = await DB(env)
+    .prepare(`
+      SELECT currency,
+             SUM(CASE WHEN verified = 1 THEN amount ELSE 0 END) AS verified_amt,
+             SUM(CASE WHEN verified = 0 THEN amount ELSE 0 END) AS pending_amt,
+             COUNT(*)                                            AS total_count,
+             SUM(CASE WHEN verified = 1 THEN 1 ELSE 0 END)      AS verified_count
+      FROM fundraiser_contributions
+      WHERE slug = ?
+      GROUP BY currency
+    `)
+    .bind(slug)
+    .all();
+
+  const totals = {};
+  let totalCount = 0, verifiedCount = 0;
+  for (const r of rows) {
+    totals[r.currency] = { verified: r.verified_amt ?? 0, pending: r.pending_amt ?? 0 };
+    totalCount    += r.total_count;
+    verifiedCount += r.verified_count;
+  }
+
+  return json({ contributions: contributions ?? [], totals, totalCount, verifiedCount });
+}
+
+// PATCH /api/admin/fundraisers/:slug/contributions/:id
+export async function adminUpdateContribution(request, env, slug, id) {
+  const session = await getSession(env.KV, request);
+  const denied  = await requireAdmin(session, env);
+  if (denied) return denied;
+  const { verified } = await request.json();
+  await DB(env)
+    .prepare('UPDATE fundraiser_contributions SET verified = ? WHERE id = ? AND slug = ?')
+    .bind(verified ? 1 : 0, Number(id), slug)
+    .run();
+  return json({ ok: true });
+}
+
+// DELETE /api/admin/fundraisers/:slug/contributions/:id
+export async function adminDeleteContribution(request, env, slug, id) {
+  const session = await getSession(env.KV, request);
+  const denied  = await requireAdmin(session, env);
+  if (denied) return denied;
+  await DB(env)
+    .prepare('DELETE FROM fundraiser_contributions WHERE id = ? AND slug = ?')
+    .bind(Number(id), slug)
+    .run();
   return json({ ok: true });
 }

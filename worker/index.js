@@ -58,6 +58,9 @@ import {
   getFundraiser,
   listFundraisers, createFundraiser, updateFundraiser,
   submitContribution,
+  adminListContributions,
+  adminUpdateContribution,
+  adminDeleteContribution,
 } from './fundraiserPages.js';
 import {
   submitPledge, getPledgeStats,
@@ -227,15 +230,23 @@ async function handleRequest(request, env) {
 
       // ── Pattern-matched admin routes (pages + surveys) ────────
       else {
-        const fundraiserMatch    = path.match(/^\/api\/admin\/fundraisers\/([^/]+)$/);
-        const pledgeMatch        = path.match(/^\/api\/admin\/kamalesh\/pledges\/([^/]+)$/);
-        const adminPageMatch     = path.match(/^\/api\/admin\/pages\/([^/]+)$/);
+        const fundraiserMatch          = path.match(/^\/api\/admin\/fundraisers\/([^/]+)$/);
+        const contribMatch             = path.match(/^\/api\/admin\/fundraisers\/([^/]+)\/contributions$/);
+        const contribItemMatch         = path.match(/^\/api\/admin\/fundraisers\/([^/]+)\/contributions\/(\d+)$/);
+        const pledgeMatch              = path.match(/^\/api\/admin\/kamalesh\/pledges\/([^/]+)$/);
+        const adminPageMatch           = path.match(/^\/api\/admin\/pages\/([^/]+)$/);
         const adminSurveyMatch   = path.match(/^\/api\/admin\/surveys\/([^/]+)$/);
         const adminSessionsMatch = path.match(/^\/api\/admin\/surveys\/([^/]+)\/sessions$/);
         const adminSessionMatch  = path.match(/^\/api\/admin\/surveys\/([^/]+)\/sessions\/([^/]+)$/);
         const adminSessionTagsMatch = path.match(/^\/api\/admin\/surveys\/([^/]+)\/sessions\/([^/]+)\/tags$/);
 
-        if (fundraiserMatch && method === 'PUT') {
+        if (contribMatch && method === 'GET') {
+          response = await adminListContributions(request, env, contribMatch[1]);
+        } else if (contribItemMatch && method === 'PATCH') {
+          response = await adminUpdateContribution(request, env, contribItemMatch[1], contribItemMatch[2]);
+        } else if (contribItemMatch && method === 'DELETE') {
+          response = await adminDeleteContribution(request, env, contribItemMatch[1], contribItemMatch[2]);
+        } else if (fundraiserMatch && method === 'PUT') {
           response = await updateFundraiser(request, env, fundraiserMatch[1]);
         } else if (pledgeMatch && method === 'PATCH') {
           response = await adminUpdatePledge(request, env, pledgeMatch[1]);

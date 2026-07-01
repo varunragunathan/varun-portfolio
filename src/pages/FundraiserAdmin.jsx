@@ -223,6 +223,9 @@ function FundraiserRow({ fr, onRefresh }) {
           <button style={s.btnAcc} onClick={updateRaised} disabled={saving}>
             {saveMsg ?? (saving ? '…' : 'Set raised')}
           </button>
+          <Link to={`/admin/fundraisers/${fr.slug}`} style={{ ...s.btn, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
+            admin →
+          </Link>
           <button style={expanded ? s.btnAcc : s.btn} onClick={() => setExpanded(x => !x)}>
             {expanded ? 'close' : 'edit'}
           </button>
