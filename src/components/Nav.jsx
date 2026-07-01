@@ -444,7 +444,7 @@ export default function Nav() {
           {enabled && !loading && user && (
             <AvatarMenu user={user} onLogout={handleLogout} />
           )}
-          {enabled && !loading && !user && (
+          {enabled && !user && (
             <Link to="/auth" className="nav__sign-in">sign in</Link>
           )}
         </div>
