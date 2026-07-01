@@ -57,6 +57,7 @@ import { trackPageView, getPageViewStats } from './pageViews.js';
 import {
   getFundraiser,
   listFundraisers, createFundraiser, updateFundraiser,
+  submitContribution,
 } from './fundraiserPages.js';
 import {
   submitPledge, getPledgeStats,
@@ -293,12 +294,23 @@ async function handleRequest(request, env) {
   }
 
   // ── /api/fundraiser/:slug (public) ───────────────────────────
-  const publicFundraiserMatch = url.pathname.match(/^\/api\/fundraiser\/([^/]+)$/);
+  const publicFundraiserMatch  = url.pathname.match(/^\/api\/fundraiser\/([^/]+)$/);
+  const fundraiserPledgeMatch  = url.pathname.match(/^\/api\/fundraiser\/([^/]+)\/pledge$/);
   if (publicFundraiserMatch && request.method === 'GET') {
     try {
       return withCors(await getFundraiser(publicFundraiserMatch[1], env), cors);
     } catch (err) {
       console.error('Fundraiser error:', err);
+      return withCors(new Response(JSON.stringify({ error: 'Internal server error' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' },
+      }), cors);
+    }
+  }
+  if (fundraiserPledgeMatch && request.method === 'POST') {
+    try {
+      return withCors(await submitContribution(request, env, fundraiserPledgeMatch[1]), cors);
+    } catch (err) {
+      console.error('Contribution error:', err);
       return withCors(new Response(JSON.stringify({ error: 'Internal server error' }), {
         status: 500, headers: { 'Content-Type': 'application/json' },
       }), cors);

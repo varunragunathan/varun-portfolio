@@ -189,7 +189,8 @@ function FundraiserRow({ fr, onRefresh }) {
     finally { setSaving(false); setTimeout(() => setSaveMsg(null), 2000); }
   }
 
-  const pct = fr.goal_inr > 0 ? Math.min(100, Math.round((fr.raised_inr / fr.goal_inr) * 100)) : 0;
+  const pct       = fr.goal_inr > 0 ? Math.min(100, Math.round((fr.raised_inr / fr.goal_inr) * 100)) : 0;
+  const remaining = Math.max(0, (fr.goal_inr || 0) - (fr.raised_inr || 0));
 
   return (
     <div style={s.card}>
@@ -205,6 +206,9 @@ function FundraiserRow({ fr, onRefresh }) {
                style={{ color: 'var(--accent)', textDecoration: 'none' }}>/f/{fr.slug}</a>
             {' · '}Goal: {fmtInr(fr.goal_inr)}
             {' · '}{pct}% raised ({fmtInr(fr.raised_inr)})
+            {' · '}<span style={{ color: remaining > 0 ? 'var(--error-color, #f87171)' : 'var(--success-color, #4ade80)' }}>
+              {remaining > 0 ? `${fmtInr(remaining)} remaining` : 'Goal reached!'}
+            </span>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

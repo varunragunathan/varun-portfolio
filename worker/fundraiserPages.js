@@ -1,11 +1,13 @@
 // ── Generic fundraiser page CRUD ──────────────────────────────────
 // GET  /api/fundraiser/:slug            — public
+// POST /api/fundraiser/:slug/pledge     — public, log a contribution
 // GET  /api/admin/fundraisers           — admin: list all
 // POST /api/admin/fundraisers           — admin: create
 // PUT  /api/admin/fundraisers/:slug     — admin: update
 
-import { requireAdmin } from './admin.js';
-import { getSession }   from './auth/session.js';
+import { requireAdmin }      from './admin.js';
+import { getSession }        from './auth/session.js';
+import { checkIpRateLimit }  from './rateLimit.js';
 
 const DB = env => env.varun_portfolio_auth;
 
@@ -24,6 +26,30 @@ const MUTABLE_FIELDS = [
   'payment_bank_ac', 'payment_bank_ifsc', 'payment_bank_name',
   'payment_upi', 'memo',
 ];
+
+const VALID_CURRENCIES = ['INR', 'USD', 'CAD', 'SGD', 'AED'];
+
+// POST /api/fundraiser/:slug/pledge — public
+export async function submitContribution(request, env, slug) {
+  const ip    = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const limit = await checkIpRateLimit(env.KV, ip, `fc:${slug}`, 5, 3_600_000);
+  if (!limit.allowed) return json({ error: 'Too many submissions. Try again later.' }, 429);
+
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'Bad request' }, 400); }
+
+  const { name, amount, currency = 'INR', sent = false, note } = body;
+  if (!name?.trim())                          return json({ error: 'Name is required.' }, 400);
+  if (!amount || isNaN(amount) || amount <= 0) return json({ error: 'Valid amount is required.' }, 400);
+  if (!VALID_CURRENCIES.includes(currency))   return json({ error: 'Invalid currency.' }, 400);
+
+  const country = request.headers.get('CF-IPCountry') || null;
+  await DB(env)
+    .prepare('INSERT INTO fundraiser_contributions (slug, name, amount, currency, sent, note, ts, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(slug, name.trim(), Number(amount), currency, sent ? 1 : 0, note?.trim() || null, Math.floor(Date.now() / 1000), country)
+    .run();
+  return json({ ok: true });
+}
 
 export async function getFundraiser(slug, env) {
   const row = await DB(env)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import './FundraiserPage.css';
 
@@ -26,6 +26,130 @@ function CopyField({ label, value }) {
         <span className="fr__copy-hint">{copied ? 'copied!' : 'copy'}</span>
       </button>
     </div>
+  );
+}
+
+function Countdown({ deadline }) {
+  function getLeft() {
+    const diff = new Date(deadline + 'T23:59:59Z') - Date.now();
+    if (diff <= 0) return null;
+    return {
+      days:    Math.floor(diff / 86400000),
+      hours:   Math.floor((diff % 86400000) / 3600000),
+      minutes: Math.floor((diff % 3600000) / 60000),
+      seconds: Math.floor((diff % 60000) / 1000),
+    };
+  }
+  const [left, setLeft] = useState(getLeft);
+  useEffect(() => {
+    const id = setInterval(() => setLeft(getLeft()), 1000);
+    return () => clearInterval(id);
+  }, [deadline]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!left) return (
+    <div className="fr__countdown-done">Campaign deadline has passed — thank you to everyone who donated.</div>
+  );
+
+  const units = [
+    { n: left.days,                            u: 'days' },
+    { n: String(left.hours).padStart(2, '0'),  u: 'hrs'  },
+    { n: String(left.minutes).padStart(2, '0'), u: 'min' },
+    { n: String(left.seconds).padStart(2, '0'), u: 'sec' },
+  ];
+
+  return (
+    <div className="fr__countdown">
+      <div className="fr__countdown-label">Campaign ends in</div>
+      <div className="fr__countdown-units">
+        {units.map(({ n, u }, i) => (
+          <React.Fragment key={u}>
+            {i > 0 && <span className="fr__countdown-sep">:</span>}
+            <div className="fr__countdown-unit">
+              <span className="fr__countdown-n">{n}</span>
+              <span className="fr__countdown-u">{u}</span>
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
+      <div className="fr__countdown-date">{new Date(deadline + 'T00:00:00Z').toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+    </div>
+  );
+}
+
+function ContributionForm({ slug, onSuccess }) {
+  const [name,     setName]     = useState('');
+  const [amount,   setAmount]   = useState('');
+  const [currency, setCurrency] = useState('INR');
+  const [sent,     setSent]     = useState(false);
+  const [note,     setNote]     = useState('');
+  const [busy,     setBusy]     = useState(false);
+  const [error,    setError]    = useState('');
+
+  async function submit(e) {
+    e.preventDefault();
+    setError('');
+    const num = parseFloat(amount);
+    if (!name.trim())        return setError('Please enter your name.');
+    if (!num || num <= 0)    return setError('Please enter a valid amount.');
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/fundraiser/${encodeURIComponent(slug)}/pledge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), amount: num, currency, sent, note: note.trim() || null }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error || 'Something went wrong. Please try again.');
+      } else {
+        onSuccess();
+      }
+    } catch { setError('Network error. Please try again.'); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <form className="fr__contrib-form" onSubmit={submit}>
+      <div className="fr__contrib-row">
+        <div className="fr__contrib-field">
+          <label className="fr__contrib-label" htmlFor="cf-name">Your name</label>
+          <input id="cf-name" className="fr__contrib-input" type="text"
+            placeholder="e.g. Priya S." value={name}
+            onChange={e => setName(e.target.value)} maxLength={100} required />
+        </div>
+        <div className="fr__contrib-field">
+          <label className="fr__contrib-label" htmlFor="cf-amount">Amount</label>
+          <div className="fr__contrib-amount-row">
+            <input id="cf-amount" className="fr__contrib-input fr__contrib-input--num"
+              type="number" min="1" step="any" placeholder="500"
+              value={amount} onChange={e => setAmount(e.target.value)} required />
+            <div className="fr__currency-toggle">
+              {['INR', 'USD', 'CAD', 'SGD', 'AED'].map(c => (
+                <button key={c} type="button"
+                  className={`fr__currency-btn${currency === c ? ' fr__currency-btn--active' : ''}`}
+                  onClick={() => setCurrency(c)}>{c}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="fr__contrib-check">
+        <input id="cf-sent" type="checkbox" checked={sent} onChange={e => setSent(e.target.checked)} />
+        <label htmlFor="cf-sent">I have already sent this payment</label>
+      </div>
+      <div className="fr__contrib-field">
+        <label className="fr__contrib-label" htmlFor="cf-note">
+          Message <span className="fr__contrib-optional">(optional)</span>
+        </label>
+        <input id="cf-note" className="fr__contrib-input" type="text"
+          placeholder="Get well soon!" value={note}
+          onChange={e => setNote(e.target.value)} maxLength={300} />
+      </div>
+      {error && <p className="fr__contrib-error">{error}</p>}
+      <button className="fr__contrib-submit" type="submit" disabled={busy}>
+        {busy ? 'Submitting…' : 'Log my contribution'}
+      </button>
+    </form>
   );
 }
 
@@ -126,8 +250,10 @@ function Organizers({ json }) {
 
 export default function FundraiserPage() {
   const { slug } = useParams();
-  const [data,  setData]  = useState(null);
-  const [error, setError] = useState(null);
+  const [data,        setData]        = useState(null);
+  const [error,       setError]       = useState(null);
+  const [contributed, setContributed] = useState(false);
+  const formRef = useRef(null);
 
   useEffect(() => {
     fetch(`/api/fundraiser/${encodeURIComponent(slug)}`)
@@ -187,6 +313,9 @@ export default function FundraiserPage() {
         </div>
       </div>
 
+      {/* countdown */}
+      {data.surgery_date && <Countdown deadline={data.surgery_date} />}
+
       {/* story */}
       <div className="fr__section">
         <h2 className="fr__section-title">About {data.beneficiary}</h2>
@@ -208,6 +337,7 @@ export default function FundraiserPage() {
                 {data.payment_zelle_name  && <CopyField label="Name"   value={data.payment_zelle_name} />}
                 {data.payment_zelle_phone && <CopyField label="Phone"  value={data.payment_zelle_phone} />}
                 {data.memo && <CopyField label="Memo" value={data.memo} />}
+                <button className="fr__log-btn" onClick={() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Log my donation →</button>
               </div>
             )}
 
@@ -217,6 +347,7 @@ export default function FundraiserPage() {
                 {data.payment_interac_email && <CopyField label="Email" value={data.payment_interac_email} />}
                 {data.payment_interac_name  && <CopyField label="Name"  value={data.payment_interac_name} />}
                 {data.memo && <CopyField label="Memo" value={data.memo} />}
+                <button className="fr__log-btn" onClick={() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Log my donation →</button>
               </div>
             )}
 
@@ -228,6 +359,7 @@ export default function FundraiserPage() {
                 {data.payment_bank_ifsc && <CopyField label="IFSC"         value={data.payment_bank_ifsc} />}
                 {data.payment_bank_name && <CopyField label="Account Name" value={data.payment_bank_name} />}
                 {data.memo && <CopyField label="Memo" value={data.memo} />}
+                <button className="fr__log-btn" onClick={() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Log my donation →</button>
               </div>
             )}
           </div>
@@ -239,6 +371,30 @@ export default function FundraiserPage() {
 
       {/* organizers */}
       {data.organizers_json && <Organizers json={data.organizers_json} />}
+
+      {/* contribution form */}
+      <div className="fr__section" ref={formRef}>
+        <h2 className="fr__section-title">Log Your Contribution</h2>
+        {contributed ? (
+          <div className="fr__contrib-success">
+            <div className="fr__contrib-success-icon">✓</div>
+            <div className="fr__contrib-success-title">Thank you!</div>
+            <p className="fr__contrib-success-text">
+              Your contribution has been logged. Please share this page to help reach the goal.
+            </p>
+            <button className="fr__contrib-again" onClick={() => setContributed(false)}>
+              Log another contribution
+            </button>
+          </div>
+        ) : (
+          <>
+            <p className="fr__donate-intro">
+              After sending your payment, let us know here so we can track progress towards the goal.
+            </p>
+            <ContributionForm slug={slug} onSuccess={() => setContributed(true)} />
+          </>
+        )}
+      </div>
 
       {/* footer */}
       <div className="fr__footer">
