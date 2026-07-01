@@ -48,6 +48,23 @@ export async function myHandler(request, env) {
 }
 ```
 
+### Admin route guard
+Every admin handler **must** call `getSession` first, then pass the session (not the request) to `requireAdmin`. Passing `request` directly to `requireAdmin` silently bypasses auth — the function receives an object with no `.email`, `isAdmin` always returns false, and every caller gets 403.
+
+```js
+import { requireAdmin } from './admin.js';
+import { getSession }   from './auth/session.js';
+
+export async function myAdminHandler(request, env) {
+  const session = await getSession(env.KV, request);  // ← step 1: extract session
+  const denied  = await requireAdmin(session, env);   // ← step 2: pass SESSION not request
+  if (denied) return denied;
+  // admin-only logic here — session.email / session.userId are safe to use
+}
+```
+
+> **Root cause of past bug (fixed 2026-07-01):** `fundraiserPages.js` called `requireAdmin(request, env)` — the request object has no `.email`, so `isAdmin` always returned false and all callers got 403.
+
 ### Adding a new Worker route
 1. Create handler(s) in a new `worker/feature.js` file (define local `json()` helper there)
 2. Import handlers in `worker/index.js`
