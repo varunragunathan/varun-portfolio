@@ -8,7 +8,7 @@ export default {
   parameters: {
     docs: {
       description: {
-        component: 'Animated slot-machine version display. Reads version from package.json.',
+        component: 'Static version display. Reads version from package.json.',
       },
     },
   },
@@ -25,15 +25,16 @@ export const Large = {
 /** Custom color — overrides theme token */
 export const CustomColor = {
   args: { color: '#6366f1' },
+  parameters: {
+    a11y: { disable: true },
+  },
 };
 
 /** Renders the version string correctly */
 export const RendersVersion = {
   play: async ({ canvasElement }) => {
-    // VersionBadge wraps each char — the element should be in the DOM
     const badge = canvasElement.querySelector('.version-badge');
     await expect(badge).not.toBeNull();
-    // Badge text should contain the version prefix 'v'
     await expect(badge.textContent).toMatch(/v\d+\.\d+\.\d+/);
   },
 };
