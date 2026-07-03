@@ -31,6 +31,7 @@ const MUTABLE_FIELDS = [
 ];
 
 const VALID_CURRENCIES = ['INR', 'USD', 'CAD', 'SGD', 'AED'];
+const INR_RATES = { INR: 1, USD: 94.7, CAD: 68.1, SGD: 73.1, AED: 25.7 };
 
 // POST /api/fundraiser/:slug/pledge — public
 export async function submitContribution(request, env, slug) {
@@ -176,10 +177,33 @@ export async function adminUpdateContribution(request, env, slug, id) {
   const denied  = await requireAdmin(session, env);
   if (denied) return denied;
   const { verified } = await request.json();
-  await DB(env)
+  const db = DB(env);
+
+  // Fetch the contribution to get its INR-equivalent value
+  const row = await db
+    .prepare('SELECT amount, currency, verified AS was_verified FROM fundraiser_contributions WHERE id = ? AND slug = ?')
+    .bind(Number(id), slug)
+    .first();
+  if (!row) return json({ error: 'Not found' }, 404);
+
+  const wasVerified  = !!row.was_verified;
+  const nowVerified  = !!verified;
+  const inrDelta     = Math.round(row.amount * (INR_RATES[row.currency] || 1));
+
+  await db
     .prepare('UPDATE fundraiser_contributions SET verified = ? WHERE id = ? AND slug = ?')
-    .bind(verified ? 1 : 0, Number(id), slug)
+    .bind(nowVerified ? 1 : 0, Number(id), slug)
     .run();
+
+  // Adjust raised_inr: +delta when verifying, -delta when unverifying
+  if (wasVerified !== nowVerified) {
+    const sign = nowVerified ? 1 : -1;
+    await db
+      .prepare('UPDATE fundraisers SET raised_inr = MAX(0, COALESCE(raised_inr, 0) + ?) WHERE slug = ?')
+      .bind(sign * inrDelta, slug)
+      .run();
+  }
+
   return json({ ok: true });
 }
 
