@@ -248,11 +248,45 @@ function Organizers({ json }) {
   );
 }
 
+function Supporters({ slug, refresh }) {
+  const [list, setList] = useState(null);
+
+  useEffect(() => {
+    fetch(`/api/fundraiser/${encodeURIComponent(slug)}/contributions`)
+      .then(r => r.ok ? r.json() : [])
+      .then(setList)
+      .catch(() => setList([]));
+  }, [slug, refresh]);
+
+  if (!list || list.length === 0) return null;
+
+  function fmtAmt(amount, currency) {
+    if (currency === 'INR') return '₹' + Math.round(amount).toLocaleString('en-IN');
+    return currency + ' ' + amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+
+  return (
+    <div className="fr__section fr__supporters">
+      <h2 className="fr__section-title">Supporters ({list.length})</h2>
+      <ul className="fr__supporters-list">
+        {list.map((c, i) => (
+          <li key={i} className="fr__supporter">
+            <span className="fr__supporter-name">{c.name}</span>
+            <span className="fr__supporter-amt">{fmtAmt(c.amount, c.currency)}</span>
+            {c.note && <span className="fr__supporter-note">"{c.note}"</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function FundraiserPage() {
   const { slug } = useParams();
   const [data,        setData]        = useState(null);
   const [error,       setError]       = useState(null);
   const [contributed, setContributed] = useState(false);
+  const [supporterKey, setSupporterKey] = useState(0);
   const formRef = useRef(null);
 
   useEffect(() => {
@@ -391,10 +425,12 @@ export default function FundraiserPage() {
             <p className="fr__donate-intro">
               After sending your payment, let us know here so we can track progress towards the goal.
             </p>
-            <ContributionForm slug={slug} onSuccess={() => setContributed(true)} />
+            <ContributionForm slug={slug} onSuccess={() => { setContributed(true); setSupporterKey(k => k + 1); }} />
           </>
         )}
       </div>
+
+      <Supporters slug={slug} refresh={supporterKey} />
 
       {/* footer */}
       <div className="fr__footer">

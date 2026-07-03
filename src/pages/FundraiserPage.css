@@ -316,6 +316,43 @@
 }
 .fr__footer-link:hover { text-decoration: underline; }
 
+/* ── Supporters list ── */
+.fr__supporters-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fr__supporter {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  flex-wrap: wrap;
+}
+.fr__supporter-name {
+  font-weight: 600;
+  color: var(--text-1);
+  font-size: 14px;
+}
+.fr__supporter-amt {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+  margin-left: auto;
+}
+.fr__supporter-note {
+  width: 100%;
+  font-size: 12px;
+  color: var(--text-3);
+  font-style: italic;
+}
+
 /* misc */
 .fr__error {
   color: var(--error-color, #f87171);

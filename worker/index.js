@@ -56,6 +56,7 @@ import { logEndpointRequest, getEndpointMetrics } from './endpointMetrics.js';
 import { trackPageView, getPageViewStats } from './pageViews.js';
 import {
   getFundraiser,
+  getPublicContributions,
   listFundraisers, createFundraiser, updateFundraiser,
   submitContribution,
   adminListContributions,
@@ -305,8 +306,19 @@ async function handleRequest(request, env) {
   }
 
   // ── /api/fundraiser/:slug (public) ───────────────────────────
-  const publicFundraiserMatch  = url.pathname.match(/^\/api\/fundraiser\/([^/]+)$/);
-  const fundraiserPledgeMatch  = url.pathname.match(/^\/api\/fundraiser\/([^/]+)\/pledge$/);
+  const publicFundraiserMatch   = url.pathname.match(/^\/api\/fundraiser\/([^/]+)$/);
+  const fundraiserPledgeMatch   = url.pathname.match(/^\/api\/fundraiser\/([^/]+)\/pledge$/);
+  const publicContribsMatch     = url.pathname.match(/^\/api\/fundraiser\/([^/]+)\/contributions$/);
+  if (publicContribsMatch && request.method === 'GET') {
+    try {
+      return withCors(await getPublicContributions(publicContribsMatch[1], env), cors);
+    } catch (err) {
+      console.error('Contributions error:', err);
+      return withCors(new Response(JSON.stringify({ error: 'Internal server error' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' },
+      }), cors);
+    }
+  }
   if (publicFundraiserMatch && request.method === 'GET') {
     try {
       return withCors(await getFundraiser(publicFundraiserMatch[1], env), cors);

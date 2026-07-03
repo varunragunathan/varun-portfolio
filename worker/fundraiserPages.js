@@ -63,6 +63,18 @@ export async function getFundraiser(slug, env) {
   return json(row);
 }
 
+// GET /api/fundraiser/:slug/contributions — public, verified only
+export async function getPublicContributions(slug, env) {
+  const { results } = await DB(env)
+    .prepare(`SELECT name, amount, currency, note, ts
+              FROM fundraiser_contributions
+              WHERE slug = ? AND verified = 1
+              ORDER BY ts DESC LIMIT 100`)
+    .bind(slug)
+    .all();
+  return json(results ?? []);
+}
+
 export async function listFundraisers(request, env) {
   const session = await getSession(env.KV, request);
   const denied = await requireAdmin(session, env);
