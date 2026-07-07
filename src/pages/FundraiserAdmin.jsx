@@ -31,7 +31,7 @@ const s = {
 
 const EMPTY_FORM = {
   slug: '', title: '', beneficiary: '', age: '', condition: '', story: '',
-  goal_inr: '', raised_inr: '0', image_url: '', surgery_date: '', active: '1',
+  goal_inr: '', raised_inr: '0', image_url: '', surgery_date: '', active: '1', expiry_date: '',
   payment_zelle_email: '', payment_zelle_name: '', payment_zelle_phone: '',
   payment_interac_email: '', payment_interac_name: '',
   payment_bank_ac: '', payment_bank_ifsc: '', payment_bank_name: '',
@@ -116,6 +116,9 @@ function FundraiserForm({ initial, onSave, onCancel, isNew }) {
         <div style={s.grid2}>
           <Field label="Image URL (e.g. /geetha-appeal.jpg)" name="image_url"    value={form.image_url}    onChange={set} />
           <Field label="Surgery Date (ISO, optional)"        name="surgery_date" value={form.surgery_date} onChange={set} />
+        </div>
+        <div style={s.grid2}>
+          <Field label="Expiry Date (ISO, optional — page hides after this date)" name="expiry_date" value={form.expiry_date} onChange={set} />
         </div>
         <div style={{ marginBottom: 12 }}>
           <Field label="Story / Background" name="story" value={form.story} onChange={set} rows={6} />
@@ -234,7 +237,7 @@ function FundraiserRow({ fr, onRefresh }) {
 
       {expanded && (
         <FundraiserForm
-          initial={{ ...fr, age: fr.age ?? '', surgery_date: fr.surgery_date ?? '', image_url: fr.image_url ?? '' }}
+          initial={{ ...fr, age: fr.age ?? '', surgery_date: fr.surgery_date ?? '', expiry_date: fr.expiry_date ?? '', image_url: fr.image_url ?? '' }}
           onSave={() => { setExpanded(false); onRefresh(); }}
           onCancel={() => setExpanded(false)}
           isNew={false}

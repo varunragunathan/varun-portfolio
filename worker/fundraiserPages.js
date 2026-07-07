@@ -23,7 +23,7 @@ function json(data, status = 200) {
 
 const MUTABLE_FIELDS = [
   'title', 'beneficiary', 'age', 'condition', 'story',
-  'goal_inr', 'raised_inr', 'image_url', 'surgery_date', 'active',
+  'goal_inr', 'raised_inr', 'image_url', 'surgery_date', 'active', 'expiry_date',
   'payment_zelle_email', 'payment_zelle_name', 'payment_zelle_phone',
   'payment_interac_email', 'payment_interac_name',
   'payment_bank_ac', 'payment_bank_ifsc', 'payment_bank_name',
@@ -57,7 +57,7 @@ export async function submitContribution(request, env, slug) {
 export async function getFundraiser(slug, env) {
   const db  = DB(env);
   const row = await db
-    .prepare('SELECT * FROM fundraisers WHERE slug = ? AND active = 1')
+    .prepare("SELECT * FROM fundraisers WHERE slug = ? AND active = 1 AND (expiry_date IS NULL OR expiry_date >= date('now'))")
     .bind(slug)
     .first();
   if (!row) return json({ error: 'Not found' }, 404);
