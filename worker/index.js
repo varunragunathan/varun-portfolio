@@ -64,6 +64,9 @@ import {
   adminDeleteContribution,
 } from './fundraiserPages.js';
 import {
+  listHabits, createHabit, updateHabit, deleteHabit, toggleHabit,
+} from './habits.js';
+import {
   submitPledge, getPledgeStats,
   adminListPledges, adminUpdatePledge, adminDeletePledge,
   adminGetRates, adminSetRates,
@@ -334,6 +337,37 @@ async function handleRequest(request, env) {
       return withCors(await submitContribution(request, env, fundraiserPledgeMatch[1]), cors);
     } catch (err) {
       console.error('Contribution error:', err);
+      return withCors(new Response(JSON.stringify({ error: 'Internal server error' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' },
+      }), cors);
+    }
+  }
+
+  // ── /api/habits ───────────────────────────────────────────────
+  if (url.pathname.startsWith('/api/habits')) {
+    try {
+      const habitIdMatch     = url.pathname.match(/^\/api\/habits\/(\d+)$/);
+      const habitToggleMatch = url.pathname.match(/^\/api\/habits\/(\d+)\/toggle$/);
+      const method = request.method;
+      let response;
+      if (habitToggleMatch && method === 'POST') {
+        response = await toggleHabit(request, env, habitToggleMatch[1]);
+      } else if (habitIdMatch && method === 'PUT') {
+        response = await updateHabit(request, env, habitIdMatch[1]);
+      } else if (habitIdMatch && method === 'DELETE') {
+        response = await deleteHabit(request, env, habitIdMatch[1]);
+      } else if (url.pathname === '/api/habits' && method === 'GET') {
+        response = await listHabits(request, env);
+      } else if (url.pathname === '/api/habits' && method === 'POST') {
+        response = await createHabit(request, env);
+      } else {
+        response = new Response(JSON.stringify({ error: 'Not found' }), {
+          status: 404, headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return withCors(response, cors);
+    } catch (err) {
+      console.error('Habits error:', err);
       return withCors(new Response(JSON.stringify({ error: 'Internal server error' }), {
         status: 500, headers: { 'Content-Type': 'application/json' },
       }), cors);

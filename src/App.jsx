@@ -66,6 +66,7 @@ const KamaleshAdmin      = lazy(() => import('./pages/KamaleshAdmin'));
 const FundraiserPage     = lazy(() => import('./pages/FundraiserPage'));
 const FundraiserAdmin      = lazy(() => import('./pages/FundraiserAdmin'));
 const FundraiserSlugAdmin  = lazy(() => import('./pages/FundraiserSlugAdmin'));
+const HabitsPage           = lazy(() => import('./pages/Habits'));
 
 function Loading() {
   return (
@@ -184,6 +185,7 @@ function Shell() {
             <Route path="/admin/fundraisers" element={<FundraiserAdmin />} />
             <Route path="/admin/fundraisers/:slug" element={<FundraiserSlugAdmin />} />
             <Route path="/f/:slug" element={<FundraiserPage />} />
+            <Route path="/habits" element={<HabitsPage />} />
           </Routes>
         </Suspense>
       </main>
