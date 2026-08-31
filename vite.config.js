@@ -66,11 +66,12 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
-          if (id.includes('react/') || id.includes('react-dom/')) return 'vendor';
-          if (id.includes('react-router-dom/') || id.includes('react-router/')) return 'vendor';
+          if (id.includes('react/') || id.includes('react-dom/') || id.includes('react-router-dom/') || id.includes('react-router/')) {
+            return 'vendor';
+          }
           if (id.includes('framer-motion/')) return 'motion';
           if (id.includes('@simplewebauthn/') || id.includes('qrcode/')) return 'auth-libs';
-          return 'vendor';
+          return 'common'; // Separate chunk for other node_modules
         }
       }
     }
